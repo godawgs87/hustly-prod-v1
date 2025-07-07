@@ -8,9 +8,6 @@ import EbayPolicyStatusCard from './connections/EbayPolicyStatusCard';
 import EbayCategorySync from './connections/EbayCategorySync';
 import { GenericPlatformCard } from './connections/GenericPlatformCard';
 import { PlatformSettingsSection } from './connections/PlatformSettingsSection';
-import EbayDebugPanel from '../debug/EbayDebugPanel';
-import EbayQuickTest from '../debug/EbayQuickTest';
-import EbaySyncDebugger from '../debug/EbaySyncDebugger';
 interface Platform {
   name: string;
   connected: boolean;
@@ -77,15 +74,6 @@ const UserConnectionsTab = () => {
             {index < platforms.length - 1 && <Separator className="mt-6" />}
           </div>)}
 
-        {/* eBay Debug Panel */}
-        
-        <EbaySyncDebugger />
-        
-        
-        <EbayQuickTest />
-        
-        
-        <EbayDebugPanel />
       </div>
     </Card>;
 };

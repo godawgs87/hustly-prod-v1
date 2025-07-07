@@ -13,7 +13,7 @@ import SimpleListingModal from './SimpleListingModal';
 import InventoryStateRenderer from './components/InventoryStateRenderer';
 import InventoryStatusNotifications from './components/InventoryStatusNotifications';
 import TableEditDebugPanel from '@/components/debug/TableEditDebugPanel';
-import EbayDebugDashboard from '@/components/debug/EbayDebugDashboard';
+
 import type { Listing } from '@/types/Listing';
 
 interface InventoryManagerProps {
@@ -180,10 +180,7 @@ const InventoryManager = ({ onCreateListing, onBack }: InventoryManagerProps) =>
       
       {/* Debug Panels - only in development */}
       {process.env.NODE_ENV === 'development' && (
-        <>
-          <TableEditDebugPanel />
-          <EbayDebugDashboard />
-        </>
+        <TableEditDebugPanel />
       )}
     </div>
   );
