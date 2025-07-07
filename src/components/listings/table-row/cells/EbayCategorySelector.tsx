@@ -393,12 +393,16 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => console.log('Dropdown state:', open)}>
       <DropdownMenuTrigger asChild>
         <Button 
           variant="outline" 
           disabled={disabled}
           className="w-full justify-between font-normal"
+          onClick={(e) => {
+            e.stopPropagation();
+            console.log('Category trigger clicked');
+          }}
         >
           <span className="truncate">{getDisplayValue()}</span>
           <ChevronDown className="h-4 w-4 flex-shrink-0" />

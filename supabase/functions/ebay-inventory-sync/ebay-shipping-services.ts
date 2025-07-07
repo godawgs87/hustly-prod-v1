@@ -39,32 +39,32 @@ export interface FulfillmentDetails {
 // eBay Inventory API shipping service codes (different from Trading API)
 // Source: eBay Inventory API documentation - these codes work with fulfillmentDetails
 const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
-  'US_PriorityMail': {
-    serviceCode: 'US_PriorityMail',
+  'USPSPriorityMail': {
+    serviceCode: 'USPSPriorityMail',
     displayName: 'USPS Priority Mail',
     estimatedDays: { min: 1, max: 3 },
     isValid: true
   },
-  'US_FirstClassMail': {
-    serviceCode: 'US_FirstClassMail',
+  'USPSFirstClassMail': {
+    serviceCode: 'USPSFirstClassMail',
     displayName: 'USPS First Class Mail',
     estimatedDays: { min: 1, max: 3 },
     isValid: true
   },
-  'US_GroundAdvantage': {
-    serviceCode: 'US_GroundAdvantage',
+  'USPSGroundAdvantage': {
+    serviceCode: 'USPSGroundAdvantage',
     displayName: 'USPS Ground Advantage',
     estimatedDays: { min: 2, max: 8 },
     isValid: true
   },
-  'US_ExpressMail': {
-    serviceCode: 'US_ExpressMail',
+  'USPSExpressMail': {
+    serviceCode: 'USPSExpressMail',
     displayName: 'USPS Priority Mail Express',
     estimatedDays: { min: 1, max: 2 },
     isValid: true
   },
-  'US_UPSGround': {
-    serviceCode: 'US_UPSGround',
+  'UPSGround': {
+    serviceCode: 'UPSGround',
     displayName: 'UPS Ground',
     estimatedDays: { min: 3, max: 5 },
     isValid: true
@@ -73,18 +73,18 @@ const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
 
 // User preference to eBay Inventory API service mapping
 const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
-  'usps_priority': 'US_PriorityMail',
-  'usps_first_class': 'US_FirstClassMail',
-  'usps_ground': 'US_GroundAdvantage',
-  'ups_ground': 'US_UPSGround',
-  'standard': 'US_PriorityMail',
-  'expedited': 'US_PriorityMail',
-  'overnight': 'US_ExpressMail',
-  'express': 'US_ExpressMail'
+  'usps_priority': 'USPSPriorityMail',
+  'usps_first_class': 'USPSFirstClassMail',
+  'usps_ground': 'USPSGroundAdvantage',
+  'ups_ground': 'UPSGround',
+  'standard': 'USPSPriorityMail',
+  'expedited': 'USPSPriorityMail',
+  'overnight': 'USPSExpressMail',
+  'express': 'USPSExpressMail'
 };
 
-const DEFAULT_SERVICE = 'US_PriorityMail'; // eBay Inventory API service code
-const FALLBACK_SERVICE = 'US_PriorityMail';
+const DEFAULT_SERVICE = 'USPSPriorityMail'; // eBay Inventory API service code
+const FALLBACK_SERVICE = 'USPSPriorityMail';
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
