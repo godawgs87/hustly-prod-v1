@@ -11,37 +11,47 @@ import { PlatformSettingsSection } from './connections/PlatformSettingsSection';
 import EbayDebugPanel from '../debug/EbayDebugPanel';
 import EbayQuickTest from '../debug/EbayQuickTest';
 import EbaySyncDebugger from '../debug/EbaySyncDebugger';
-
 interface Platform {
   name: string;
   connected: boolean;
   autoList: boolean;
   icon: string;
 }
-
 const UserConnectionsTab = () => {
   // const { importSoldListings, importing } = useEbayIntegration(); // Temporarily disabled - using newer sync operation
-  
-  const [platforms, setPlatforms] = useState<Platform[]>([
-    { name: 'Mercari', connected: false, autoList: false, icon: '📦' },
-    { name: 'Poshmark', connected: false, autoList: false, icon: '👗' },
-    { name: 'Whatnot', connected: false, autoList: false, icon: '📱' },
-    { name: 'Depop', connected: false, autoList: false, icon: '🎨' }
-  ]);
 
+  const [platforms, setPlatforms] = useState<Platform[]>([{
+    name: 'Mercari',
+    connected: false,
+    autoList: false,
+    icon: '📦'
+  }, {
+    name: 'Poshmark',
+    connected: false,
+    autoList: false,
+    icon: '👗'
+  }, {
+    name: 'Whatnot',
+    connected: false,
+    autoList: false,
+    icon: '📱'
+  }, {
+    name: 'Depop',
+    connected: false,
+    autoList: false,
+    icon: '🎨'
+  }]);
   const handleImportListings = async () => {
     // await importSoldListings(10); // Temporarily disabled - using newer sync operation
     console.log('Import listings functionality temporarily disabled');
   };
-
   const handleGenericDisconnect = (platformName: string) => {
-    setPlatforms(prev => prev.map(p => 
-      p.name === platformName ? { ...p, connected: false } : p
-    ));
+    setPlatforms(prev => prev.map(p => p.name === platformName ? {
+      ...p,
+      connected: false
+    } : p));
   };
-
-  return (
-    <Card className="p-6">
+  return <Card className="p-6">
       <div className="flex items-center space-x-3 mb-6">
         <Link className="w-5 h-5 text-gray-600" />
         <h3 className="text-lg font-semibold">Platform Connections</h3>
@@ -59,39 +69,24 @@ const UserConnectionsTab = () => {
         </div>
 
         {/* Other Platforms */}
-        {platforms.map((platform, index) => (
-          <div key={platform.name}>
-            <GenericPlatformCard
-              platform={platform}
-              onConnect={() => {}}
-              onDisconnect={() => handleGenericDisconnect(platform.name)}
-            />
+        {platforms.map((platform, index) => <div key={platform.name}>
+            <GenericPlatformCard platform={platform} onConnect={() => {}} onDisconnect={() => handleGenericDisconnect(platform.name)} />
 
-            {platform.connected && (
-              <PlatformSettingsSection
-                platform={platform}
-                index={index + 1}
-                platforms={platforms}
-                setPlatforms={setPlatforms}
-              />
-            )}
+            {platform.connected && <PlatformSettingsSection platform={platform} index={index + 1} platforms={platforms} setPlatforms={setPlatforms} />}
 
             {index < platforms.length - 1 && <Separator className="mt-6" />}
-          </div>
-        ))}
+          </div>)}
 
         {/* eBay Debug Panel */}
-        <Separator className="mt-6" />
+        
         <EbaySyncDebugger />
         
-        <Separator className="mt-6" />
+        
         <EbayQuickTest />
         
-        <Separator className="mt-6" />
+        
         <EbayDebugPanel />
       </div>
-    </Card>
-  );
+    </Card>;
 };
-
 export default UserConnectionsTab;
