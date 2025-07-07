@@ -406,20 +406,25 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
       </DropdownMenuTrigger>
       
       <DropdownMenuContent 
-        className="w-80 sm:w-96 max-h-[70vh] overflow-y-auto bg-white dark:bg-gray-800 border shadow-lg z-[60]"
+        className="w-80 sm:w-96 max-h-[70vh] overflow-y-auto bg-background border shadow-lg z-[100] p-0"
         align="start"
         sideOffset={5}
-        style={{ backgroundColor: 'white' }}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        style={{ 
+          backgroundColor: 'hsl(var(--background))',
+          zIndex: 100
+        }}
       >
         {/* Search Box */}
-        <div className="p-2 border-b bg-white dark:bg-gray-800 sticky top-0 z-10">
+        <div className="p-2 border-b bg-background sticky top-0 z-20">
           <div className="relative">
             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search categories..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              className="pl-8 h-8 bg-white dark:bg-gray-700"
+              className="pl-8 h-8 bg-background"
+              autoComplete="off"
             />
           </div>
         </div>
@@ -427,7 +432,7 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         {/* Search Results */}
         {searchQuery && (
           <div className="max-h-[50vh] overflow-y-auto">
-            <DropdownMenuLabel className="flex items-center gap-2 bg-white dark:bg-gray-800 sticky top-0 z-10">
+            <DropdownMenuLabel className="flex items-center gap-2 bg-background sticky top-0 z-10">
               Search Results ({searchResults.length})
               {isSearching && <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />}
             </DropdownMenuLabel>
@@ -441,7 +446,7 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
                   <DropdownMenuItem
                     key={`search-${category.ebay_category_id}`}
                     onClick={() => handleSearchResultSelect(category)}
-                    className="flex flex-col items-start p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                    className="flex flex-col items-start p-3 cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-md"
                   >
                     <div className="flex items-center justify-between w-full">
                       <span className="font-medium text-sm">{category.category_name}</span>

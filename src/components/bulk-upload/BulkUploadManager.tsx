@@ -45,6 +45,16 @@ export interface PhotoGroup {
     features?: string[];
     includes?: string[];
     defects?: string[];
+    ebay_category_id?: string;
+    ebay_category_path?: string;
+    mercari_category_id?: string;
+    mercari_category_path?: string;
+    poshmark_category_id?: string;
+    poshmark_category_path?: string;
+    depop_category_id?: string;
+    depop_category_path?: string;
+    facebook_category_id?: string;
+    facebook_category_path?: string;
   };
   shippingOptions?: any[];
   selectedShipping?: {
@@ -57,7 +67,7 @@ export interface PhotoGroup {
   listingId?: string;
 }
 
-type StepType = 'upload' | 'grouping' | 'review' | 'shipping';
+type StepType = 'upload' | 'grouping' | 'review' | 'categories' | 'shipping';
 
 interface BulkUploadManagerProps {
   onComplete: (results: any[]) => void;
@@ -87,6 +97,16 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     console.log('📸 Photos uploaded for bulk processing:', uploadedPhotos.length);
     state.setPhotos(uploadedPhotos);
   }, [state.setPhotos]);
+
+  const handleCategoriesComplete = useCallback((groupsWithCategories: PhotoGroup[]) => {
+    state.setPhotoGroups(groupsWithCategories);
+    state.setCurrentStep('shipping');
+    
+    toast({
+      title: "Categories configured!",
+      description: "Proceeding to shipping configuration.",
+    });
+  }, [state.setPhotoGroups, state.setCurrentStep, toast]);
 
   const handleShippingComplete = useCallback((groupsWithShipping: PhotoGroup[]) => {
     state.setPhotoGroups(groupsWithShipping);
@@ -120,10 +140,11 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     onPostAll: handlers.handlePostAll,
     onUpdateGroup: handlers.handleUpdateGroup,
     onRetryAnalysis: handlers.handleRetryAnalysis,
+    onCategoriesComplete: handleCategoriesComplete,
     onShippingComplete: handleShippingComplete,
     onViewInventory: handleViewInventory,
     onBack,
-    onStepChange: state.setCurrentStep
+    onStepChange: (step: StepType) => state.setCurrentStep(step)
   }), [
     state.currentStep,
     state.photos,
@@ -139,10 +160,11 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     handlers.handlePostAll,
     handlers.handleUpdateGroup,
     handlers.handleRetryAnalysis,
+    handleCategoriesComplete,
     handleShippingComplete,
     handleViewInventory,
     onBack,
-    state.setCurrentStep
+    (step: StepType) => state.setCurrentStep(step)
   ]);
 
   return (

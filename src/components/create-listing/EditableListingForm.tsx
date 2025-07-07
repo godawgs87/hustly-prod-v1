@@ -20,16 +20,18 @@ interface EditableListingFormProps {
   onBack: () => void;
   backButtonText: string;
   isSaving: boolean;
+  hideBackButton?: boolean;
 }
 
-const EditableListingForm = ({
-  listingData,
-  onUpdate,
+const EditableListingForm = ({ 
+  listingData, 
+  onUpdate, 
   onEdit,
-  onExport,
-  onBack,
+  onExport, 
+  onBack, 
   backButtonText,
-  isSaving
+  isSaving,
+  hideBackButton = false
 }: EditableListingFormProps) => {
   const handleConsignmentUpdate = (field: string, value: any) => {
     console.log('Updating consignment field:', field, 'with value:', value);

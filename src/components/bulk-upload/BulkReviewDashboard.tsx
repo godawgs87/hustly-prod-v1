@@ -13,7 +13,7 @@ interface BulkReviewDashboardProps {
   onPostAll: () => void;
   onUpdateGroup?: (updatedGroup: PhotoGroup) => void;
   onRetryAnalysis?: (groupId: string) => void;
-  onProceedToShipping?: () => void;
+  onProceedToCategories?: () => void;
   onViewInventory?: () => void;
   isAnalyzing?: boolean;
 }
@@ -26,7 +26,7 @@ const BulkReviewDashboard = ({
   onPostAll,
   onUpdateGroup,
   onRetryAnalysis,
-  onProceedToShipping,
+  onProceedToCategories,
   onViewInventory,
   isAnalyzing
 }: BulkReviewDashboardProps) => {
@@ -70,14 +70,14 @@ const BulkReviewDashboard = ({
             </div>
           )}
           
-          {/* Show Configure Shipping button when there are completed items */}
-          {completedItems > 0 && onProceedToShipping && (
+          {/* Show Configure Categories button when there are completed items */}
+          {completedItems > 0 && onProceedToCategories && (
             <Button 
-              onClick={onProceedToShipping}
+              onClick={onProceedToCategories}
               className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto text-sm sm:text-base"
               size="lg"
             >
-              📦 Configure Shipping ({completedItems} items)
+              🏷️ Configure Categories ({completedItems} items)
             </Button>
           )}
 
@@ -114,7 +114,7 @@ const BulkReviewDashboard = ({
             </span>
             {readyForShipping > 0 && (
               <span className="text-orange-600">
-                📦 {readyForShipping} need shipping configuration
+                🏷️ {readyForShipping} need category configuration
               </span>
             )}
             {readyToPost > 0 && (

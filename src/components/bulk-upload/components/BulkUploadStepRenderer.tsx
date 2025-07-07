@@ -3,10 +3,11 @@ import React, { memo } from 'react';
 import BulkUploadStep from './BulkUploadStep';
 import PhotoGroupingInterface from '../PhotoGroupingInterface';
 import BulkReviewDashboard from '../BulkReviewDashboard';
+import BulkCategoryConfiguration from '../BulkCategoryConfiguration';
 import BulkShippingConfiguration from '../BulkShippingConfiguration';
 import type { PhotoGroup } from '../BulkUploadManager';
 
-type StepType = 'upload' | 'grouping' | 'review' | 'shipping';
+type StepType = 'upload' | 'grouping' | 'review' | 'categories' | 'shipping';
 
 interface BulkUploadStepRendererProps {
   currentStep: StepType;
@@ -24,6 +25,7 @@ interface BulkUploadStepRendererProps {
   onUpdateGroup: (group: PhotoGroup) => void;
   onRetryAnalysis: (groupId: string) => void;
   onBack: () => void;
+  onCategoriesComplete: (groupsWithCategories: PhotoGroup[]) => void;
   onShippingComplete: (groupsWithShipping: PhotoGroup[]) => void;
   onViewInventory?: () => void;
   onStepChange: (step: StepType) => void;
@@ -63,9 +65,19 @@ const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
           onPostAll={props.onPostAll}
           onUpdateGroup={props.onUpdateGroup}
           onRetryAnalysis={props.onRetryAnalysis}
-          onProceedToShipping={() => props.onStepChange('shipping')}
+          onProceedToCategories={() => props.onStepChange('categories')}
           onViewInventory={props.onViewInventory}
           isAnalyzing={props.isAnalyzing}
+        />
+      );
+      
+    case 'categories':
+      return (
+        <BulkCategoryConfiguration
+          photoGroups={props.photoGroups}
+          onComplete={props.onCategoriesComplete}
+          onBack={() => props.onStepChange('review')}
+          onUpdateGroup={props.onUpdateGroup}
         />
       );
       
@@ -74,7 +86,7 @@ const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
         <BulkShippingConfiguration
           photoGroups={props.photoGroups}
           onComplete={props.onShippingComplete}
-          onBack={() => props.onStepChange('review')}
+          onBack={() => props.onStepChange('categories')}
           onUpdateGroup={props.onUpdateGroup}
         />
       );
