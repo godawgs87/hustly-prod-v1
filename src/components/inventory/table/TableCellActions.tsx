@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Eye, Edit, Trash2, Copy, MoreVertical, Check, X } from 'lucide-react';
+import { Eye, Edit, Trash2, Copy, MoreVertical, Check, X, Settings } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import EbaySyncButton from '../EbaySyncButton';
@@ -68,58 +68,58 @@ const TableCellActions = ({
           </Button>
         </div>
       ) : (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <MoreVertical className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-white border shadow-lg z-50">
-            {onPreview && (
-              <DropdownMenuItem onClick={() => onPreview(listing)}>
-                <Eye className="w-4 h-4 mr-2" />
-                View
+        <div className="flex gap-1">
+          {/* Category Button - Outside dropdown to prevent conflict */}
+          {!listing.ebay_category_id && onUpdateListing && (
+            <QuickFixCategoryButton 
+              listing={listing} 
+              onUpdate={onUpdateListing}
+            />
+          )}
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-white border shadow-lg z-50">
+              {onPreview && (
+                <DropdownMenuItem onClick={() => onPreview(listing)}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  View
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={onEdit}>
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
               </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={onEdit}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </DropdownMenuItem>
-            {onDuplicate && (
-              <DropdownMenuItem onClick={() => onDuplicate(listing)}>
-                <Copy className="w-4 h-4 mr-2" />
-                Duplicate
-              </DropdownMenuItem>
-            )}
-            {!listing.ebay_category_id && onUpdateListing && (
+              {onDuplicate && (
+                <DropdownMenuItem onClick={() => onDuplicate(listing)}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Duplicate
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem asChild>
                 <div className="px-2 py-1.5">
-                  <QuickFixCategoryButton 
-                    listing={listing} 
-                    onUpdate={onUpdateListing}
-                  />
+                  <EbaySyncButton listing={listing} onSyncComplete={onSyncComplete} />
                 </div>
               </DropdownMenuItem>
-            )}
-            <DropdownMenuItem asChild>
-              <div className="px-2 py-1.5">
-                <EbaySyncButton listing={listing} onSyncComplete={onSyncComplete} />
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <div className="px-2 py-1.5">
-                <InventoryDebugActions listing={listing} onRefresh={onSyncComplete} />
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={handleDeleteClick}
-              className="text-red-600"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuItem asChild>
+                <div className="px-2 py-1.5">
+                  <InventoryDebugActions listing={listing} onRefresh={onSyncComplete} />
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={handleDeleteClick}
+                className="text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       )}
       
       {/* Delete Confirmation Dialog */}
