@@ -409,6 +409,9 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestData: any = {};
+  let userData: any = null;
+
   try {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -420,13 +423,14 @@ Deno.serve(async (req) => {
     if (!authHeader) throw new Error("No authorization header provided");
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    const { data: userAuthData, error: userError } = await supabaseClient.auth.getUser(token);
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     
+    userData = userAuthData;
     const user = userData.user;
     if (!user?.id) throw new Error("User not authenticated");
 
-    const requestData = await req.json();
+    requestData = await req.json();
     const { listingId, action = 'sync_listing', dryRun = false } = requestData;
     
     // 🧪 ISOLATION TESTING: Test shipping service module independently
@@ -491,7 +495,7 @@ Deno.serve(async (req) => {
       message: errorMessage,
       stack: errorStack,
       timestamp: new Date().toISOString(),
-      requestData: { listingId: requestData?.listingId, action: requestData?.action }
+      requestData: requestData ? { listingId: requestData.listingId, action: requestData.action } : null
     });
     
     // Log to Supabase for persistence (best effort)

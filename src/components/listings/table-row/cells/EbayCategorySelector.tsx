@@ -410,9 +410,11 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         align="start"
         sideOffset={5}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
         style={{ 
           backgroundColor: 'hsl(var(--background))',
-          zIndex: 100
+          zIndex: 1000
         }}
       >
         {/* Search Box */}
