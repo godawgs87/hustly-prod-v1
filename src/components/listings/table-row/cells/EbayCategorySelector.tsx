@@ -35,6 +35,8 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<EbayCategory[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingChildren, setIsLoadingChildren] = useState(false);
+  const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -227,16 +229,31 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
       onChange(category.ebay_category_id, pathString);
     } else {
       // Load children lazily for next level
-      const children = await loadChildCategories(category.ebay_category_id);
-      
-      // Update the categories state with the newly loaded children
-      setCategories(prev => {
-        const existing = prev.filter(cat => cat.parent_ebay_category_id !== category.ebay_category_id);
-        return [...existing, ...children];
-      });
-      
-      setCurrentLevel(children);
+      setIsLoadingChildren(true);
+      try {
+        const children = await loadChildCategories(category.ebay_category_id);
+        
+        // Update the categories state with the newly loaded children
+        setCategories(prev => {
+          const existing = prev.filter(cat => cat.parent_ebay_category_id !== category.ebay_category_id);
+          return [...existing, ...children];
+        });
+        
+        setCurrentLevel(children);
+      } finally {
+        setIsLoadingChildren(false);
+      }
     }
+  };
+
+  // Allow selection of non-leaf categories when appropriate
+  const handleUseThisCategory = (category: EbayCategory) => {
+    const pathString = [...selectedPath, category].map(cat => cat.category_name).join(' > ');
+    console.log('🔄 EbayCategorySelector: Using non-leaf category', { 
+      categoryId: category.ebay_category_id, 
+      pathString 
+    });
+    onChange(category.ebay_category_id, pathString);
   };
 
   const handleLevelSelect = async (levelIndex: number) => {
@@ -426,11 +443,13 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
       </DropdownMenuTrigger>
       
       <DropdownMenuContent 
-        className="w-80 sm:w-96 max-h-[70vh] overflow-y-auto bg-background border shadow-lg z-[9999] p-0"
+        className="w-80 sm:w-96 bg-background border shadow-lg z-[9999] p-0"
         align="start"
         sideOffset={5}
         side="bottom"
         avoidCollisions={true}
+        collisionPadding={10}
+        sticky="always"
         onCloseAutoFocus={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -439,7 +458,6 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
           e.stopPropagation();
         }}
         onPointerDownOutside={(e) => {
-          console.log('Pointer down outside - preventing default');
           const target = e.target as Element;
           // Only close if clicking outside the entire dropdown system
           if (!target.closest('[data-radix-dropdown-menu-content]') && 
@@ -450,7 +468,6 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
           }
         }}
         onInteractOutside={(e) => {
-          console.log('Interact outside - preventing default');
           const target = e.target as Element;
           if (target.closest('[data-radix-dropdown-menu-content]') || 
               target.closest('[data-radix-dropdown-menu-trigger]')) {
@@ -460,7 +477,8 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         style={{ 
           backgroundColor: 'hsl(var(--background))',
           zIndex: 9999,
-          position: 'relative'
+          maxHeight: 'min(70vh, 500px)',
+          overflowY: 'auto'
         }}
       >
         {/* Search Box */}
@@ -559,29 +577,69 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         {/* Current level options */}
         {!searchQuery && (
           <>
-            <DropdownMenuLabel>
+            <DropdownMenuLabel className="flex items-center justify-between">
               {selectedPath.length === 0 ? 'Categories' : 'Subcategories'}
+              {currentLevel.some(cat => !cat.leaf_category) && (
+                <span className="text-xs text-muted-foreground">
+                  📁 has subcategories
+                </span>
+              )}
             </DropdownMenuLabel>
             
-            {currentLevel.length === 0 ? (
+            {isLoadingChildren ? (
+              <DropdownMenuItem disabled className="flex items-center justify-center p-4">
+                <div className="w-4 h-4 border border-current border-t-transparent rounded-full animate-spin mr-2" />
+                Loading subcategories...
+              </DropdownMenuItem>
+            ) : currentLevel.length === 0 ? (
               <DropdownMenuItem disabled>
                 No subcategories available
               </DropdownMenuItem>
             ) : (
-              currentLevel.map((category) => (
-                <DropdownMenuItem
-                  key={category.ebay_category_id}
-                  onClick={() => handleCategorySelect(category)}
-                  className="flex items-center justify-between"
-                >
-                  <span className="truncate">{category.category_name}</span>
-                  {category.leaf_category ? (
-                    <span className="text-xs text-muted-foreground ml-2">✓</span>
-                  ) : (
-                    <ChevronDown className="h-3 w-3 ml-2" />
-                  )}
-                </DropdownMenuItem>
-              ))
+              <div className="space-y-1 p-1">
+                {currentLevel.map((category) => (
+                  <div key={category.ebay_category_id} className="space-y-1">
+                    {/* Main category item */}
+                    <DropdownMenuItem
+                      onClick={() => handleCategorySelect(category)}
+                      className="flex items-center justify-between group hover:bg-accent hover:text-accent-foreground rounded-md"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="truncate font-medium">{category.category_name}</span>
+                        {!category.leaf_category && (
+                          <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-md flex-shrink-0">
+                            📁 {/* Folder icon for categories with subcategories */}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {category.leaf_category ? (
+                          <span className="text-xs text-green-600 font-semibold">✓ Final</span>
+                        ) : (
+                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </div>
+                    </DropdownMenuItem>
+                    
+                    {/* "Use This Category" button for non-leaf categories */}
+                    {!category.leaf_category && (
+                      <div className="px-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUseThisCategory(category);
+                          }}
+                          className="w-full h-7 text-xs text-primary hover:text-primary-foreground hover:bg-primary/80 border border-primary/20 hover:border-primary"
+                        >
+                          Use "{category.category_name}" Category
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </>
         )}
