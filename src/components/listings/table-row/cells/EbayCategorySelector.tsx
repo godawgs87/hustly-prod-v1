@@ -227,6 +227,10 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         pathString 
       });
       onChange(category.ebay_category_id, pathString);
+      // Close dropdown after successful selection
+      setTimeout(() => {
+        setOpen(false);
+      }, 100);
     } else {
       // Load children lazily for next level
       setIsLoadingChildren(true);
@@ -254,6 +258,10 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
       pathString 
     });
     onChange(category.ebay_category_id, pathString);
+    // Close dropdown after successful selection
+    setTimeout(() => {
+      setOpen(false);
+    }, 100);
   };
 
   const handleLevelSelect = async (levelIndex: number) => {
@@ -411,9 +419,11 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
 
   return (
     <DropdownMenu 
-      onOpenChange={(open) => {
-        console.log('Dropdown state changed:', open);
-        if (!open) {
+      open={open}
+      onOpenChange={(newOpen) => {
+        console.log('Dropdown state changed:', newOpen);
+        setOpen(newOpen);
+        if (!newOpen) {
           // Add small delay to prevent immediate closing
           setTimeout(() => {
             setSearchQuery('');
@@ -448,7 +458,7 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         sideOffset={5}
         side="bottom"
         avoidCollisions={true}
-        collisionPadding={10}
+        collisionPadding={20}
         sticky="always"
         onCloseAutoFocus={(e) => {
           e.preventDefault();
@@ -457,40 +467,24 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         onEscapeKeyDown={(e) => {
           e.stopPropagation();
         }}
-        onPointerDownOutside={(e) => {
-          const target = e.target as Element;
-          // Only close if clicking outside the entire dropdown system
-          if (!target.closest('[data-radix-dropdown-menu-content]') && 
-              !target.closest('[data-radix-dropdown-menu-trigger]')) {
-            // Allow normal close behavior
-          } else {
-            e.preventDefault();
-          }
-        }}
-        onInteractOutside={(e) => {
-          const target = e.target as Element;
-          if (target.closest('[data-radix-dropdown-menu-content]') || 
-              target.closest('[data-radix-dropdown-menu-trigger]')) {
-            e.preventDefault();
-          }
-        }}
         style={{ 
           backgroundColor: 'hsl(var(--background))',
           zIndex: 9999,
-          maxHeight: 'min(70vh, 500px)',
+          maxHeight: 'min(80vh, 600px)',
           overflowY: 'auto'
         }}
       >
-        {/* Search Box */}
-        <div className="p-2 border-b bg-background sticky top-0 z-20">
+        {/* Search Box - Always visible */}
+        <div className="p-3 border-b bg-background sticky top-0 z-30 shadow-sm">
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search categories..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              className="pl-8 h-8 bg-background"
+              className="pl-10 h-10 bg-background border-input"
               autoComplete="off"
+              autoFocus
             />
           </div>
         </div>
@@ -604,36 +598,31 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
                       onClick={() => handleCategorySelect(category)}
                       className="flex items-center justify-between group hover:bg-accent hover:text-accent-foreground rounded-md"
                     >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="flex items-center justify-between w-full">
                         <span className="truncate font-medium">{category.category_name}</span>
-                        {!category.leaf_category && (
-                          <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-md flex-shrink-0">
-                            📁 {/* Folder icon for categories with subcategories */}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {category.leaf_category ? (
-                          <span className="text-xs text-green-600 font-semibold">✓ Final</span>
-                        ) : (
-                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                        )}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {category.leaf_category ? (
+                            <span className="text-xs text-green-600 font-semibold">✓ Final</span>
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
                       </div>
                     </DropdownMenuItem>
                     
                     {/* "Use This Category" button for non-leaf categories */}
                     {!category.leaf_category && (
-                      <div className="px-2">
+                      <div className="px-2 mt-1">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleUseThisCategory(category);
                           }}
-                          className="w-full h-7 text-xs text-primary hover:text-primary-foreground hover:bg-primary/80 border border-primary/20 hover:border-primary"
+                          className="w-full h-6 text-xs"
                         >
-                          Use "{category.category_name}" Category
+                          Use This Category
                         </Button>
                       </div>
                     )}
