@@ -453,36 +453,28 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
       </DropdownMenuTrigger>
       
       <DropdownMenuContent 
-        className="w-80 sm:w-96 bg-background border shadow-lg z-[9999] p-0"
+        className="w-[95vw] max-w-md bg-background border shadow-lg z-[9999] p-0"
         align="start"
         sideOffset={5}
         side="bottom"
         avoidCollisions={true}
         collisionPadding={20}
-        sticky="always"
-        onCloseAutoFocus={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        onEscapeKeyDown={(e) => {
-          e.stopPropagation();
-        }}
         style={{ 
           backgroundColor: 'hsl(var(--background))',
           zIndex: 9999,
-          maxHeight: 'min(80vh, 600px)',
+          maxHeight: 'min(85vh, 500px)',
           overflowY: 'auto'
         }}
       >
-        {/* Search Box - Always visible */}
-        <div className="p-3 border-b bg-background sticky top-0 z-30 shadow-sm">
+        {/* Search Box - Fixed at top */}
+        <div className="p-3 border-b bg-background/95 backdrop-blur-sm sticky top-0 z-50">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search categories..."
+              placeholder="Search eBay categories..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10 h-10 bg-background border-input"
+              className="pl-10 h-10 bg-background focus:bg-background"
               autoComplete="off"
               autoFocus
             />
@@ -571,13 +563,8 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         {/* Current level options */}
         {!searchQuery && (
           <>
-            <DropdownMenuLabel className="flex items-center justify-between">
-              {selectedPath.length === 0 ? 'Categories' : 'Subcategories'}
-              {currentLevel.some(cat => !cat.leaf_category) && (
-                <span className="text-xs text-muted-foreground">
-                  📁 has subcategories
-                </span>
-              )}
+            <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
+              {selectedPath.length === 0 ? 'Choose a Category' : 'Select Subcategory'}
             </DropdownMenuLabel>
             
             {isLoadingChildren ? (
@@ -592,38 +579,36 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
             ) : (
               <div className="space-y-1 p-1">
                 {currentLevel.map((category) => (
-                  <div key={category.ebay_category_id} className="space-y-1">
-                    {/* Main category item */}
+                  <div key={category.ebay_category_id}>
                     <DropdownMenuItem
                       onClick={() => handleCategorySelect(category)}
-                      className="flex items-center justify-between group hover:bg-accent hover:text-accent-foreground rounded-md"
+                      className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-md"
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="truncate font-medium">{category.category_name}</span>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {category.leaf_category ? (
-                            <span className="text-xs text-green-600 font-semibold">✓ Final</span>
-                          ) : (
+                      <span className="font-medium flex-1">{category.category_name}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {category.leaf_category ? (
+                          <span className="text-xs text-green-600 font-semibold">✓ Final</span>
+                        ) : (
+                          <>
+                            <span className="text-xs text-muted-foreground">Has subcategories</span>
                             <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
+                          </>
+                        )}
                       </div>
                     </DropdownMenuItem>
                     
-                    {/* "Use This Category" button for non-leaf categories */}
+                    {/* Compact "Use This" option for non-leaf categories */}
                     {!category.leaf_category && (
-                      <div className="px-2 mt-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
+                      <div className="px-3 pb-2">
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleUseThisCategory(category);
                           }}
-                          className="w-full h-6 text-xs"
+                          className="text-xs text-primary hover:text-primary/80 underline"
                         >
-                          Use This Category
-                        </Button>
+                          Or use "{category.category_name}" as final category
+                        </button>
                       </div>
                     )}
                   </div>
