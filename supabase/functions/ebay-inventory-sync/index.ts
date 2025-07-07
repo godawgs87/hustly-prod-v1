@@ -223,11 +223,22 @@ async function validateListingData(listing: any, userProfile: any): Promise<{ is
     errors.push('At least one photo is required to sync this listing to eBay');
   }
   
-  // Policy validation
-  if (!userProfile.ebay_payment_policy_id || 
-      !userProfile.ebay_return_policy_id || 
-      !userProfile.ebay_fulfillment_policy_id) {
-    errors.push('eBay policies not configured. Please refresh your eBay policies.');
+  // Only validate policies for business accounts - individual accounts use inline fulfillment
+  const isIndividualAccount = EbayOfferManager.isIndividualAccount(userProfile);
+  if (!isIndividualAccount) {
+    if (!userProfile.ebay_payment_policy_id || 
+        !userProfile.ebay_return_policy_id || 
+        !userProfile.ebay_fulfillment_policy_id) {
+      errors.push('eBay policies not configured. Please refresh your eBay policies.');
+    }
+  } else {
+    // For individual accounts, validate fulfillment data instead
+    if (!userProfile.shipping_cost_domestic) {
+      errors.push('Shipping cost is required for individual accounts');
+    }
+    if (!userProfile.handling_time_days) {
+      errors.push('Handling time is required for individual accounts');
+    }
   }
   
   return {
@@ -361,8 +372,21 @@ async function syncListingToEbay(supabaseClient: any, userId: string, listingId:
     } else if (offerResult.shouldCreateNew) {
       // Create new offer with proper account type detection
       const offerData = EbayOfferManager.createOfferData(listing, listingId, userProfile, ebayLocationKey);
-      offerId = await ebayApi.createOffer(offerData);
       
+      // Enhanced logging for troubleshooting
+      const fulfillmentValidation = EbayShippingServices.validateFulfillmentDetails(offerData.fulfillmentDetails || {});
+      logStep('🔍 Pre-creation validation', {
+        isValid: fulfillmentValidation.isValid,
+        errors: fulfillmentValidation.errors,
+        serviceCode: offerData.fulfillmentDetails?.shippingOptions[0]?.shippingServices[0]?.serviceCode,
+        accountType: EbayOfferManager.isIndividualAccount(userProfile) ? 'individual' : 'business'
+      });
+      
+      if (!fulfillmentValidation.isValid) {
+        throw new Error(`Invalid fulfillment data: ${fulfillmentValidation.errors.join(', ')}`);
+      }
+      
+      offerId = await ebayApi.createOffer(offerData);
       logStep('✅ Offer created');
 
       // Publish offer
