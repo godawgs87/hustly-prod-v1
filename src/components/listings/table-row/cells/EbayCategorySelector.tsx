@@ -1,24 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, Search, ArrowUp } from 'lucide-react';
+import { ChevronDown, Search, ArrowLeft, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel
-} from '@/components/ui/dropdown-menu';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface EbayCategory {
   ebay_category_id: string;
   category_name: string;
   parent_ebay_category_id: string | null;
   leaf_category: boolean;
-  fullPath?: string; // Add optional fullPath for enhanced search results
 }
 
 interface EbayCategorySelectorProps {
@@ -34,70 +32,46 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   const [currentLevel, setCurrentLevel] = useState<EbayCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<EbayCategory[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isLoadingChildren, setIsLoadingChildren] = useState(false);
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
+  // Load all categories on mount
   useEffect(() => {
     loadCategories();
   }, []);
 
+  // Build selected path when value changes
   useEffect(() => {
-    if (value && !loading) {
+    if (value && categories.length > 0) {
       buildSelectedPath(value);
     }
-  }, [value, loading]);
+  }, [value, categories]);
 
   const loadCategories = async () => {
     try {
-      console.log('🔍 Loading eBay root categories...');
+      console.log('🔍 Loading eBay categories...');
       
-      // Only load root categories initially for better performance
-      const { data: rootData, error: rootError } = await supabase
+      const { data, error } = await supabase
         .from('ebay_categories')
         .select('*')
         .eq('is_active', true)
-        .is('parent_ebay_category_id', null) // Only root categories
-        .not('ebay_category_id', 'is', null)
-        .not('category_name', 'is', null)
         .order('category_name');
 
-      if (rootError) {
-        console.error('❌ Error loading root categories:', rootError);
-        throw rootError;
-      }
+      if (error) throw error;
 
-      // Defensive filter to ensure data integrity
-      const validRootCategories = (rootData || []).filter(cat => 
+      const validCategories = (data || []).filter(cat => 
         cat.ebay_category_id && 
         cat.category_name && 
         cat.ebay_category_id.trim() !== '' &&
         cat.category_name.trim() !== ''
       );
 
-      console.log('✅ Loaded root categories:', validRootCategories.length);
+      console.log('✅ Loaded categories:', validCategories.length);
+      setCategories(validCategories);
       
-      // Set root categories as both the full category list (for now) and current level
-      setCategories(validRootCategories);
-      setCurrentLevel(validRootCategories);
-      
-      // Check if we need to trigger a category sync (if very few root categories)
-      if (validRootCategories.length < 10) {
-        console.log('⚠️ Very few root categories, checking sync status...');
-        try {
-          const { data: syncData, error: syncError } = await supabase.functions.invoke('ebay-category-sync', {
-            body: { fullSync: true }
-          });
-          if (syncError) {
-            console.error('❌ Sync failed:', syncError);
-          } else {
-            console.log('✅ Categories sync triggered:', syncData);
-          }
-        } catch (syncErr) {
-          console.error('❌ Sync error:', syncErr);
-        }
-      }
+      // Set root categories as current level
+      const rootCategories = validCategories.filter(cat => !cat.parent_ebay_category_id);
+      setCurrentLevel(rootCategories);
     } catch (error) {
       console.error('❌ Error loading eBay categories:', error);
       toast({
@@ -110,79 +84,18 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
     }
   };
 
-  // New function to load child categories lazily
-  const loadChildCategories = async (parentCategoryId: string): Promise<EbayCategory[]> => {
-    try {
-      console.log('🔍 Loading child categories for:', parentCategoryId);
-      
-      const { data, error } = await supabase
-        .from('ebay_categories')
-        .select('*')
-        .eq('is_active', true)
-        .eq('parent_ebay_category_id', parentCategoryId)
-        .not('ebay_category_id', 'is', null)
-        .not('category_name', 'is', null)
-        .order('category_name');
-
-      if (error) {
-        console.error('❌ Error loading child categories:', error);
-        return [];
-      }
-
-      const validChildren = (data || []).filter(cat => 
-        cat.ebay_category_id && 
-        cat.category_name && 
-        cat.ebay_category_id.trim() !== '' &&
-        cat.category_name.trim() !== ''
-      );
-
-      console.log('✅ Loaded child categories:', validChildren.length);
-      return validChildren;
-    } catch (error) {
-      console.error('❌ Error loading child categories:', error);
-      return [];
-    }
-  };
-
-  const buildSelectedPath = async (categoryId: string) => {
-    // Add guard clause for empty categoryId
-    if (!categoryId) {
-      console.log('⚠️ Cannot build path: no categoryId provided');
-      return;
-    }
+  const buildSelectedPath = (categoryId: string) => {
+    if (!categoryId) return;
 
     try {
-      console.log('📍 Building category path for:', categoryId);
-      
-      // Fetch the full path from root to the selected category
-      const { data: selectedCategory, error } = await supabase
-        .from('ebay_categories')
-        .select('*')
-        .eq('ebay_category_id', categoryId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (error || !selectedCategory) {
-        console.log('⚠️ Category not found:', categoryId);
-        return;
-      }
-
-      // Build path by walking up the parent chain
       const path: EbayCategory[] = [];
-      let currentCat = selectedCategory;
+      let currentCat = categories.find(cat => cat.ebay_category_id === categoryId);
       
+      // Build path from selected category to root
       while (currentCat) {
         path.unshift(currentCat);
-        
         if (currentCat.parent_ebay_category_id) {
-          const { data: parentCat } = await supabase
-            .from('ebay_categories')
-            .select('*')
-            .eq('ebay_category_id', currentCat.parent_ebay_category_id)
-            .eq('is_active', true)
-            .maybeSingle();
-          
-          currentCat = parentCat || null;
+          currentCat = categories.find(cat => cat.ebay_category_id === currentCat!.parent_ebay_category_id);
         } else {
           break;
         }
@@ -191,22 +104,11 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
       console.log('📍 Built category path:', path.map(cat => cat.category_name).join(' > '));
       setSelectedPath(path);
       
-      // Update categories state with the path categories and load current level
-      setCategories(prev => {
-        const existingIds = new Set(prev.map(cat => cat.ebay_category_id));
-        const newCategories = path.filter(cat => !existingIds.has(cat.ebay_category_id));
-        return [...prev, ...newCategories];
-      });
-      
-      // Load and set current level (children of the last selected category)
+      // Set current level based on selected path
       if (path.length > 0) {
         const lastSelected = path[path.length - 1];
         if (!lastSelected.leaf_category) {
-          const children = await loadChildCategories(lastSelected.ebay_category_id);
-          setCategories(prev => {
-            const existing = prev.filter(cat => cat.parent_ebay_category_id !== lastSelected.ebay_category_id);
-            return [...existing, ...children];
-          });
+          const children = categories.filter(cat => cat.parent_ebay_category_id === lastSelected.ebay_category_id);
           setCurrentLevel(children);
         }
       }
@@ -215,183 +117,88 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
     }
   };
 
-  const handleCategorySelect = async (category: EbayCategory) => {
+  const handleCategorySelect = (category: EbayCategory) => {
+    console.log('🔄 Category selected:', category.category_name, 'Leaf:', category.leaf_category);
+    
     const newPath = [...selectedPath, category];
     setSelectedPath(newPath);
 
     if (category.leaf_category) {
-      // Final selection - leaf category
+      // This is a final selectable category
       const pathString = newPath.map(cat => cat.category_name).join(' > ');
-      console.log('🔄 EbayCategorySelector: Calling onChange with leaf category', { 
-        categoryId: category.ebay_category_id, 
-        pathString 
-      });
+      console.log('✅ Final category selected:', { categoryId: category.ebay_category_id, pathString });
+      
       onChange(category.ebay_category_id, pathString);
-      // Close dropdown after successful selection
-      setTimeout(() => {
-        setOpen(false);
-      }, 100);
+      setOpen(false);
     } else {
-      // Load children lazily for next level
-      setIsLoadingChildren(true);
-      try {
-        const children = await loadChildCategories(category.ebay_category_id);
-        
-        // Update the categories state with the newly loaded children
-        setCategories(prev => {
-          const existing = prev.filter(cat => cat.parent_ebay_category_id !== category.ebay_category_id);
-          return [...existing, ...children];
-        });
-        
-        setCurrentLevel(children);
-      } finally {
-        setIsLoadingChildren(false);
-      }
+      // Show children of selected category
+      const children = categories.filter(cat => cat.parent_ebay_category_id === category.ebay_category_id);
+      setCurrentLevel(children);
     }
   };
 
-  // Allow selection of non-leaf categories when appropriate
   const handleUseThisCategory = (category: EbayCategory) => {
-    const pathString = [...selectedPath, category].map(cat => cat.category_name).join(' > ');
-    console.log('🔄 EbayCategorySelector: Using non-leaf category', { 
-      categoryId: category.ebay_category_id, 
-      pathString 
-    });
+    const newPath = [...selectedPath, category];
+    const pathString = newPath.map(cat => cat.category_name).join(' > ');
+    console.log('✅ Using non-leaf category:', { categoryId: category.ebay_category_id, pathString });
+    
     onChange(category.ebay_category_id, pathString);
-    // Close dropdown after successful selection
-    setTimeout(() => {
-      setOpen(false);
-    }, 100);
+    setOpen(false);
   };
 
-  const handleLevelSelect = async (levelIndex: number) => {
-    const newPath = selectedPath.slice(0, levelIndex + 1);
+  const handleGoBack = () => {
+    if (selectedPath.length === 0) return;
+    
+    const newPath = selectedPath.slice(0, -1);
     setSelectedPath(newPath);
     
-    if (levelIndex === -1) {
-      // Back to root - use root categories from current state
+    if (newPath.length === 0) {
+      // Back to root
       const rootCategories = categories.filter(cat => !cat.parent_ebay_category_id);
       setCurrentLevel(rootCategories);
     } else {
-      const selectedCategory = newPath[levelIndex];
-      if (!selectedCategory.leaf_category) {
-        // Load children lazily when navigating back to a level
-        const children = await loadChildCategories(selectedCategory.ebay_category_id);
-        
-        // Update categories state with the loaded children
-        setCategories(prev => {
-          const existing = prev.filter(cat => cat.parent_ebay_category_id !== selectedCategory.ebay_category_id);
-          return [...existing, ...children];
-        });
-        
-        setCurrentLevel(children);
-      }
+      // Show children of the new last category
+      const lastCategory = newPath[newPath.length - 1];
+      const children = categories.filter(cat => cat.parent_ebay_category_id === lastCategory.ebay_category_id);
+      setCurrentLevel(children);
     }
   };
 
-  // Handle search functionality with full path context
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     
     if (!query.trim()) {
       setSearchResults([]);
-      setIsSearching(false);
       return;
     }
 
-    setIsSearching(true);
-    
     try {
-      // Search across all categories in database with proper encoding
-      const { data, error } = await supabase
-        .from('ebay_categories')
-        .select('*')
-        .eq('is_active', true)
-        .ilike('category_name', `%${query.replace(/[%_]/g, '\\$&')}%`)
-        .order('category_name')
-        .limit(100); // Increase limit for better search results
+      const filtered = categories.filter(cat => 
+        cat.category_name.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 20);
 
-      if (error) throw error;
-      
-      // Enhance search results with full paths
-      const enhancedResults = await Promise.all((data || []).map(async (category) => {
+      // Enhance with full paths
+      const enhancedResults = await Promise.all(filtered.map(async (category) => {
         const fullPath = await getCategoryPath(category.ebay_category_id);
-        return {
-          ...category,
-          fullPath
-        };
+        return { ...category, fullPath };
       }));
 
-      // Sort by relevance - prefer leaf categories and shorter paths
-      const sortedResults = enhancedResults.sort((a, b) => {
-        // Prioritize leaf categories
-        if (a.leaf_category && !b.leaf_category) return -1;
-        if (!a.leaf_category && b.leaf_category) return 1;
-        
-        // Then by path length (shorter = more specific)
-        const aDepth = a.fullPath.split(' > ').length;
-        const bDepth = b.fullPath.split(' > ').length;
-        if (aDepth !== bDepth) return aDepth - bDepth;
-        
-        // Finally alphabetical
-        return a.category_name.localeCompare(b.category_name);
-      });
-      
-      setSearchResults(sortedResults.slice(0, 50)); // Show more results
+      setSearchResults(enhancedResults);
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
-    } finally {
-      setIsSearching(false);
     }
-  };
-
-  const handleSearchResultSelect = async (category: EbayCategory) => {
-    if (category.leaf_category) {
-      // Build path for selected category
-      await buildSelectedPath(category.ebay_category_id);
-      const pathString = await getCategoryPath(category.ebay_category_id);
-      console.log('🔄 EbayCategorySelector: Calling onChange from search result', { 
-        categoryId: category.ebay_category_id, 
-        pathString 
-      });
-      onChange(category.ebay_category_id, pathString);
-    } else {
-      // Navigate to this category level
-      await buildSelectedPath(category.ebay_category_id);
-      const children = await loadChildCategories(category.ebay_category_id);
-      setCurrentLevel(children);
-    }
-    
-    // Clear search
-    setSearchQuery('');
-    setSearchResults([]);
   };
 
   const getCategoryPath = async (categoryId: string): Promise<string> => {
     try {
-      const { data: category } = await supabase
-        .from('ebay_categories')
-        .select('*')
-        .eq('ebay_category_id', categoryId)
-        .single();
-
-      if (!category) return '';
-
       const path: string[] = [];
-      let currentCat = category;
+      let currentCat = categories.find(cat => cat.ebay_category_id === categoryId);
       
       while (currentCat) {
         path.unshift(currentCat.category_name);
-        
         if (currentCat.parent_ebay_category_id) {
-          const { data: parentCat } = await supabase
-            .from('ebay_categories')
-            .select('*')
-            .eq('ebay_category_id', currentCat.parent_ebay_category_id)
-            .maybeSingle();
-          
-          currentCat = parentCat;
+          currentCat = categories.find(cat => cat.ebay_category_id === currentCat!.parent_ebay_category_id);
         } else {
           break;
         }
@@ -401,6 +208,20 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
     } catch {
       return '';
     }
+  };
+
+  const handleSearchResultSelect = (category: EbayCategory & { fullPath?: string }) => {
+    if (category.leaf_category) {
+      console.log('✅ Search result selected (leaf):', { categoryId: category.ebay_category_id, fullPath: category.fullPath });
+      onChange(category.ebay_category_id, category.fullPath || category.category_name);
+      setOpen(false);
+    } else {
+      // Navigate to this category
+      buildSelectedPath(category.ebay_category_id);
+    }
+    
+    setSearchQuery('');
+    setSearchResults([]);
   };
 
   const getDisplayValue = () => {
@@ -418,229 +239,167 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   }
 
   return (
-    <DropdownMenu 
-      open={open}
-      onOpenChange={(newOpen) => {
-        console.log('Dropdown state changed:', newOpen);
-        setOpen(newOpen);
-        if (!newOpen) {
-          // Add small delay to prevent immediate closing
-          setTimeout(() => {
-            setSearchQuery('');
-            setSearchResults([]);
-            setIsSearching(false);
-          }, 100);
-        }
-      }}
-    >
-      <DropdownMenuTrigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
         <Button 
           variant="outline" 
           disabled={disabled}
           className="w-full justify-between font-normal"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            console.log('Category trigger clicked');
-          }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-          }}
+          onClick={() => setOpen(true)}
         >
-          <span className="truncate">{getDisplayValue()}</span>
+          <span className="truncate text-left">{getDisplayValue()}</span>
           <ChevronDown className="h-4 w-4 flex-shrink-0" />
         </Button>
-      </DropdownMenuTrigger>
+      </PopoverTrigger>
       
-      <DropdownMenuContent 
-        className="w-[95vw] max-w-md bg-background border shadow-lg z-[9999] p-0"
-        align="start"
-        sideOffset={5}
-        side="bottom"
-        avoidCollisions={true}
-        collisionPadding={20}
-        style={{ 
-          backgroundColor: 'hsl(var(--background))',
-          zIndex: 9999,
-          maxHeight: 'min(85vh, 500px)',
-          overflowY: 'auto'
-        }}
-      >
-        {/* Search Box - Fixed at top */}
-        <div className="p-3 border-b bg-background/95 backdrop-blur-sm sticky top-0 z-50">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search eBay categories..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10 h-10 bg-background focus:bg-background"
-              autoComplete="off"
-              autoFocus
-            />
+      <PopoverContent className="w-96 p-0" align="start">
+        <Command>
+          <div className="border-b px-3 py-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <CommandInput
+                placeholder="Search categories..."
+                value={searchQuery}
+                onValueChange={handleSearch}
+                className="pl-8"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Search Results */}
-        {searchQuery && (
-          <div className="max-h-[50vh] overflow-y-auto">
-            <DropdownMenuLabel className="flex items-center gap-2 bg-background sticky top-0 z-10">
-              Search Results ({searchResults.length})
-              {isSearching && <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />}
-            </DropdownMenuLabel>
-            {searchResults.length === 0 && !isSearching ? (
-              <DropdownMenuItem disabled className="p-4 text-center">
-                No results found for "{searchQuery}"
-              </DropdownMenuItem>
-            ) : (
-              <div className="space-y-1 p-1">
+          <CommandList className="max-h-80">
+            {/* Search Results */}
+            {searchQuery && searchResults.length > 0 && (
+              <CommandGroup heading="Search Results">
                 {searchResults.map((category) => (
-                  <DropdownMenuItem
+                  <CommandItem
                     key={`search-${category.ebay_category_id}`}
-                    onClick={() => handleSearchResultSelect(category)}
-                    className="flex flex-col items-start p-3 cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-md"
+                    onSelect={() => handleSearchResultSelect(category)}
+                    className="flex flex-col items-start gap-1 py-2"
                   >
                     <div className="flex items-center justify-between w-full">
-                      <span className="font-medium text-sm">{category.category_name}</span>
-                      {category.leaf_category ? (
-                        <span className="text-xs text-green-600 ml-2 font-semibold">✓ Final</span>
-                      ) : (
-                        <ChevronDown className="h-3 w-3 ml-2 text-muted-foreground" />
+                      <span className="font-medium">{category.category_name}</span>
+                      {category.leaf_category && (
+                        <Check className="h-3 w-3 text-green-600" />
                       )}
                     </div>
-                    {category.fullPath && (
-                      <div className="text-xs text-gray-500 mt-1 w-full truncate">
-                        {category.fullPath}
-                      </div>
+                    {(category as any).fullPath && (
+                      <span className="text-xs text-muted-foreground">
+                        {(category as any).fullPath}
+                      </span>
                     )}
-                  </DropdownMenuItem>
+                  </CommandItem>
                 ))}
-              </div>
+              </CommandGroup>
             )}
-            <DropdownMenuSeparator />
-          </div>
-        )}
 
-        {/* Breadcrumb navigation - Enhanced */}
-        {selectedPath.length > 0 && !searchQuery && (
-          <>
-            <div className="p-2 bg-muted/50 border-b">
-              <div className="flex items-center gap-1 text-xs">
-                <button 
-                  onClick={() => handleLevelSelect(-1)}
-                  className="hover:underline text-primary hover:text-primary/80 font-medium"
-                >
-                  Root
-                </button>
-                {selectedPath.map((cat, index) => (
-                  <React.Fragment key={cat.ebay_category_id}>
-                    <ChevronDown className="h-3 w-3 rotate-[-90deg] text-muted-foreground" />
-                    <button 
-                      onClick={() => handleLevelSelect(index)}
-                      className="hover:underline text-primary hover:text-primary/80 truncate max-w-24"
-                      title={cat.category_name}
-                    >
-                      {cat.category_name}
-                    </button>
-                  </React.Fragment>
-                ))}
-              </div>
-              {selectedPath.length > 0 && (
+            {/* Breadcrumb and Back Button */}
+            {!searchQuery && selectedPath.length > 0 && (
+              <div className="border-b px-3 py-2 bg-muted/50">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                  <button onClick={() => {
+                    setSelectedPath([]);
+                    const rootCategories = categories.filter(cat => !cat.parent_ebay_category_id);
+                    setCurrentLevel(rootCategories);
+                  }} className="hover:underline">
+                    Root
+                  </button>
+                  {selectedPath.map((cat, index) => (
+                    <span key={cat.ebay_category_id}>
+                      {' > '}
+                      <button 
+                        onClick={() => {
+                          const newPath = selectedPath.slice(0, index + 1);
+                          setSelectedPath(newPath);
+                          const children = categories.filter(c => c.parent_ebay_category_id === cat.ebay_category_id);
+                          setCurrentLevel(children);
+                        }}
+                        className="hover:underline"
+                      >
+                        {cat.category_name}
+                      </button>
+                    </span>
+                  ))}
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleLevelSelect(selectedPath.length - 2)}
-                  className="mt-1 h-6 px-2 text-xs"
+                  onClick={handleGoBack}
+                  className="h-6 px-2 text-xs"
                 >
-                  <ArrowUp className="h-3 w-3 mr-1" />
-                  Go Up
+                  <ArrowLeft className="h-3 w-3 mr-1" />
+                  Back
                 </Button>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* Current level options */}
-        {!searchQuery && (
-          <>
-            <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
-              {selectedPath.length === 0 ? 'Choose a Category' : 'Select Subcategory'}
-            </DropdownMenuLabel>
-            
-            {isLoadingChildren ? (
-              <DropdownMenuItem disabled className="flex items-center justify-center p-4">
-                <div className="w-4 h-4 border border-current border-t-transparent rounded-full animate-spin mr-2" />
-                Loading subcategories...
-              </DropdownMenuItem>
-            ) : currentLevel.length === 0 ? (
-              <DropdownMenuItem disabled>
-                No subcategories available
-              </DropdownMenuItem>
-            ) : (
-              <div className="space-y-1 p-1">
-                {currentLevel.map((category) => (
-                  <div key={category.ebay_category_id}>
-                    <DropdownMenuItem
-                      onClick={() => handleCategorySelect(category)}
-                      className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-md"
-                    >
-                      <span className="font-medium flex-1">{category.category_name}</span>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {category.leaf_category ? (
-                          <span className="text-xs text-green-600 font-semibold">✓ Final</span>
-                        ) : (
-                          <>
-                            <span className="text-xs text-muted-foreground">Has subcategories</span>
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          </>
-                        )}
-                      </div>
-                    </DropdownMenuItem>
-                    
-                    {/* Compact "Use This" option for non-leaf categories */}
-                    {!category.leaf_category && (
-                      <div className="px-3 pb-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUseThisCategory(category);
-                          }}
-                          className="text-xs text-primary hover:text-primary/80 underline"
-                        >
-                          Or use "{category.category_name}" as final category
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
               </div>
             )}
-          </>
-        )}
 
-        {/* Clear selection */}
-        {selectedPath.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => {
-                setSelectedPath([]);
-                const rootCategories = categories.filter(cat => !cat.parent_ebay_category_id);
-                setCurrentLevel(rootCategories);
-                // Reset all search state
-                setSearchQuery('');
-                setSearchResults([]);
-                setIsSearching(false);
-                onChange('', '');
-              }}
-              className="text-muted-foreground"
-            >
-              Clear Selection
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            {/* Current Level Categories */}
+            {!searchQuery && (
+              <CommandGroup 
+                heading={selectedPath.length === 0 ? 'Select Category' : 'Select Subcategory'}
+              >
+                {currentLevel.length === 0 ? (
+                  <CommandEmpty>No categories found</CommandEmpty>
+                ) : (
+                  currentLevel.map((category) => (
+                    <div key={category.ebay_category_id}>
+                      <CommandItem
+                        onSelect={() => handleCategorySelect(category)}
+                        className="flex items-center justify-between py-3"
+                      >
+                        <span className="flex-1">{category.category_name}</span>
+                        <div className="flex items-center gap-2">
+                          {category.leaf_category ? (
+                            <span className="text-xs text-green-600 font-medium">✓ Final</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Has subcategories</span>
+                          )}
+                          <ChevronDown className="h-4 w-4" />
+                        </div>
+                      </CommandItem>
+                      
+                      {/* Use This Category option for non-leaf categories */}
+                      {!category.leaf_category && (
+                        <div className="px-3 pb-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUseThisCategory(category);
+                            }}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Use "{category.category_name}" as final category
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </CommandGroup>
+            )}
+
+            {/* Clear Selection */}
+            {selectedPath.length > 0 && !searchQuery && (
+              <div className="border-t p-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPath([]);
+                    const rootCategories = categories.filter(cat => !cat.parent_ebay_category_id);
+                    setCurrentLevel(rootCategories);
+                    onChange('', '');
+                    setOpen(false);
+                  }}
+                  className="w-full text-muted-foreground"
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 };
 
