@@ -484,10 +484,45 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("❌ ERROR", { message: errorMessage });
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Enhanced error logging for debugging
+    logStep("❌ CRITICAL ERROR", { 
+      message: errorMessage,
+      stack: errorStack,
+      timestamp: new Date().toISOString(),
+      requestData: { listingId: requestData?.listingId, action: requestData?.action }
+    });
+    
+    // Log to Supabase for persistence (best effort)
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        { auth: { persistSession: false } }
+      );
+      
+      await supabaseClient.from('posting_queue').insert({
+        user_id: userData?.user?.id || 'unknown',
+        listing_id: requestData?.listingId || 'unknown',
+        platform: 'ebay',
+        queue_status: 'error',
+        error_message: errorMessage,
+        result_data: { 
+          error: errorMessage, 
+          stack: errorStack,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (logError) {
+      // Don't fail the response if logging fails
+      console.error('Failed to log error to database:', logError);
+    }
+    
     return new Response(JSON.stringify({ 
       status: 'error',
-      error: errorMessage
+      error: errorMessage,
+      timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

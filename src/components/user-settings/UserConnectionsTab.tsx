@@ -20,7 +20,7 @@ interface Platform {
 }
 
 const UserConnectionsTab = () => {
-  const { importSoldListings, importing } = useEbayIntegration();
+  // const { importSoldListings, importing } = useEbayIntegration(); // Temporarily disabled - using newer sync operation
   
   const [platforms, setPlatforms] = useState<Platform[]>([
     { name: 'Mercari', connected: false, autoList: false, icon: '📦' },
@@ -30,7 +30,8 @@ const UserConnectionsTab = () => {
   ]);
 
   const handleImportListings = async () => {
-    await importSoldListings(10);
+    // await importSoldListings(10); // Temporarily disabled - using newer sync operation
+    console.log('Import listings functionality temporarily disabled');
   };
 
   const handleGenericDisconnect = (platformName: string) => {

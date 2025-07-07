@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useEbayIntegration } from '@/hooks/useEbayIntegration';
+// import { useEbayIntegration } from '@/hooks/useEbayIntegration'; // Removed - using useEbaySyncOperation instead
 import BulkEbaySyncManager from './BulkEbaySyncManager';
 import type { Listing } from '@/types/Listing';
 

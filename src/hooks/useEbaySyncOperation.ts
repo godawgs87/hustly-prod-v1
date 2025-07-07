@@ -14,13 +14,42 @@ export const useEbaySyncOperation = () => {
     try {
       console.log('🔄 Starting eBay sync for listing:', listing.id, 'Title:', listing.title);
 
-      // Check if eBay account is connected
+      // Check if eBay account is connected and token is valid
       const { data: ebayAccount, error: accountError } = await supabase
         .from('marketplace_accounts')
         .select('*')
         .eq('platform', 'ebay')
         .eq('is_connected', true)
+        .eq('is_active', true)
         .single();
+
+      // Additional token validation
+      if (ebayAccount && ebayAccount.oauth_expires_at) {
+        const expiryTime = new Date(ebayAccount.oauth_expires_at);
+        const now = new Date();
+        if (expiryTime <= now) {
+          console.error('❌ eBay token expired:', { 
+            expiresAt: ebayAccount.oauth_expires_at, 
+            now: now.toISOString(),
+            accountUsername: ebayAccount.account_username 
+          });
+          
+          // Mark account as disconnected due to expired token
+          await supabase
+            .from('marketplace_accounts')
+            .update({ is_connected: false, is_active: false })
+            .eq('id', ebayAccount.id);
+          
+          toast({
+            title: "eBay Token Expired",
+            description: "Your eBay connection has expired. Please reconnect your account in Settings.",
+            variant: "destructive"
+          });
+          
+          setShowSetupNotification(true);
+          return { success: false, error: 'eBay token expired - reconnection required' };
+        }
+      }
 
       if (accountError || !ebayAccount) {
         console.error('❌ eBay account not connected:', accountError);
@@ -194,10 +223,26 @@ export const useEbaySyncOperation = () => {
 
       if (data?.status !== 'success') {
         const errorMsg = data?.error || 'Unknown error occurred';
-        console.error('❌ eBay sync failed:', errorMsg);
+        console.error('❌ eBay sync failed:', errorMsg, { 
+          fullResponse: data,
+          listingId: listing.id,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Enhanced error feedback with specific guidance
+        let userMessage = `Failed to sync to eBay: ${errorMsg}`;
+        if (errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('authentication')) {
+          userMessage = 'eBay authentication failed. Please reconnect your eBay account in Settings.';
+          setShowSetupNotification(true);
+        } else if (errorMsg.includes('25007') || errorMsg.includes('shipping')) {
+          userMessage = 'eBay shipping service error. Please check your shipping preferences in Settings.';
+        } else if (errorMsg.includes('25002') || errorMsg.includes('SKU')) {
+          userMessage = 'This item already exists in your eBay inventory. Please use a different SKU or update the existing listing.';
+        }
+        
         toast({
           title: "Sync Failed",
-          description: `Failed to sync to eBay: ${errorMsg}`,
+          description: userMessage,
           variant: "destructive"
         });
         return { success: false, error: errorMsg };
@@ -237,7 +282,34 @@ export const useEbaySyncOperation = () => {
         .select('*')
         .eq('platform', 'ebay')
         .eq('is_connected', true)
+        .eq('is_active', true)
         .single();
+
+      // Validate token for bulk sync
+      if (ebayAccount && ebayAccount.oauth_expires_at) {
+        const expiryTime = new Date(ebayAccount.oauth_expires_at);
+        const now = new Date();
+        if (expiryTime <= now) {
+          console.error('❌ Bulk sync: eBay token expired:', { 
+            expiresAt: ebayAccount.oauth_expires_at, 
+            now: now.toISOString() 
+          });
+          
+          await supabase
+            .from('marketplace_accounts')
+            .update({ is_connected: false, is_active: false })
+            .eq('id', ebayAccount.id);
+          
+          toast({
+            title: "eBay Token Expired",
+            description: "Your eBay connection has expired. Please reconnect your account in Settings.",
+            variant: "destructive"
+          });
+          
+          setShowSetupNotification(true);
+          return { success: false, error: 'eBay token expired - reconnection required' };
+        }
+      }
 
       if (accountError || !ebayAccount) {
         console.error('❌ eBay account not connected:', accountError);
@@ -347,7 +419,14 @@ export const useEbaySyncOperation = () => {
           });
 
           if (syncError || syncResult?.status === 'error') {
-            throw new Error(syncError?.message || syncResult?.error || 'Sync failed');
+            const errorMsg = syncError?.message || syncResult?.error || 'Sync failed';
+            console.error(`❌ Bulk sync item failed:`, { 
+              listingId: listing.id, 
+              error: errorMsg,
+              fullError: syncError,
+              fullResponse: syncResult 
+            });
+            throw new Error(errorMsg);
           }
 
           successCount++;

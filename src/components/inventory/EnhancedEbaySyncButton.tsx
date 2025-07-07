@@ -12,6 +12,7 @@ import type { Listing } from '@/types/Listing';
 import ListingValidation from './ListingValidation';
 import PlatformSetupNotifications from '@/components/notifications/PlatformSetupNotifications';
 import { testEbayShippingService, testAllShippingPreferences } from '@/utils/ebayShippingTest';
+import { validateEbayConnection, cleanupExpiredEbayConnections } from '@/utils/ebayConnectionValidator';
 
 interface EnhancedEbaySyncButtonProps {
   listing: Listing;
@@ -63,6 +64,21 @@ const EnhancedEbaySyncButton = ({ listing, onSyncComplete }: EnhancedEbaySyncBut
   const checkEbayStatus = async () => {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
+      
+      // First check connection status and clean up expired connections
+      await cleanupExpiredEbayConnections();
+      const connectionStatus = await validateEbayConnection();
+      
+      console.log('🔍 eBay connection validation:', connectionStatus);
+      
+      if (!connectionStatus.isConnected || !connectionStatus.isTokenValid) {
+        console.warn('⚠️ eBay connection issues detected:', connectionStatus.issues);
+        if (connectionStatus.needsReconnection) {
+          setShowSetupNotification(true);
+        }
+      }
+      
+      // Check if this listing is already synced
       const { data } = await supabase
         .from('platform_listings')
         .select(`*, marketplace_accounts!inner(platform)`)
@@ -86,6 +102,16 @@ const EnhancedEbaySyncButton = ({ listing, onSyncComplete }: EnhancedEbaySyncBut
     setRetryCount(0);
     updateProgress('validating', 10, 'Validating listing and account...');
     
+    // Pre-sync validation
+    const connectionStatus = await validateEbayConnection();
+    if (!connectionStatus.isConnected || !connectionStatus.isTokenValid) {
+      updateProgress('error', 0, 'Connection validation failed', 
+        `eBay connection issues: ${connectionStatus.issues.join(', ')}`);
+      setShowSetupNotification(true);
+      return;
+    }
+    
+    updateProgress('connecting', 30, 'Connecting to eBay...');
     const result = await syncToEbay(listing);
     
     if (result.success && result.data) {
