@@ -393,7 +393,19 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   }
 
   return (
-    <DropdownMenu onOpenChange={(open) => console.log('Dropdown state:', open)}>
+    <DropdownMenu 
+      onOpenChange={(open) => {
+        console.log('Dropdown state changed:', open);
+        if (!open) {
+          // Add small delay to prevent immediate closing
+          setTimeout(() => {
+            setSearchQuery('');
+            setSearchResults([]);
+            setIsSearching(false);
+          }, 100);
+        }
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button 
           variant="outline" 
@@ -401,7 +413,11 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
           className="w-full justify-between font-normal"
           onClick={(e) => {
             e.stopPropagation();
+            e.preventDefault();
             console.log('Category trigger clicked');
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
           }}
         >
           <span className="truncate">{getDisplayValue()}</span>
@@ -410,15 +426,41 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
       </DropdownMenuTrigger>
       
       <DropdownMenuContent 
-        className="w-80 sm:w-96 max-h-[70vh] overflow-y-auto bg-background border shadow-lg z-[100] p-0"
+        className="w-80 sm:w-96 max-h-[70vh] overflow-y-auto bg-background border shadow-lg z-[9999] p-0"
         align="start"
         sideOffset={5}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
+        side="bottom"
+        avoidCollisions={true}
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onEscapeKeyDown={(e) => {
+          e.stopPropagation();
+        }}
+        onPointerDownOutside={(e) => {
+          console.log('Pointer down outside - preventing default');
+          const target = e.target as Element;
+          // Only close if clicking outside the entire dropdown system
+          if (!target.closest('[data-radix-dropdown-menu-content]') && 
+              !target.closest('[data-radix-dropdown-menu-trigger]')) {
+            // Allow normal close behavior
+          } else {
+            e.preventDefault();
+          }
+        }}
+        onInteractOutside={(e) => {
+          console.log('Interact outside - preventing default');
+          const target = e.target as Element;
+          if (target.closest('[data-radix-dropdown-menu-content]') || 
+              target.closest('[data-radix-dropdown-menu-trigger]')) {
+            e.preventDefault();
+          }
+        }}
         style={{ 
           backgroundColor: 'hsl(var(--background))',
-          zIndex: 1000
+          zIndex: 9999,
+          position: 'relative'
         }}
       >
         {/* Search Box */}

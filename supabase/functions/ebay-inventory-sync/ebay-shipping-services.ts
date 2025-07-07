@@ -36,24 +36,24 @@ export interface FulfillmentDetails {
   };
 }
 
-// eBay Inventory API shipping service codes (different from Trading API)
-// Source: eBay Inventory API documentation - these codes work with fulfillmentDetails
+// eBay Trading API shipping service codes - Updated with correct codes from Trading API reference
+// Source: eBay Trading API GeteBayDetails - ShippingServiceDetails
 const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
-  'USPSPriorityMail': {
-    serviceCode: 'USPSPriorityMail',
-    displayName: 'USPS Priority Mail',
+  'USPSPriority': {
+    serviceCode: 'USPSPriority',
+    displayName: 'USPS Priority',
     estimatedDays: { min: 1, max: 3 },
     isValid: true
   },
-  'USPSFirstClassMail': {
-    serviceCode: 'USPSFirstClassMail',
-    displayName: 'USPS First Class Mail',
+  'USPSFirstClass': {
+    serviceCode: 'USPSFirstClass',
+    displayName: 'USPS First Class',
     estimatedDays: { min: 1, max: 3 },
     isValid: true
   },
-  'USPSGroundAdvantage': {
-    serviceCode: 'USPSGroundAdvantage',
-    displayName: 'USPS Ground Advantage',
+  'USPSGround': {
+    serviceCode: 'USPSGround',
+    displayName: 'US Postal Service Ground',
     estimatedDays: { min: 2, max: 8 },
     isValid: true
   },
@@ -63,28 +63,35 @@ const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
     estimatedDays: { min: 1, max: 2 },
     isValid: true
   },
-  'UPSGround': {
-    serviceCode: 'UPSGround',
-    displayName: 'UPS Ground',
-    estimatedDays: { min: 3, max: 5 },
+  'USPSPriorityFlatRateBox': {
+    serviceCode: 'USPSPriorityFlatRateBox',
+    displayName: 'USPS Priority Flat Rate Box',
+    estimatedDays: { min: 1, max: 3 },
+    isValid: true
+  },
+  'USPSMedia': {
+    serviceCode: 'USPSMedia',
+    displayName: 'USPS Media',
+    estimatedDays: { min: 2, max: 8 },
     isValid: true
   }
 };
 
-// User preference to eBay Inventory API service mapping
+// User preference to eBay Trading API service mapping
 const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
-  'usps_priority': 'USPSPriorityMail',
-  'usps_first_class': 'USPSFirstClassMail',
-  'usps_ground': 'USPSGroundAdvantage',
-  'ups_ground': 'UPSGround',
-  'standard': 'USPSPriorityMail',
-  'expedited': 'USPSPriorityMail',
+  'usps_priority': 'USPSPriority',
+  'usps_first_class': 'USPSFirstClass',
+  'usps_ground': 'USPSGround',
+  'usps_media': 'USPSMedia',
+  'standard': 'USPSPriority',
+  'expedited': 'USPSPriority',
   'overnight': 'USPSExpressMail',
-  'express': 'USPSExpressMail'
+  'express': 'USPSExpressMail',
+  'flat_rate': 'USPSPriorityFlatRateBox'
 };
 
-const DEFAULT_SERVICE = 'USPSPriorityMail'; // eBay Inventory API service code
-const FALLBACK_SERVICE = 'USPSPriorityMail';
+const DEFAULT_SERVICE = 'USPSPriority'; // eBay Trading API service code
+const FALLBACK_SERVICE = 'USPSPriority';
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
