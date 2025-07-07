@@ -1,0 +1,1 @@
+DELETE FROM marketplace_accounts WHERE platform = 'ebay' AND oauth_token LIKE 'mock_%';
