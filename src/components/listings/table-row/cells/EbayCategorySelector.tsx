@@ -35,7 +35,22 @@ interface EbayCategorySelectorProps {
   disabled?: boolean;
 }
 
-// Custom debounce hook
+// Enhanced search with special patterns for common terms
+const SEARCH_ENHANCEMENTS = {
+  'toy': ['Toys & Hobbies', 'Games'],
+  'game': ['Toys & Hobbies', 'Games', 'Video Games'],
+  'clothing': ['Clothing, Shoes & Accessories', 'Women', 'Men', 'Kids'],
+  'clothes': ['Clothing, Shoes & Accessories', 'Women', 'Men', 'Kids'],
+  'shoe': ['Clothing, Shoes & Accessories', 'Athletic Shoes', 'Casual Shoes'],
+  'car': ['eBay Motors', 'Automotive', 'Parts & Accessories'],
+  'book': ['Books', 'Textbooks', 'Fiction & Literature'],
+  'electronic': ['Electronics', 'Cell Phones', 'Computers'],
+  'jewelry': ['Jewelry & Watches', 'Fine Jewelry', 'Fashion Jewelry'],
+  'art': ['Art', 'Paintings', 'Antiques'],
+  'music': ['Music', 'CDs', 'Vinyl Records', 'Musical Instruments'],
+  'sport': ['Sporting Goods', 'Exercise & Fitness', 'Outdoor Sports']
+};
+
 const useDebounce = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -62,23 +77,17 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  // Debounce search query to prevent excessive filtering
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  // Load all categories on mount
   useEffect(() => {
     loadCategories();
   }, []);
 
-  // Build selected path when value changes
   useEffect(() => {
     if (value && categories.length > 0) {
       buildSelectedPath(value);
-    } else if (!value) {
-      // Reset to root when value is cleared
-      setSelectedPath([]);
-      const rootCategories = categories.filter(cat => !cat.parent_ebay_category_id);
-      setCurrentLevel(rootCategories);
+    } else if (!value && categories.length > 0) {
+      resetToRoot();
     }
   }, [value, categories]);
 
@@ -88,39 +97,51 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
       
       const { data, error } = await supabase
         .from('ebay_categories')
-        .select('*')
+        .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
         .eq('is_active', true)
         .order('category_name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
 
-      const validCategories = (data || []).filter(cat => 
+      if (!data || data.length === 0) {
+        console.warn('⚠️ No categories returned from database');
+        throw new Error('No categories found in database');
+      }
+
+      const validCategories = data.filter(cat => 
         cat.ebay_category_id && 
         cat.category_name && 
         cat.ebay_category_id.trim() !== '' &&
         cat.category_name.trim() !== ''
       );
 
-      console.log('✅ Loaded categories:', validCategories.length);
-      console.log('📊 Category breakdown:', {
+      const rootCategories = validCategories.filter(cat => !cat.parent_ebay_category_id);
+      
+      console.log('✅ Categories loaded successfully:', {
         total: validCategories.length,
-        roots: validCategories.filter(cat => !cat.parent_ebay_category_id).length,
+        roots: rootCategories.length,
         leaves: validCategories.filter(cat => cat.leaf_category).length
       });
       
-      // Log first few root categories for debugging
-      const rootCategories = validCategories.filter(cat => !cat.parent_ebay_category_id);
-      console.log('🌳 Root categories:', rootCategories.slice(0, 10).map(cat => cat.category_name));
+      console.log('🌳 Sample root categories:', rootCategories.slice(0, 5).map(cat => cat.category_name));
       
       setCategories(validCategories);
       setCurrentLevel(rootCategories);
+      
     } catch (error) {
-      console.error('❌ Error loading eBay categories:', error);
+      console.error('❌ Error loading categories:', error);
       toast({
         title: "Loading Failed",
         description: "Could not load eBay categories. Please try again.",
         variant: "destructive"
       });
+      
+      // Set empty state to prevent infinite loading
+      setCategories([]);
+      setCurrentLevel([]);
     } finally {
       setLoading(false);
     }
@@ -159,32 +180,66 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
     }
   }, [categories]);
 
-  // Enhanced search with fuzzy matching and hierarchical results
+  // Enhanced search with intelligent matching and hierarchical awareness
   const searchResults = useMemo(() => {
     if (!debouncedSearchQuery.trim()) return [];
     
-    const query = debouncedSearchQuery.toLowerCase();
-    const results: Array<EbayCategory & { score: number; fullPath: string }> = [];
+    const query = debouncedSearchQuery.toLowerCase().trim();
+    const results: Array<EbayCategory & { score: number; fullPath: string; matchType: string }> = [];
+    
+    // Check for enhanced search patterns
+    const enhancedTerms = SEARCH_ENHANCEMENTS[query] || [];
     
     categories.forEach(category => {
       const categoryName = category.category_name.toLowerCase();
       let score = 0;
+      let matchType = '';
+      
+      // Enhanced pattern matching for common search terms
+      if (enhancedTerms.length > 0) {
+        const isEnhancedMatch = enhancedTerms.some(term => 
+          categoryName.includes(term.toLowerCase())
+        );
+        if (isEnhancedMatch) {
+          score = 95;
+          matchType = 'enhanced';
+        }
+      }
       
       // Exact match gets highest score
       if (categoryName === query) {
-        score = 100;
+        score = Math.max(score, 100);
+        matchType = matchType || 'exact';
       }
       // Starts with query gets high score
       else if (categoryName.startsWith(query)) {
-        score = 90;
+        score = Math.max(score, 90);
+        matchType = matchType || 'starts';
       }
       // Contains query gets medium score
       else if (categoryName.includes(query)) {
-        score = 70;
+        score = Math.max(score, 70);
+        matchType = matchType || 'contains';
       }
       // Word boundary match gets lower score
-      else if (categoryName.split(' ').some(word => word.startsWith(query))) {
-        score = 50;
+      else if (categoryName.split(/[\s&-]+/).some(word => word.startsWith(query))) {
+        score = Math.max(score, 50);
+        matchType = matchType || 'word';
+      }
+      // Partial word match for longer queries
+      else if (query.length >= 3 && categoryName.split(/[\s&-]+/).some(word => word.includes(query))) {
+        score = Math.max(score, 30);
+        matchType = matchType || 'partial';
+      }
+      
+      // Boost score for root categories
+      if (!category.parent_ebay_category_id && score > 0) {
+        score += 20;
+      }
+      
+      // Boost score for leaf categories (final selectable)
+      if (category.leaf_category && score > 0) {
+        score += 10;
       }
       
       if (score > 0) {
@@ -204,15 +259,21 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         results.push({
           ...category,
           score,
-          fullPath: path.join(' > ')
+          fullPath: path.join(' > '),
+          matchType
         });
       }
     });
     
-    // Sort by score (descending) and then by name
+    // Sort by score (descending), then by category level (root first), then by name
     return results
-      .sort((a, b) => b.score - a.score || a.category_name.localeCompare(b.category_name))
-      .slice(0, 50);
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (!a.parent_ebay_category_id && b.parent_ebay_category_id) return -1;
+        if (a.parent_ebay_category_id && !b.parent_ebay_category_id) return 1;
+        return a.category_name.localeCompare(b.category_name);
+      })
+      .slice(0, 100);
   }, [debouncedSearchQuery, categories]);
 
   const handleCategorySelect = useCallback((category: EbayCategory, fromSearch = false) => {
@@ -290,8 +351,10 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   }, [selectedPath, categories]);
 
   const resetToRoot = useCallback(() => {
-    setSelectedPath([]);
+    console.log('🔄 Resetting to root categories');
     const rootCategories = categories.filter(cat => !cat.parent_ebay_category_id);
+    console.log('🌳 Root categories count:', rootCategories.length);
+    setSelectedPath([]);
     setCurrentLevel(rootCategories);
     setSearchQuery('');
   }, [categories]);
@@ -429,9 +492,9 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{result.category_name}</span>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
-                          {result.score}% match
-                        </Badge>
+                         <Badge variant="outline" className="text-xs">
+                           {Math.round(result.score)}% • {result.matchType}
+                         </Badge>
                         {result.leaf_category && (
                           <Badge variant="secondary" className="text-xs">
                             <Check className="h-3 w-3 mr-1" />
@@ -451,11 +514,23 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         ) : (
           // Current Level Categories
           <div className="p-2">
-            {currentLevel.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {categories.length === 0 ? 'No categories available' : 'No subcategories found'}
-              </div>
-            ) : (
+             {currentLevel.length === 0 ? (
+               <div className="text-center py-8 text-muted-foreground">
+                 <div>
+                   {categories.length === 0 ? 'No categories available' : 'No categories found at this level'}
+                 </div>
+                 {categories.length === 0 && (
+                   <Button 
+                     variant="outline" 
+                     onClick={loadCategories} 
+                     className="mt-4"
+                   >
+                     <Loader2 className="h-4 w-4 mr-2" />
+                     Retry Loading
+                   </Button>
+                 )}
+               </div>
+             ) : (
               <div className="space-y-1">
                 <div className="text-sm font-medium text-muted-foreground px-3 py-2">
                   {selectedPath.length === 0 ? `Categories (${currentLevel.length})` : `Subcategories (${currentLevel.length})`}
