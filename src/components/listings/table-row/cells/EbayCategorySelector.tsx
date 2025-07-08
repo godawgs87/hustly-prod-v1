@@ -108,6 +108,8 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         .eq('is_active', true)
         .order('category_name');
 
+      console.log('📊 Raw database response:', { dataCount: data?.length, error });
+
       if (error) {
         console.error('❌ Database error:', error);
         throw error;
@@ -127,16 +129,21 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
 
       const rootCategories = validCategories.filter(cat => !cat.parent_ebay_category_id);
       
-      console.log('✅ Categories loaded successfully:', {
+      console.log('✅ Categories processed:', {
         total: validCategories.length,
         roots: rootCategories.length,
         leaves: validCategories.filter(cat => cat.leaf_category).length
       });
       
-      console.log('🌳 All root categories:', rootCategories.map(cat => cat.category_name));
+      console.log('🌳 Root categories found:', rootCategories.map(cat => ({ 
+        id: cat.ebay_category_id, 
+        name: cat.category_name 
+      })));
       
       setCategories(validCategories);
       setCurrentLevel(rootCategories);
+      
+      console.log('🎯 State updated - currentLevel should now have:', rootCategories.length, 'categories');
       
     } catch (error) {
       console.error('❌ Error loading categories:', error);
@@ -404,10 +411,12 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   }, [selectedPath]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
     const newValue = e.target.value;
-    console.log('🔍 Search input changed:', newValue);
+    console.log('🔍 Search input changed from:', searchQuery, 'to:', newValue);
     setSearchQuery(newValue);
-  }, []);
+  }, [searchQuery]);
 
   const clearSearch = useCallback(() => {
     setSearchQuery('');
@@ -434,6 +443,8 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
             onChange={handleSearchChange}
             className="pl-10"
             autoComplete="off"
+            onKeyDown={(e) => e.stopPropagation()}
+            onFocus={(e) => e.stopPropagation()}
           />
           {searchQuery && (
             <Button
@@ -532,27 +543,31 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
           // Current Level Categories
           <div className="p-2">
              {currentLevel.length === 0 ? (
-               <div className="text-center py-8 text-muted-foreground">
-                 <div>
-                   {categories.length === 0 ? 'No categories available' : 'No categories found at this level'}
-                 </div>
-                 {categories.length === 0 && (
-                   <Button 
-                     variant="outline" 
-                     onClick={loadCategories} 
-                     className="mt-4"
-                   >
-                     <Loader2 className="h-4 w-4 mr-2" />
-                     Retry Loading
-                   </Button>
-                 )}
-               </div>
-             ) : (
-              <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground px-3 py-2">
-                  {selectedPath.length === 0 ? `Categories (${currentLevel.length})` : `Subcategories (${currentLevel.length})`}
+                <div className="text-center py-8 text-muted-foreground">
+                  <div>
+                    {categories.length === 0 ? 'No categories available' : `No categories found at this level (categories: ${categories.length}, currentLevel: ${currentLevel.length})`}
+                  </div>
+                  <div className="text-xs mt-2">
+                    Debug: Categories total: {categories.length}, CurrentLevel: {currentLevel.length}
+                  </div>
+                  {categories.length === 0 && (
+                    <Button 
+                      variant="outline" 
+                      onClick={loadCategories} 
+                      className="mt-4"
+                    >
+                      <Loader2 className="h-4 w-4 mr-2" />
+                      Retry Loading
+                    </Button>
+                  )}
                 </div>
-                {currentLevel.map((category) => (
+             ) : (
+               <div className="space-y-1">
+                 <div className="text-sm font-medium text-muted-foreground px-3 py-2">
+                   {selectedPath.length === 0 ? `Categories (${currentLevel.length})` : `Subcategories (${currentLevel.length})`}
+                   <div className="text-xs opacity-70">Debug: Rendering {currentLevel.length} items</div>
+                 </div>
+                 {currentLevel.map((category) => (
                   <div key={category.ebay_category_id} className="space-y-1">
                     <div
                       onClick={() => handleCategorySelect(category)}
