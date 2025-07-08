@@ -495,7 +495,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
   }
 
   const CategoryContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-[500px]">
       {/* Search Box */}
       <div className="p-4 border-b bg-background">
         <div className="relative">
@@ -728,11 +728,11 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="max-w-2xl h-[600px] p-0">
-        <DialogHeader className="p-4 border-b">
+      <DialogContent className="max-w-2xl max-h-[80vh] p-0 flex flex-col">
+        <DialogHeader className="p-4 border-b flex-shrink-0">
           <DialogTitle>Select eBay Category</DialogTitle>
         </DialogHeader>
-        <div className="h-full">
+        <div className="flex-1 overflow-hidden min-h-0">
           <CategoryContent />
         </div>
       </DialogContent>
