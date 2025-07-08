@@ -14,7 +14,6 @@ interface QuickFixCategoryButtonProps {
 }
 
 const QuickFixCategoryButton = ({ listing, onUpdate }: QuickFixCategoryButtonProps) => {
-  const [isOpen, setIsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
 
@@ -41,8 +40,6 @@ const QuickFixCategoryButton = ({ listing, onUpdate }: QuickFixCategoryButtonPro
           title: "eBay Category Set",
           description: "Listing is now ready for eBay sync",
         });
-        
-        setIsOpen(false);
       }
     } catch (error) {
       console.error('Failed to update eBay category:', error);
@@ -62,43 +59,25 @@ const QuickFixCategoryButton = ({ listing, onUpdate }: QuickFixCategoryButtonPro
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-orange-600 border-orange-200 hover:bg-orange-50">
-          <Settings className="w-4 h-4 mr-1" />
-          Set eBay Category
-          <Badge variant="destructive" className="ml-2 text-xs">
-            Required
-          </Badge>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="bg-white">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-orange-500" />
-            Set eBay Category
-          </DialogTitle>
-          <DialogDescription>
-            This listing needs an eBay-specific category to sync to eBay.
-            {listing.category && (
-              <span className="block mt-1 text-sm">
-                Current general category: <strong>{listing.category}</strong>
-              </span>
-            )}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <EbayCategorySelector
-            value={listing.ebay_category_id}
-            onChange={handleCategoryChange}
-            disabled={isUpdating}
-          />
-          {isUpdating && (
-            <div className="text-sm text-gray-500">Updating...</div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="flex flex-col gap-2">
+      <div className="text-xs text-orange-600 flex items-center gap-1">
+        <AlertTriangle className="w-3 h-3" />
+        eBay category required
+        {listing.category && (
+          <span className="text-muted-foreground">
+            (Current: {listing.category})
+          </span>
+        )}
+      </div>
+      <EbayCategorySelector
+        value={listing.ebay_category_id}
+        onChange={handleCategoryChange}
+        disabled={isUpdating}
+      />
+      {isUpdating && (
+        <div className="text-xs text-muted-foreground">Updating...</div>
+      )}
+    </div>
   );
 };
 
