@@ -234,6 +234,8 @@ const CategoryContent = React.memo(({
                   </div>
                   <div className="text-xs mt-2">
                     Debug: Categories total: {categories.length}, CurrentLevel: {currentLevel.length}
+                    <br />RootCategories: {rootCategories.length}
+                    <br />First few root: {rootCategories.slice(0, 3).map(cat => cat.category_name).join(', ')}
                   </div>
                   {categories.length === 0 && (
                     <Button 
@@ -448,6 +450,8 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       setCurrentLevel(validRootCategories);
       
       console.log('🎯 State updated - categories:', validAllCategories.length, 'currentLevel:', validRootCategories.length);
+      console.log('🔍 Root categories names:', validRootCategories.map(cat => cat.category_name));
+      console.log('🔍 Setting currentLevel to rootCategories with length:', validRootCategories.length);
       
     } catch (error) {
       console.error('❌ Error loading categories:', error);
@@ -821,7 +825,8 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
   const resetToRoot = useCallback(() => {
     console.log('🔄 Resetting to root categories');
     console.log('🌳 Root categories count:', rootCategories.length);
-    console.log('🌳 Root categories:', rootCategories.slice(0, 5).map(cat => cat.category_name));
+    console.log('🌳 Root categories:', rootCategories.slice(0, 10).map(cat => cat.category_name));
+    console.log('🔍 About to setCurrentLevel with:', rootCategories.length, 'categories');
     setSelectedPath([]);
     setCurrentLevel(rootCategories); // Use stored root categories instead of filtering
     // Don't clear search when resetting to root - let users keep searching
