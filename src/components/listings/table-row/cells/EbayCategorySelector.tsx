@@ -104,6 +104,14 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     }
   }, [value, categories]);
 
+  // Reset to root when dialog opens
+  useEffect(() => {
+    if (open && categories.length > 0 && !value) {
+      console.log('🔄 Dialog opened - resetting to root categories');
+      resetToRoot();
+    }
+  }, [open, categories, value]);
+
   const loadCategories = async () => {
     try {
       console.log('🔍 Loading eBay categories...');
@@ -384,6 +392,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     console.log('🔄 Resetting to root categories');
     const rootCategories = categories.filter(cat => !cat.parent_ebay_category_id);
     console.log('🌳 Root categories count:', rootCategories.length);
+    console.log('🌳 Root categories:', rootCategories.slice(0, 5).map(cat => cat.category_name));
     setSelectedPath([]);
     setCurrentLevel(rootCategories);
     setSearchQuery('');

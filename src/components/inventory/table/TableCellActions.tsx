@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import EbaySyncButton from '../EbaySyncButton';
 import InventoryDebugActions from '../InventoryDebugActions';
-import QuickFixCategoryButton from '../QuickFixCategoryButton';
+
 import type { Listing } from '@/types/Listing';
 
 interface TableCellActionsProps {
@@ -69,14 +69,6 @@ const TableCellActions = ({
         </div>
       ) : (
         <div className="flex gap-1">
-          {/* Category Button - Outside dropdown to prevent conflict */}
-          {!listing.ebay_category_id && onUpdateListing && (
-            <QuickFixCategoryButton 
-              listing={listing} 
-              onUpdate={onUpdateListing}
-            />
-          )}
-          
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">

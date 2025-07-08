@@ -23,18 +23,23 @@ const EditableCategoryCell = ({
   };
 
   return (
-    <>
+    <div className="space-y-2">
       <EbayCategorySelector
         value={ebayCategory}
         onChange={handleCategoryChange}
         disabled={disabled}
       />
+      {!ebayCategory && (
+        <div className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200">
+          ⚠️ eBay category required for sync
+        </div>
+      )}
       {category && !ebayCategory && (
-        <div className="mt-1 text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           Current: {category}
         </div>
       )}
-    </>
+    </div>
   );
 };
 
