@@ -452,13 +452,21 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     
     // Show children of selected category
     const parentId = String(category.ebay_category_id).trim();
+    console.log('🔍 Looking for children of category:', category.category_name, 'with ID:', parentId);
+    
     const children = categories.filter(cat => {
       const childParentId = cat.parent_ebay_category_id ? String(cat.parent_ebay_category_id).trim() : null;
-      return childParentId === parentId;
+      const isMatch = childParentId === parentId;
+      if (cat.category_name.includes('Baby') || cat.category_name.includes('Men') || cat.category_name.includes('Women')) {
+        console.log('🧩 Child check:', cat.category_name, 'parentId:', childParentId, 'targetId:', parentId, 'match:', isMatch);
+      }
+      return isMatch;
     });
+    
     console.log('👶 Found children for', category.category_name, ':', children.length, 'children');
     console.log('👶 Children names:', children.map(c => c.category_name));
-    console.log('🔍 Parent ID:', parentId, 'Child parent IDs:', children.map(c => c.parent_ebay_category_id));
+    console.log('🔍 Parent ID used:', parentId, 'Type:', typeof parentId);
+    console.log('🔍 Sample child parent IDs:', categories.slice(0, 5).map(c => ({ name: c.category_name, parentId: c.parent_ebay_category_id, type: typeof c.parent_ebay_category_id })));
     
     setCurrentLevel(children);
     setSearchQuery('');
