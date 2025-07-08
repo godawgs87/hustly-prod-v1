@@ -130,13 +130,23 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     try {
       console.log('🔍 Loading eBay categories...');
       
+      // First, get the total count
+      const { count } = await supabase
+        .from('ebay_categories')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+      
+      console.log('📊 Total active categories in DB:', count);
+      
+      // Load all categories with explicit limit removal
       const { data, error } = await supabase
         .from('ebay_categories')
         .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
         .eq('is_active', true)
-        .order('category_name');
+        .order('category_name')
+        .limit(20000); // Explicit high limit to ensure we get all categories
 
-      console.log('📊 Raw database response:', { dataCount: data?.length, error });
+      console.log('📊 Raw database response:', { dataCount: data?.length, error, totalExpected: count });
 
       if (error) {
         console.error('❌ Database error:', error);
@@ -160,7 +170,8 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       console.log('✅ Categories processed:', {
         total: validCategories.length,
         roots: rootCategories.length,
-        leaves: validCategories.filter(cat => cat.leaf_category).length
+        leaves: validCategories.filter(cat => cat.leaf_category).length,
+        expectedTotal: count
       });
       
       console.log('🌳 Root categories found:', rootCategories.map(cat => ({ 
