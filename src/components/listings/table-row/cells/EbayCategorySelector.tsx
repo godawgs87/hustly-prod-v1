@@ -404,16 +404,39 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         cat.category_name.trim() !== ''
       );
 
+      // Debug: Check ALL categories and their parent IDs to understand the data
+      console.log('🔍 Sample categories with parent IDs:', validAllCategories.slice(0, 20).map(cat => ({
+        name: cat.category_name,
+        parentId: cat.parent_ebay_category_id,
+        parentType: typeof cat.parent_ebay_category_id,
+        isNull: cat.parent_ebay_category_id === null,
+        isUndefined: cat.parent_ebay_category_id === undefined,
+        isEmpty: cat.parent_ebay_category_id === '',
+        isStringNull: cat.parent_ebay_category_id === 'null'
+      })));
+
       // Separate root categories for navigation - handle various null representations
-      const validRootCategories = validAllCategories.filter(cat => 
-        !cat.parent_ebay_category_id || 
-        cat.parent_ebay_category_id === null || 
-        cat.parent_ebay_category_id === 'null' || 
-        cat.parent_ebay_category_id === ''
-      );
+      const validRootCategories = validAllCategories.filter(cat => {
+        const parentId = cat.parent_ebay_category_id;
+        const isRoot = (
+          parentId === null || 
+          parentId === undefined || 
+          parentId === '' || 
+          parentId === 'null' ||
+          String(parentId).trim() === '' ||
+          String(parentId).toLowerCase() === 'null'
+        );
+        
+        // Log first few that we're considering as root
+        if (isRoot && validRootCategories.length < 5) {
+          console.log('✅ Found root category:', cat.category_name, 'parentId:', parentId);
+        }
+        
+        return isRoot;
+      });
 
       // Debug: Show what we found as root categories
-      console.log('🔍 Root categories found:', validRootCategories.map(cat => ({
+      console.log('🔍 All root categories found:', validRootCategories.map(cat => ({
         name: cat.category_name,
         id: cat.ebay_category_id,
         parentId: cat.parent_ebay_category_id
