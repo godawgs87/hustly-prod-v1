@@ -669,7 +669,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="max-w-2xl h-[600px] p-0 fixed top-[10%] left-[50%] translate-x-[-50%]">
+      <DialogContent className="max-w-2xl h-[600px] p-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle>Select eBay Category</DialogTitle>
         </DialogHeader>
