@@ -376,6 +376,14 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     try {
       console.log('🔍 Loading ALL eBay categories...');
       
+      // Environment detection for debugging
+      console.log('🌍 Environment info:', {
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        isLovablePreview: window.location.href.includes('lovable'),
+        timestamp: new Date().toISOString()
+      });
+      
       // Load ALL categories for complete hierarchy support
       const { data: allData, error: allError } = await supabase
         .from('ebay_categories')
@@ -399,12 +407,24 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         throw new Error('No categories found in database');
       }
 
+      // Raw data validation - log exactly what Supabase returns
+      console.log('📊 Raw Supabase data sample:', allData.slice(0, 5));
+
       const validAllCategories = allData.filter(cat => 
         cat.ebay_category_id && 
         cat.category_name && 
         cat.ebay_category_id.trim() !== '' &&
         cat.category_name.trim() !== ''
       );
+
+      // Enhanced null checking function for cross-environment compatibility
+      const isRootCategory = (parentId) => {
+        return parentId === null || 
+               parentId === undefined || 
+               parentId === '' || 
+               parentId === 'null' ||
+               String(parentId).toLowerCase() === 'null';
+      };
 
       // Debug: Check ALL categories and their parent IDs to understand the data
       console.log('🔍 Sample categories with parent IDs:', validAllCategories.slice(0, 20).map(cat => ({
@@ -414,18 +434,13 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         isNull: cat.parent_ebay_category_id === null,
         isUndefined: cat.parent_ebay_category_id === undefined,
         isEmpty: cat.parent_ebay_category_id === '',
-        isStringNull: cat.parent_ebay_category_id === 'null'
+        isStringNull: cat.parent_ebay_category_id === 'null',
+        isRootByFunction: isRootCategory(cat.parent_ebay_category_id)
       })));
 
-      // Separate root categories for navigation - simplified null check
-      console.log('🔍 First 10 categories with parent IDs:', validAllCategories.slice(0, 10).map(cat => ({
-        name: cat.category_name,
-        parentId: cat.parent_ebay_category_id,
-        isNull: cat.parent_ebay_category_id === null
-      })));
-
+      // Separate root categories using enhanced null checking
       const validRootCategories = validAllCategories.filter(cat => {
-        const isRoot = cat.parent_ebay_category_id === null;
+        const isRoot = isRootCategory(cat.parent_ebay_category_id);
         return isRoot;
       });
 
