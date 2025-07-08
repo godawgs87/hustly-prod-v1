@@ -416,6 +416,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       })));
 
       // Separate root categories for navigation - handle various null representations
+      let rootCount = 0;
       const validRootCategories = validAllCategories.filter(cat => {
         const parentId = cat.parent_ebay_category_id;
         const isRoot = (
@@ -428,8 +429,9 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         );
         
         // Log first few that we're considering as root
-        if (isRoot && validRootCategories.length < 5) {
+        if (isRoot && rootCount < 5) {
           console.log('✅ Found root category:', cat.category_name, 'parentId:', parentId);
+          rootCount++;
         }
         
         return isRoot;
