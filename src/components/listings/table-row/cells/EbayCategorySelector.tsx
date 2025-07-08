@@ -173,7 +173,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
         .eq('is_active', true)
         .order('category_name')
-        .limit(20000);
+        .limit(25000);
 
       console.log('📊 All categories query result:', { 
         dataCount: allData?.length, 
