@@ -220,14 +220,14 @@ export class EbayOfferManager {
       paymentPolicyValue: userProfile.ebay_payment_policy_id,
       fulfillmentPolicyValue: userProfile.ebay_fulfillment_policy_id,
       returnPolicyValue: userProfile.ebay_return_policy_id,
-      isIndividual: this.isIndividualAccount(userProfile),
-      codePath: this.isIndividualAccount(userProfile) ? 'INDIVIDUAL_ACCOUNT' : 'BUSINESS_ACCOUNT'
+      isIndividual: EbayOfferManager.isIndividualAccount(userProfile),
+      codePath: EbayOfferManager.isIndividualAccount(userProfile) ? 'INDIVIDUAL_ACCOUNT' : 'BUSINESS_ACCOUNT'
     });
 
-    if (this.isIndividualAccount(userProfile)) {
-      return await this.buildIndividualAccountOffer(listing, sku, userProfile, ebayLocationKey, this.userId);
+    if (EbayOfferManager.isIndividualAccount(userProfile)) {
+      return await EbayOfferManager.buildIndividualAccountOffer(listing, sku, userProfile, ebayLocationKey, this.userId);
     } else {
-      return this.buildBusinessAccountOffer(listing, sku, userProfile, ebayLocationKey);
+      return EbayOfferManager.buildBusinessAccountOffer(listing, sku, userProfile, ebayLocationKey);
     }
   }
 
