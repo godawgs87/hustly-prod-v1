@@ -78,6 +78,7 @@ const useDebounce = (value: string, delay: number) => {
 
 const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, onOpenChange }: EbayCategorySelectorProps) => {
   const [categories, setCategories] = useState<EbayCategory[]>([]);
+  const [rootCategories, setRootCategories] = useState<EbayCategory[]>([]); // Store root categories separately
   const [loading, setLoading] = useState(true);
   const [selectedPath, setSelectedPath] = useState<EbayCategory[]>([]);
   const [currentLevel, setCurrentLevel] = useState<EbayCategory[]>([]);
@@ -205,6 +206,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       
       console.log('🔄 Setting state - categories:', validAllCategories.length, 'currentLevel:', validRootCategories.length);
       setCategories(validAllCategories);
+      setRootCategories(validRootCategories); // Store root categories separately
       setCurrentLevel(validRootCategories);
       
       console.log('🎯 State updated - currentLevel should now have:', validRootCategories.length, 'categories');
@@ -412,24 +414,6 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     setSearchQuery('');
   }, [selectedPath, onChange]);
 
-  const handleGoBack = useCallback(() => {
-    if (selectedPath.length === 0) return;
-    
-    const newPath = selectedPath.slice(0, -1);
-    setSelectedPath(newPath);
-    
-    if (newPath.length === 0) {
-      // Back to root
-      const rootCategories = categories.filter(cat => !cat.parent_ebay_category_id);
-      setCurrentLevel(rootCategories);
-    } else {
-      // Show children of the new last category
-      const lastCategory = newPath[newPath.length - 1];
-      const children = categories.filter(cat => cat.parent_ebay_category_id === lastCategory.ebay_category_id);
-      setCurrentLevel(children);
-    }
-  }, [selectedPath, categories]);
-
   const navigateToCategory = useCallback((category: EbayCategory, index: number) => {
     const newPath = selectedPath.slice(0, index + 1);
     setSelectedPath(newPath);
@@ -438,15 +422,31 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     setSearchQuery('');
   }, [selectedPath, categories]);
 
+  const handleGoBack = useCallback(() => {
+    if (selectedPath.length === 0) return;
+    
+    const newPath = selectedPath.slice(0, -1);
+    setSelectedPath(newPath);
+    
+    if (newPath.length === 0) {
+      // Back to root - use stored root categories
+      setCurrentLevel(rootCategories);
+    } else {
+      // Show children of the new last category
+      const lastCategory = newPath[newPath.length - 1];
+      const children = categories.filter(cat => cat.parent_ebay_category_id === lastCategory.ebay_category_id);
+      setCurrentLevel(children);
+    }
+  }, [selectedPath, categories, rootCategories]);
+
   const resetToRoot = useCallback(() => {
     console.log('🔄 Resetting to root categories');
-    const rootCategories = categories.filter(cat => !cat.parent_ebay_category_id);
     console.log('🌳 Root categories count:', rootCategories.length);
     console.log('🌳 Root categories:', rootCategories.slice(0, 5).map(cat => cat.category_name));
     setSelectedPath([]);
-    setCurrentLevel(rootCategories);
+    setCurrentLevel(rootCategories); // Use stored root categories instead of filtering
     setSearchQuery('');
-  }, [categories]);
+  }, [rootCategories]); // Updated dependency
 
   const clearSelection = useCallback(() => {
     resetToRoot();
