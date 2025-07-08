@@ -85,8 +85,9 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
   const [internalOpen, setInternalOpen] = useState(false);
   
   // Use external control if provided, otherwise use internal state
-  const open = externalOpen !== undefined ? externalOpen : internalOpen;
-  const setOpen = onOpenChange || setInternalOpen;
+  const isControlled = externalOpen !== undefined && onOpenChange !== undefined;
+  const open = isControlled ? externalOpen : internalOpen;
+  const setOpen = isControlled ? onOpenChange : setInternalOpen;
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -104,13 +105,21 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     }
   }, [value, categories]);
 
-  // Reset to root when dialog opens
+  // Reset to root when dialog opens (only for non-controlled mode)
   useEffect(() => {
-    if (open && categories.length > 0 && !value) {
+    if (open && categories.length > 0 && !value && !isControlled) {
       console.log('🔄 Dialog opened - resetting to root categories');
       resetToRoot();
     }
-  }, [open, categories, value]);
+  }, [open, categories, value, isControlled]);
+
+  // For controlled mode, always reset to root when opening
+  useEffect(() => {
+    if (isControlled && open && categories.length > 0) {
+      console.log('🔄 Controlled dialog opened - resetting to root categories');
+      resetToRoot();
+    }
+  }, [isControlled, open, categories]);
 
   const loadCategories = async () => {
     try {
