@@ -118,7 +118,7 @@ const CategoryContent = React.memo(({
   clearSelection,
   isMobile
 }: CategoryContentProps) => (
-  <div className="flex flex-col h-full max-h-[70vh]">
+  <div className="flex flex-col h-full">
     {/* Search Box */}
     <div className="p-4 border-b bg-background flex-shrink-0">
       <div className="relative">
@@ -176,7 +176,7 @@ const CategoryContent = React.memo(({
 
     {/* Category List */}
     <div className="flex-1 min-h-0">
-      <div className="h-full overflow-y-auto" style={{ maxHeight: isMobile ? '400px' : '500px' }}>
+      <div className="h-full overflow-y-auto" style={{ maxHeight: isMobile ? '300px' : '400px' }}>
         {searchQuery ? (
           // Search Results
           <div className="p-2">
@@ -883,7 +883,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
           </Button>
         </SheetTrigger>
         
-        <SheetContent side="bottom" className="h-[85vh] p-0 flex flex-col">
+        <SheetContent side="bottom" className="max-h-[70vh] p-0 flex flex-col">
           <SheetHeader className="p-4 border-b flex-shrink-0">
             <SheetTitle>Select eBay Category</SheetTitle>
           </SheetHeader>
@@ -927,7 +927,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="max-w-2xl h-[80vh] p-0 flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[60vh] p-0 flex flex-col">
         <DialogHeader className="p-4 border-b flex-shrink-0">
           <DialogTitle>Select eBay Category</DialogTitle>
         </DialogHeader>
