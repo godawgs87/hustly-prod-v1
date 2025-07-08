@@ -495,9 +495,9 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
   }
 
   const CategoryContent = () => (
-    <div className="flex flex-col h-full min-h-[500px]">
+    <div className="flex flex-col h-full max-h-[70vh]">
       {/* Search Box */}
-      <div className="p-4 border-b bg-background">
+      <div className="p-4 border-b bg-background flex-shrink-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -522,7 +522,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
 
       {/* Breadcrumb */}
       {!searchQuery && selectedPath.length > 0 && (
-        <div className="p-4 border-b bg-muted/30">
+        <div className="p-4 border-b bg-muted/30 flex-shrink-0">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
             <button onClick={resetToRoot} className="hover:text-foreground hover:underline">
               Root
@@ -552,7 +552,8 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       )}
 
       {/* Category List */}
-      <div className="flex-1 overflow-y-auto min-h-0 max-h-full">
+      <div className="flex-1 min-h-0">
+        <div className="h-full overflow-y-auto max-h-[400px] border border-gray-200 rounded">
         {searchQuery ? (
           // Search Results
           <div className="p-2">
@@ -602,7 +603,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
           </div>
         ) : (
           // Current Level Categories
-          <div className="p-2 h-full overflow-y-auto">
+          <div className="p-2">
              {currentLevel.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <div>
@@ -671,12 +672,14 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
               </div>
             )}
           </div>
-        )}
+         )}
+         </div>
+        </div>
       </div>
 
       {/* Clear Selection */}
       {selectedPath.length > 0 && (
-        <div className="p-4 border-t bg-background">
+        <div className="p-4 border-t bg-background flex-shrink-0">
           <Button 
             variant="ghost" 
             onClick={clearSelection}
