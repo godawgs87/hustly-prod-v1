@@ -366,8 +366,24 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       .slice(0, 50);
   }, [debouncedSearchQuery, categories]);
 
+  const getCategoryPath = useCallback((category: EbayCategory): string => {
+    const path: string[] = [];
+    let currentCat: EbayCategory | undefined = category;
+    
+    while (currentCat) {
+      path.unshift(currentCat.category_name);
+      if (currentCat.parent_ebay_category_id) {
+        currentCat = categories.find(cat => cat.ebay_category_id === currentCat!.parent_ebay_category_id);
+      } else {
+        break;
+      }
+    }
+    
+    return path.join(' > ');
+  }, [categories]);
+
   const handleCategorySelect = useCallback((category: EbayCategory, fromSearch = false) => {
-    console.log('🔄 Category selected:', category.category_name, 'Leaf:', category.leaf_category);
+    console.log('🔄 Category selected:', category.category_name, 'Leaf:', category.leaf_category, 'FromSearch:', fromSearch);
     
     if (fromSearch) {
       // For search results, build the full path first
@@ -384,6 +400,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     } else {
       // For navigation, add to current path
       const newPath = [...selectedPath, category];
+      console.log('📍 New selected path:', newPath.map(cat => cat.category_name).join(' > '));
       setSelectedPath(newPath);
 
       if (category.leaf_category) {
@@ -400,9 +417,11 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     
     // Show children of selected category
     const children = categories.filter(cat => cat.parent_ebay_category_id === category.ebay_category_id);
+    console.log('👶 Found children for', category.category_name, ':', children.length, 'children');
+    console.log('👶 Children names:', children.map(c => c.category_name));
     setCurrentLevel(children);
     setSearchQuery('');
-  }, [selectedPath, categories, onChange, buildSelectedPath]);
+  }, [selectedPath, categories, onChange, buildSelectedPath, getCategoryPath]);
 
   const handleUseThisCategory = useCallback((category: EbayCategory) => {
     const newPath = [...selectedPath, category];
@@ -454,21 +473,6 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     setOpen(false);
   }, [resetToRoot, onChange]);
 
-  const getCategoryPath = useCallback((category: EbayCategory): string => {
-    const path: string[] = [];
-    let currentCat: EbayCategory | undefined = category;
-    
-    while (currentCat) {
-      path.unshift(currentCat.category_name);
-      if (currentCat.parent_ebay_category_id) {
-        currentCat = categories.find(cat => cat.ebay_category_id === currentCat!.parent_ebay_category_id);
-      } else {
-        break;
-      }
-    }
-    
-    return path.join(' > ');
-  }, [categories]);
 
   const getDisplayValue = useCallback(() => {
     if (selectedPath.length === 0) return "Select eBay Category";
@@ -520,8 +524,8 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         </div>
       </div>
 
-      {/* Breadcrumb */}
-      {!searchQuery && selectedPath.length > 0 && (
+      {/* Breadcrumb and Back Button */}
+      {selectedPath.length > 0 && (
         <div className="p-4 border-b bg-muted/30 flex-shrink-0">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
             <button onClick={resetToRoot} className="hover:text-foreground hover:underline">
