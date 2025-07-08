@@ -554,126 +554,125 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       {/* Category List */}
       <div className="flex-1 min-h-0">
         <div className="h-full overflow-y-auto max-h-[400px] border border-gray-200 rounded">
-        {searchQuery ? (
-          // Search Results
-          <div className="p-2">
-            {searchResults.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {debouncedSearchQuery !== searchQuery ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Searching...
-                  </div>
-                ) : (
-                  `No categories found for "${searchQuery}"`
-                )}
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground px-3 py-2">
-                  Search Results ({searchResults.length})
-                </div>
-                {searchResults.map((result) => (
-                  <div
-                    key={result.ebay_category_id}
-                    onClick={() => handleCategorySelect(result, true)}
-                    className="p-3 rounded-lg hover:bg-muted cursor-pointer border border-transparent hover:border-border transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{result.category_name}</span>
-                      <div className="flex items-center gap-2">
-                         <Badge variant="outline" className="text-xs">
-                           {Math.round(result.score)}% • {result.matchType}
-                         </Badge>
-                        {result.leaf_category && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Check className="h-3 w-3 mr-1" />
-                            Final
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {result.fullPath}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          // Current Level Categories
-          <div className="p-2">
-             {currentLevel.length === 0 ? (
+          {searchQuery ? (
+            // Search Results
+            <div className="p-2">
+              {searchResults.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <div>
-                    {categories.length === 0 ? 'No categories available' : `No categories found at this level (categories: ${categories.length}, currentLevel: ${currentLevel.length})`}
-                  </div>
-                  <div className="text-xs mt-2">
-                    Debug: Categories total: {categories.length}, CurrentLevel: {currentLevel.length}
-                  </div>
-                  {categories.length === 0 && (
-                    <Button 
-                      variant="outline" 
-                      onClick={loadCategories} 
-                      className="mt-4"
-                    >
-                      <Loader2 className="h-4 w-4 mr-2" />
-                      Retry Loading
-                    </Button>
+                  {debouncedSearchQuery !== searchQuery ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Searching...
+                    </div>
+                  ) : (
+                    `No categories found for "${searchQuery}"`
                   )}
                 </div>
-             ) : (
-               <div className="space-y-1">
-                 <div className="text-sm font-medium text-muted-foreground px-3 py-2">
-                   {selectedPath.length === 0 ? `Categories (${currentLevel.length})` : `Subcategories (${currentLevel.length})`}
-                   <div className="text-xs opacity-70">Debug: Rendering {currentLevel.length} items</div>
-                 </div>
-                 {currentLevel.map((category) => (
-                  <div key={category.ebay_category_id} className="space-y-1">
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-muted-foreground px-3 py-2">
+                    Search Results ({searchResults.length})
+                  </div>
+                  {searchResults.map((result) => (
                     <div
-                      onClick={() => handleCategorySelect(category)}
+                      key={result.ebay_category_id}
+                      onClick={() => handleCategorySelect(result, true)}
                       className="p-3 rounded-lg hover:bg-muted cursor-pointer border border-transparent hover:border-border transition-colors"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium">{category.category_name}</span>
+                        <span className="font-medium">{result.category_name}</span>
                         <div className="flex items-center gap-2">
-                          {category.leaf_category ? (
+                           <Badge variant="outline" className="text-xs">
+                             {Math.round(result.score)}% • {result.matchType}
+                           </Badge>
+                          {result.leaf_category && (
                             <Badge variant="secondary" className="text-xs">
                               <Check className="h-3 w-3 mr-1" />
                               Final
                             </Badge>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-muted-foreground">Has subcategories</span>
-                              <ChevronDown className="h-4 w-4" />
-                            </div>
                           )}
                         </div>
                       </div>
-                    </div>
-                    
-                    {/* Use This Category option for non-leaf categories */}
-                    {!category.leaf_category && (
-                      <div className="px-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUseThisCategory(category);
-                          }}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          Use "{category.category_name}" as final category
-                        </button>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {result.fullPath}
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            // Current Level Categories
+            <div className="p-2">
+               {currentLevel.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <div>
+                      {categories.length === 0 ? 'No categories available' : `No categories found at this level (categories: ${categories.length}, currentLevel: ${currentLevel.length})`}
+                    </div>
+                    <div className="text-xs mt-2">
+                      Debug: Categories total: {categories.length}, CurrentLevel: {currentLevel.length}
+                    </div>
+                    {categories.length === 0 && (
+                      <Button 
+                        variant="outline" 
+                        onClick={loadCategories} 
+                        className="mt-4"
+                      >
+                        <Loader2 className="h-4 w-4 mr-2" />
+                        Retry Loading
+                      </Button>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-         )}
-         </div>
+               ) : (
+                 <div className="space-y-1">
+                   <div className="text-sm font-medium text-muted-foreground px-3 py-2">
+                     {selectedPath.length === 0 ? `Categories (${currentLevel.length})` : `Subcategories (${currentLevel.length})`}
+                     <div className="text-xs opacity-70">Debug: Rendering {currentLevel.length} items</div>
+                   </div>
+                   {currentLevel.map((category) => (
+                    <div key={category.ebay_category_id} className="space-y-1">
+                      <div
+                        onClick={() => handleCategorySelect(category)}
+                        className="p-3 rounded-lg hover:bg-muted cursor-pointer border border-transparent hover:border-border transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{category.category_name}</span>
+                          <div className="flex items-center gap-2">
+                            {category.leaf_category ? (
+                              <Badge variant="secondary" className="text-xs">
+                                <Check className="h-3 w-3 mr-1" />
+                                Final
+                              </Badge>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-muted-foreground">Has subcategories</span>
+                                <ChevronDown className="h-4 w-4" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Use This Category option for non-leaf categories */}
+                      {!category.leaf_category && (
+                        <div className="px-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUseThisCategory(category);
+                            }}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Use "{category.category_name}" as final category
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+           )}
         </div>
       </div>
 
