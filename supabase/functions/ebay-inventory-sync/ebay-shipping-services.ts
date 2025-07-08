@@ -99,8 +99,8 @@ const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
   'fedex_ground': 'Other'             // ✅ Map unsupported to safe option
 };
 
-const DEFAULT_SERVICE = 'Other'; // Most basic individual seller compatible service
-const FALLBACK_SERVICE = 'Other'; // Ultimate fallback - generic "Other" service
+const DEFAULT_SERVICE = 'USPSGround'; // Most modern USPS service - try this first
+const FALLBACK_SERVICE = 'US_Postal'; // Ultimate fallback - most basic USPS service
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
