@@ -130,59 +130,73 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     try {
       console.log('🔍 Loading eBay categories...');
       
-      // First, get the total count
-      const { count } = await supabase
-        .from('ebay_categories')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
-      
-      console.log('📊 Total active categories in DB:', count);
-      
-      // Load all categories with explicit limit removal
-      const { data, error } = await supabase
+      // First, load root categories specifically
+      const { data: rootData, error: rootError } = await supabase
         .from('ebay_categories')
         .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
         .eq('is_active', true)
-        .order('category_name')
-        .limit(20000); // Explicit high limit to ensure we get all categories
+        .is('parent_ebay_category_id', null)
+        .order('category_name');
 
-      console.log('📊 Raw database response:', { dataCount: data?.length, error, totalExpected: count });
+      console.log('🌳 Root categories query result:', { dataCount: rootData?.length, error: rootError });
 
-      if (error) {
-        console.error('❌ Database error:', error);
-        throw error;
+      if (rootError) {
+        console.error('❌ Root categories error:', rootError);
+        throw rootError;
       }
 
-      if (!data || data.length === 0) {
-        console.warn('⚠️ No categories returned from database');
-        throw new Error('No categories found in database');
+      if (!rootData || rootData.length === 0) {
+        console.warn('⚠️ No root categories found');
+        throw new Error('No root categories found in database');
       }
 
-      const validCategories = data.filter(cat => 
+      const validRootCategories = rootData.filter(cat => 
         cat.ebay_category_id && 
         cat.category_name && 
         cat.ebay_category_id.trim() !== '' &&
         cat.category_name.trim() !== ''
       );
 
-      const rootCategories = validCategories.filter(cat => !cat.parent_ebay_category_id);
-      
+      console.log('🌳 Valid root categories:', validRootCategories.length);
+      console.log('🌳 Root category names:', validRootCategories.map(cat => cat.category_name));
+
+      // Now load all categories for navigation
+      const { data: allData, error: allError } = await supabase
+        .from('ebay_categories')
+        .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
+        .eq('is_active', true)
+        .order('category_name')
+        .limit(20000);
+
+      console.log('📊 All categories query result:', { dataCount: allData?.length, error: allError });
+
+      if (allError) {
+        console.error('❌ All categories error:', allError);
+        // Still proceed with root categories if we have them
+        console.log('⚠️ Continuing with root categories only');
+        setCategories(validRootCategories);
+        setCurrentLevel(validRootCategories);
+        setLoading(false);
+        return;
+      }
+
+      const validAllCategories = allData?.filter(cat => 
+        cat.ebay_category_id && 
+        cat.category_name && 
+        cat.ebay_category_id.trim() !== '' &&
+        cat.category_name.trim() !== ''
+      ) || [];
+
       console.log('✅ Categories processed:', {
-        total: validCategories.length,
-        roots: rootCategories.length,
-        leaves: validCategories.filter(cat => cat.leaf_category).length,
-        expectedTotal: count
+        allCategories: validAllCategories.length,
+        rootCategories: validRootCategories.length,
+        leaves: validAllCategories.filter(cat => cat.leaf_category).length
       });
       
-      console.log('🌳 Root categories found:', rootCategories.map(cat => ({ 
-        id: cat.ebay_category_id, 
-        name: cat.category_name 
-      })));
+      setCategories(validAllCategories);
+      setCurrentLevel(validRootCategories);
       
-      setCategories(validCategories);
-      setCurrentLevel(rootCategories);
-      
-      console.log('🎯 State updated - currentLevel should now have:', rootCategories.length, 'categories');
+      console.log('🎯 State updated - currentLevel should now have:', validRootCategories.length, 'categories');
       
     } catch (error) {
       console.error('❌ Error loading categories:', error);
