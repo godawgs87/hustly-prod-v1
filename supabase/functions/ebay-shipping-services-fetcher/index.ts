@@ -147,9 +147,28 @@ async function refreshShippingServices(supabase: any, marketplaceAccount: any): 
   const appId = Deno.env.get('EBAY_CLIENT_ID');
   const certId = Deno.env.get('EBAY_CLIENT_SECRET');
 
+  console.log('[EBAY-SERVICES-FETCHER] 🔍 CRITICAL DEBUG - Credential check:', {
+    hasDevId: !!devId,
+    hasAppId: !!appId,
+    hasCertId: !!certId,
+    devIdFirst4: devId ? devId.substring(0, 4) + '...' : 'MISSING',
+    appIdFirst4: appId ? appId.substring(0, 4) + '...' : 'MISSING'
+  });
+
   if (!devId || !appId || !certId) {
-    throw new Error('Missing eBay API credentials');
+    const missingCreds = [];
+    if (!devId) missingCreds.push('EBAY_DEV_ID');
+    if (!appId) missingCreds.push('EBAY_CLIENT_ID'); 
+    if (!certId) missingCreds.push('EBAY_CLIENT_SECRET');
+    throw new Error(`Missing eBay API credentials: ${missingCreds.join(', ')}`);
   }
+
+  console.log('[EBAY-SERVICES-FETCHER] 🔍 CRITICAL DEBUG - Marketplace account check:', {
+    hasOauthToken: !!marketplaceAccount.oauth_token,
+    tokenFirst10: marketplaceAccount.oauth_token ? marketplaceAccount.oauth_token.substring(0, 10) + '...' : 'MISSING',
+    accountUsername: marketplaceAccount.account_username,
+    sellerLevel: marketplaceAccount.seller_level
+  });
 
   if (!marketplaceAccount.oauth_token) {
     throw new Error('No eBay auth token available');

@@ -39,7 +39,7 @@ export interface FulfillmentDetails {
 // eBay Inventory API Compatible Shipping Service Codes
 // These are specifically for the Inventory API (different from Trading API)
 const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
-  // Most basic and widely accepted Inventory API service codes
+  // ✅ UPDATED: Most widely accepted Inventory API service codes based on eBay API docs
   'Other': {
     serviceCode: 'Other',
     displayName: 'Standard Shipping',
@@ -52,20 +52,22 @@ const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
     estimatedDays: { min: 3, max: 7 },
     isValid: true
   },
-  'USPS_PRIORITY': {
-    serviceCode: 'USPS_PRIORITY',
+  // ❌ REMOVE INVALID CODES - These are causing eBay Error 25007
+  // These hardcoded service codes are not working, will be replaced by eBay API fetched codes
+  'USPSPriorityMail': {
+    serviceCode: 'USPSPriorityMail',
     displayName: 'USPS Priority Mail',
     estimatedDays: { min: 1, max: 3 },
     isValid: true
   },
-  'USPS_FIRST_CLASS': {
-    serviceCode: 'USPS_FIRST_CLASS',
-    displayName: 'USPS First Class',
-    estimatedDays: { min: 1, max: 3 },
+  'USPSGround': {
+    serviceCode: 'USPSGround',
+    displayName: 'USPS Ground Advantage',
+    estimatedDays: { min: 3, max: 5 },
     isValid: true
   },
-  'USPS_MEDIA_MAIL': {
-    serviceCode: 'USPS_MEDIA_MAIL',
+  'USPSMedia': {
+    serviceCode: 'USPSMedia',
     displayName: 'USPS Media Mail',
     estimatedDays: { min: 2, max: 8 },
     isValid: true
@@ -74,20 +76,20 @@ const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
 
 // User preference to Inventory API compatible eBay service mapping
 const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
-  // Inventory API validated mappings
+  // ✅ UPDATED: Updated mappings to use new service codes that should work
   'other': 'Other',                    // ✅ Most compatible fallback
-  'usps_media': 'USPS_MEDIA_MAIL',     // ✅ Media mail
-  'usps_priority_flat': 'USPS_PRIORITY', // ✅ Priority
-  'usps_express_flat': 'USPS_PRIORITY',  // ✅ Map to Priority  
-  'usps_ground': 'US_Postal',          // ✅ Map to basic USPS
-  // Legacy mappings - all map to Inventory API services
-  'usps_priority': 'USPS_PRIORITY',    // ✅ Direct mapping
-  'usps_first_class': 'USPS_FIRST_CLASS', // ✅ Direct mapping
+  'usps_media': 'USPSMedia',           // ✅ Media mail - updated
+  'usps_priority_flat': 'USPSPriorityMail', // ✅ Priority - updated
+  'usps_express_flat': 'USPSPriorityMail',  // ✅ Map to Priority - updated
+  'usps_ground': 'USPSGround',         // ✅ USPS Ground Advantage - updated
+  // Legacy mappings - all map to updated service codes
+  'usps_priority': 'USPSPriorityMail', // ✅ Updated to new code
+  'usps_first_class': 'USPSGround',    // ✅ Map to Ground (First Class discontinued)
   'standard': 'Other',                 // ✅ Map to Other (most compatible)
-  'expedited': 'USPS_PRIORITY',        // ✅ Map to Priority
-  'overnight': 'USPS_PRIORITY',        // ✅ Map to Priority
-  'express': 'USPS_PRIORITY',          // ✅ Map to Priority
-  'flat_rate': 'USPS_PRIORITY',        // ✅ Map to Priority
+  'expedited': 'USPSPriorityMail',     // ✅ Map to Priority - updated
+  'overnight': 'USPSPriorityMail',     // ✅ Map to Priority - updated
+  'express': 'USPSPriorityMail',       // ✅ Map to Priority - updated
+  'flat_rate': 'USPSPriorityMail',     // ✅ Map to Priority - updated
   'ups_ground': 'Other',               // ✅ Map unsupported to Other
   'fedex_ground': 'Other'              // ✅ Map unsupported to Other
 };
@@ -106,7 +108,7 @@ export class EbayShippingServices {
    */
   static async fetchValidServices(userId: string, forceRefresh = false): Promise<any[]> {
     try {
-      this.logStep('Fetching valid services from eBay API', { userId, forceRefresh });
+      this.logStep('🔍 CRITICAL DEBUG - Attempting to fetch valid services from eBay API', { userId, forceRefresh });
       
       const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.50.3');
       const supabase = createClient(
@@ -116,22 +118,40 @@ export class EbayShippingServices {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
 
+      this.logStep('🚀 CRITICAL DEBUG - About to call ebay-shipping-services-fetcher', { userId, forceRefresh });
+
       const response = await supabase.functions.invoke('ebay-shipping-services-fetcher', {
         body: { userId, forceRefresh }
       });
 
+      this.logStep('📡 CRITICAL DEBUG - Response from ebay-shipping-services-fetcher', { 
+        response: JSON.stringify(response, null, 2),
+        hasError: !!response.error,
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : 'NO_DATA'
+      });
+
       if (response.error) {
+        this.logStep('❌ CRITICAL DEBUG - Error from shipping services fetcher', { 
+          error: response.error,
+          errorMessage: response.error.message 
+        });
         throw new Error(`Failed to fetch services: ${response.error.message}`);
       }
 
       this.logStep('✅ Successfully fetched valid services', {
         serviceCount: response.data?.services?.length || 0,
-        cached: response.data?.cached
+        cached: response.data?.cached,
+        services: response.data?.services
       });
 
       return response.data?.services || [];
     } catch (error) {
-      this.logStep('❌ Error fetching valid services, using fallbacks', { error: error.message });
+      this.logStep('❌ CRITICAL DEBUG - Exception in fetchValidServices', { 
+        error: error.message,
+        stack: error.stack,
+        errorType: error.constructor.name 
+      });
       return [];
     }
   }
