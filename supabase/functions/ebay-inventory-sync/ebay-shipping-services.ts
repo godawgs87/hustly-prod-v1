@@ -92,7 +92,7 @@ const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
   'flat_rate': 'USPSPriorityFlatRateBox'
 };
 
-const DEFAULT_SERVICE = 'US_Postal'; // Most basic individual seller compatible service
+const DEFAULT_SERVICE = 'USPSGround'; // Most basic individual seller compatible service
 const FALLBACK_SERVICE = 'Other'; // Ultimate fallback - generic "Other" service
 
 export class EbayShippingServices {
