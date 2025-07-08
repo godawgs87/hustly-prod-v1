@@ -372,50 +372,53 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
 
   const loadCategories = async () => {
     try {
-      console.log('🔍 Loading root eBay categories...');
+      console.log('🔍 Loading ALL eBay categories...');
       
-      // Only load root categories initially
-      const { data: rootData, error: rootError } = await supabase
+      // Load ALL categories for complete hierarchy support
+      const { data: allData, error: allError } = await supabase
         .from('ebay_categories')
         .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
         .eq('is_active', true)
-        .is('parent_ebay_category_id', null)
         .order('category_name');
 
-      console.log('🌳 Root categories query result:', { 
-        dataCount: rootData?.length, 
-        error: rootError,
-        firstFew: rootData?.slice(0, 5)?.map(cat => cat.category_name)
+      console.log('🌳 All categories query result:', { 
+        dataCount: allData?.length, 
+        error: allError,
+        firstFew: allData?.slice(0, 5)?.map(cat => cat.category_name)
       });
 
-      if (rootError) {
-        console.error('❌ Root categories error:', rootError);
-        throw rootError;
+      if (allError) {
+        console.error('❌ All categories error:', allError);
+        throw allError;
       }
 
-      if (!rootData || rootData.length === 0) {
-        console.warn('⚠️ No root categories found');
-        throw new Error('No root categories found in database');
+      if (!allData || allData.length === 0) {
+        console.warn('⚠️ No categories found');
+        throw new Error('No categories found in database');
       }
 
-      const validRootCategories = rootData.filter(cat => 
+      const validAllCategories = allData.filter(cat => 
         cat.ebay_category_id && 
         cat.category_name && 
         cat.ebay_category_id.trim() !== '' &&
         cat.category_name.trim() !== ''
       );
 
-      console.log('🌳 Valid root categories:', {
-        count: validRootCategories.length,
-        names: validRootCategories.map(cat => cat.category_name)
+      // Separate root categories for navigation
+      const validRootCategories = validAllCategories.filter(cat => !cat.parent_ebay_category_id);
+
+      console.log('🌳 Valid categories:', {
+        total: validAllCategories.length,
+        roots: validRootCategories.length,
+        rootNames: validRootCategories.slice(0, 5).map(cat => cat.category_name)
       });
       
-      // Initialize with root categories only
-      setCategories(validRootCategories);
+      // Set ALL categories for complete hierarchy support (this fixes search selection!)
+      setCategories(validAllCategories);
       setRootCategories(validRootCategories);
       setCurrentLevel(validRootCategories);
       
-      console.log('🎯 State updated - currentLevel should now have:', validRootCategories.length, 'categories');
+      console.log('🎯 State updated - categories:', validAllCategories.length, 'currentLevel:', validRootCategories.length);
       
     } catch (error) {
       console.error('❌ Error loading categories:', error);
