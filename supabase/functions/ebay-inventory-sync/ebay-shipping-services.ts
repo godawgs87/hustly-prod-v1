@@ -102,37 +102,19 @@ export class EbayShippingServices {
   }
 
   /**
-   * Maps user shipping preference to valid eBay service code - SYSTEMATIC TESTING PHASES
+   * Maps user shipping preference to valid eBay service code
    */
   static mapUserPreferenceToEbayService(userPreference?: string): string {
-    // 🧪 PHASE 1: Test with NO service code first
-    const testPhase = Deno.env.get('EBAY_SHIPPING_TEST_PHASE') || 'PHASE_1_NO_CODE';
+    // Use basic mapping to standard eBay service codes
+    const serviceCode = PREFERENCE_TO_EBAY_SERVICE[userPreference || 'standard'] || DEFAULT_SERVICE;
     
-    this.logStep(`🧪 SYSTEMATIC TESTING - ${testPhase}`, {
+    this.logStep('Mapping user preference to eBay service', {
       userPreference: userPreference || 'none',
-      testingPhase: testPhase,
-      reason: 'Testing systematic approach to find working service code'
+      mappedService: serviceCode,
+      isValidService: this.isValidService(serviceCode)
     });
 
-    switch (testPhase) {
-      case 'PHASE_1_NO_CODE':
-        return ''; // No service code - let eBay use defaults
-      
-      case 'PHASE_3_MODERN_USPS':
-        // Modern USPS service codes
-        const modernCodes = ['USPS_GROUND_ADVANTAGE', 'USPS_PRIORITY_MAIL', 'USPS_PRIORITY_MAIL_EXPRESS'];
-        const selectedCode = modernCodes[0]; // Start with Ground Advantage
-        this.logStep('Using modern USPS service code', { selectedCode });
-        return selectedCode;
-      
-      case 'PHASE_4_WORKING_CONFIG':
-        // Use the proven working service code
-        return VALIDATED_EBAY_SERVICES['US_Postal']?.serviceCode || 'USPS_GROUND_ADVANTAGE';
-      
-      default:
-        // Fallback to no service code
-        return '';
-    }
+    return serviceCode;
   }
 
   /**
@@ -175,18 +157,14 @@ export class EbayShippingServices {
       handlingTime
     });
 
-    // 🧪 SYSTEMATIC TESTING: Create shipping service based on phase
+    // Create shipping service with service code
     const shippingService: any = {
+      serviceCode: serviceCode,
       shippingCost: {
         value: domesticCost.toFixed(2),
         currency: "USD"
       }
     };
-
-    // Only add serviceCode if it's not empty (Phase 1 test)
-    if (serviceCode && serviceCode.trim() !== '') {
-      shippingService.serviceCode = serviceCode;
-    }
 
     const fulfillmentDetails: FulfillmentDetails = {
       handlingTime: {
@@ -255,16 +233,8 @@ export class EbayShippingServices {
       }
 
       option.shippingServices.forEach((service, serviceIndex) => {
-        // PHASE 1: Allow empty service codes (eBay might use defaults)
-        const testPhase = Deno.env.get('EBAY_SHIPPING_TEST_PHASE') || 'PHASE_1_NO_CODE';
-        
-        if (testPhase !== 'PHASE_1_NO_CODE' && !service.serviceCode) {
+        if (!service.serviceCode) {
           errors.push(`Shipping service ${serviceIndex + 1} in option ${optionIndex + 1} missing service code`);
-        } else if (service.serviceCode && !this.isValidService(service.serviceCode)) {
-          // Only validate service code if it exists and we're not testing modern codes
-          if (testPhase !== 'PHASE_3_MODERN_USPS') {
-            errors.push(`Invalid shipping service code: ${service.serviceCode}`);
-          }
         }
 
         if (!service.shippingCost || !service.shippingCost.value) {
@@ -386,41 +356,6 @@ export class EbayShippingServices {
     return fulfillmentDetails;
   }
 
-  /**
-   * PHASE 2: Query eBay API for valid shipping services
-   */
-  static async queryEbayShippingServices(accessToken: string): Promise<any> {
-    try {
-      this.logStep('🔍 PHASE 2: Querying eBay API for valid shipping services');
-      
-      const response = await fetch('https://api.ebay.com/sell/metadata/v1/marketplace/EBAY_US/get_shipping_services', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`eBay API error: ${response.status} - ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      this.logStep('✅ PHASE 2: eBay shipping services response', {
-        servicesCount: data.shippingServices?.length || 0,
-        sampleServices: data.shippingServices?.slice(0, 5).map((s: any) => s.shippingServiceCode) || []
-      });
-
-      return data;
-    } catch (error) {
-      this.logStep('❌ PHASE 2: Failed to query eBay shipping services', { 
-        error: error instanceof Error ? error.message : String(error) 
-      });
-      throw error;
-    }
-  }
 
   /**
    * Lists all available validated eBay services
