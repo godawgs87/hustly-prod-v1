@@ -33,6 +33,8 @@ interface EbayCategorySelectorProps {
   value?: string | null;
   onChange: (categoryId: string, categoryPath: string) => void;
   disabled?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 // Enhanced search with special patterns for common terms
@@ -74,13 +76,17 @@ const useDebounce = (value: string, delay: number) => {
   return debouncedValue;
 };
 
-const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelectorProps) => {
+const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, onOpenChange }: EbayCategorySelectorProps) => {
   const [categories, setCategories] = useState<EbayCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPath, setSelectedPath] = useState<EbayCategory[]>([]);
   const [currentLevel, setCurrentLevel] = useState<EbayCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  // Use external control if provided, otherwise use internal state
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
