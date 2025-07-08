@@ -95,17 +95,24 @@ const TableRowCells = ({
                 });
               }}
             />
-          ) : (
-            <span className="text-sm">
-              {(() => {
-                if (listing.ebay_category_path) {
-                  // Show only first level: "Category"
-                  const pathParts = listing.ebay_category_path.split(' > ');
-                  return pathParts[0] || '';
-                }
-                return listing.category || '-';
-              })()}
-            </span>
+           ) : (
+            <div className="flex flex-col gap-1">
+              <span className="text-sm">
+                {(() => {
+                  if (listing.ebay_category_path) {
+                    // Show only first level: "Category"
+                    const pathParts = listing.ebay_category_path.split(' > ');
+                    return pathParts[0] || '';
+                  }
+                  return listing.category || '-';
+                })()}
+              </span>
+              {!listing.ebay_category_id && listing.category && (
+                <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded border">
+                  eBay category needed
+                </span>
+              )}
+            </div>
           )}
         </TableCell>
       )}

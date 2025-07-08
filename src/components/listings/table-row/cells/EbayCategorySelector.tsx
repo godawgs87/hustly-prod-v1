@@ -411,8 +411,6 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   }, [selectedPath]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
     const newValue = e.target.value;
     console.log('🔍 Search input changed from:', searchQuery, 'to:', newValue);
     setSearchQuery(newValue);
@@ -443,8 +441,6 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
             onChange={handleSearchChange}
             className="pl-10"
             autoComplete="off"
-            onKeyDown={(e) => e.stopPropagation()}
-            onFocus={(e) => e.stopPropagation()}
           />
           {searchQuery && (
             <Button
@@ -642,11 +638,11 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
           </Button>
         </SheetTrigger>
         
-        <SheetContent side="bottom" className="h-[80vh] p-0">
-          <SheetHeader className="p-4 border-b">
+        <SheetContent side="bottom" className="h-[85vh] p-0 flex flex-col">
+          <SheetHeader className="p-4 border-b flex-shrink-0">
             <SheetTitle>Select eBay Category</SheetTitle>
           </SheetHeader>
-          <div className="h-full">
+          <div className="flex-1 overflow-hidden">
             <CategoryContent />
           </div>
         </SheetContent>
@@ -667,7 +663,7 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="max-w-2xl h-[600px] p-0">
+      <DialogContent className="max-w-2xl h-[600px] p-0 fixed top-[10%] left-[50%] translate-x-[-50%]">
         <DialogHeader className="p-4 border-b">
           <DialogTitle>Select eBay Category</DialogTitle>
         </DialogHeader>
