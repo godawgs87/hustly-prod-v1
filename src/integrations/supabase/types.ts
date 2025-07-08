@@ -1188,11 +1188,50 @@ export type Database = {
         Args: { prefix?: string }
         Returns: string
       }
+      get_category_path: {
+        Args: { category_id: string }
+        Returns: {
+          ebay_category_id: string
+          category_name: string
+          parent_ebay_category_id: string
+          level: number
+          leaf_category: boolean
+          full_path: string
+        }[]
+      }
+      get_child_categories: {
+        Args: { parent_id: string }
+        Returns: {
+          ebay_category_id: string
+          category_name: string
+          parent_ebay_category_id: string
+          leaf_category: boolean
+        }[]
+      }
       get_listing_with_photos: {
         Args: { listing_id_param: string }
         Returns: {
           listing_data: Json
           photo_urls: string[]
+        }[]
+      }
+      get_root_categories: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          ebay_category_id: string
+          category_name: string
+          leaf_category: boolean
+        }[]
+      }
+      search_categories: {
+        Args: { search_term: string; limit_count?: number }
+        Returns: {
+          ebay_category_id: string
+          category_name: string
+          parent_ebay_category_id: string
+          leaf_category: boolean
+          match_score: number
+          full_path: string
         }[]
       }
     }
