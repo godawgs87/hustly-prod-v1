@@ -401,24 +401,29 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       // For navigation, add to current path
       const newPath = [...selectedPath, category];
       console.log('📍 New selected path:', newPath.map(cat => cat.category_name).join(' > '));
-      setSelectedPath(newPath);
 
       if (category.leaf_category) {
         // This is a final selectable category
         const pathString = newPath.map(cat => cat.category_name).join(' > ');
         console.log('✅ Final category selected:', { categoryId: category.ebay_category_id, pathString });
         
+        // Update path before calling onChange
+        setSelectedPath(newPath);
         onChange(category.ebay_category_id, pathString);
         setOpen(false);
         setSearchQuery('');
         return;
       }
+      
+      // Update selected path for non-leaf categories
+      setSelectedPath(newPath);
     }
     
     // Show children of selected category
     const children = categories.filter(cat => cat.parent_ebay_category_id === category.ebay_category_id);
     console.log('👶 Found children for', category.category_name, ':', children.length, 'children');
     console.log('👶 Children names:', children.map(c => c.category_name));
+    
     setCurrentLevel(children);
     setSearchQuery('');
   }, [selectedPath, categories, onChange, buildSelectedPath, getCategoryPath]);
