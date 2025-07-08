@@ -138,7 +138,11 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         .is('parent_ebay_category_id', null)
         .order('category_name');
 
-      console.log('🌳 Root categories query result:', { dataCount: rootData?.length, error: rootError });
+      console.log('🌳 Root categories query result:', { 
+        dataCount: rootData?.length, 
+        error: rootError,
+        firstFew: rootData?.slice(0, 5)?.map(cat => cat.category_name)
+      });
 
       if (rootError) {
         console.error('❌ Root categories error:', rootError);
@@ -157,8 +161,10 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         cat.category_name.trim() !== ''
       );
 
-      console.log('🌳 Valid root categories:', validRootCategories.length);
-      console.log('🌳 Root category names:', validRootCategories.map(cat => cat.category_name));
+      console.log('🌳 Valid root categories:', {
+        count: validRootCategories.length,
+        names: validRootCategories.map(cat => cat.category_name)
+      });
 
       // Now load all categories for navigation
       const { data: allData, error: allError } = await supabase
@@ -168,7 +174,11 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         .order('category_name')
         .limit(20000);
 
-      console.log('📊 All categories query result:', { dataCount: allData?.length, error: allError });
+      console.log('📊 All categories query result:', { 
+        dataCount: allData?.length, 
+        error: allError,
+        limitApplied: true
+      });
 
       if (allError) {
         console.error('❌ All categories error:', allError);
@@ -193,6 +203,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         leaves: validAllCategories.filter(cat => cat.leaf_category).length
       });
       
+      console.log('🔄 Setting state - categories:', validAllCategories.length, 'currentLevel:', validRootCategories.length);
       setCategories(validAllCategories);
       setCurrentLevel(validRootCategories);
       
