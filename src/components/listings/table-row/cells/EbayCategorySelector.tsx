@@ -415,27 +415,19 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         isStringNull: cat.parent_ebay_category_id === 'null'
       })));
 
-      // Separate root categories for navigation - handle various null representations
-      let rootCount = 0;
+      // Separate root categories for navigation - simplified null check
+      console.log('🔍 First 10 categories with parent IDs:', validAllCategories.slice(0, 10).map(cat => ({
+        name: cat.category_name,
+        parentId: cat.parent_ebay_category_id,
+        isNull: cat.parent_ebay_category_id === null
+      })));
+
       const validRootCategories = validAllCategories.filter(cat => {
-        const parentId = cat.parent_ebay_category_id;
-        const isRoot = (
-          parentId === null || 
-          parentId === undefined || 
-          parentId === '' || 
-          parentId === 'null' ||
-          String(parentId).trim() === '' ||
-          String(parentId).toLowerCase() === 'null'
-        );
-        
-        // Log first few that we're considering as root
-        if (isRoot && rootCount < 5) {
-          console.log('✅ Found root category:', cat.category_name, 'parentId:', parentId);
-          rootCount++;
-        }
-        
+        const isRoot = cat.parent_ebay_category_id === null;
         return isRoot;
       });
+
+      console.log('🌳 Root categories found:', validRootCategories.length);
 
       // Debug: Show what we found as root categories
       console.log('🔍 All root categories found:', validRootCategories.map(cat => ({
