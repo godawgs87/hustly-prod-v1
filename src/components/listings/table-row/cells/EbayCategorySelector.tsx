@@ -106,7 +106,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     }
   }, [value, categories]);
 
-  // Single unified effect to handle dialog opening and category management
+  // Handle dialog opening and initial category setup
   useEffect(() => {
     console.log('🔄 Dialog state changed:', { 
       open, 
@@ -461,54 +461,54 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
   const handleCategorySelect = useCallback(async (category: EbayCategory, fromSearch = false) => {
     console.log('🔄 Category selected:', category.category_name, 'Leaf:', category.leaf_category, 'FromSearch:', fromSearch);
     
-    if (fromSearch) {
-      // For search results, build the full path first
-      buildSelectedPath(category.ebay_category_id);
+    if (category.leaf_category) {
+      // This is a final selectable category - handle immediately
+      let pathString: string;
       
-      if (category.leaf_category) {
-        // For leaf categories, select immediately
-        const path = getCategoryPath(category);
-        onChange(category.ebay_category_id, path);
-        setOpen(false);
-        setSearchQuery('');
-        return;
-      }
-    } else {
-      // For navigation, add to current path
-      const newPath = [...selectedPath, category];
-      console.log('📍 New selected path:', newPath.map(cat => cat.category_name).join(' > '));
-
-      if (category.leaf_category) {
-        // This is a final selectable category
-        const pathString = newPath.map(cat => cat.category_name).join(' > ');
-        console.log('✅ Final category selected:', { categoryId: category.ebay_category_id, pathString });
-        
-        // Update path before calling onChange
+      if (fromSearch) {
+        pathString = getCategoryPath(category);
+      } else {
+        const newPath = [...selectedPath, category];
+        pathString = newPath.map(cat => cat.category_name).join(' > ');
         setSelectedPath(newPath);
-        onChange(category.ebay_category_id, pathString);
-        setOpen(false);
-        setSearchQuery('');
-        return;
       }
       
-      // Update selected path for non-leaf categories
-      setSelectedPath(newPath);
+      console.log('✅ Final category selected:', { categoryId: category.ebay_category_id, pathString });
+      onChange(category.ebay_category_id, pathString);
+      setOpen(false);
+      setSearchQuery('');
+      return;
     }
     
-    // Load children of selected category using new hierarchical approach
-    const parentId = String(category.ebay_category_id).trim();
-    console.log('🔍 Loading children for category:', category.category_name, 'with ID:', parentId);
+    // For non-leaf categories, navigate to show children
+    let newPath: EbayCategory[];
     
-    // Use the new loadChildCategories function
-    const children = await loadChildCategories(parentId);
-    console.log('👶 Loaded children for', category.category_name, ':', {
-      count: children.length,
-      names: children.map(c => c.category_name)
-    });
+    if (fromSearch) {
+      // Build path from search - need to construct the full path
+      newPath = [];
+      let currentCat: EbayCategory | undefined = category;
+      while (currentCat) {
+        newPath.unshift(currentCat);
+        if (currentCat.parent_ebay_category_id) {
+          currentCat = categories.find(cat => cat.ebay_category_id === currentCat!.parent_ebay_category_id);
+        } else {
+          break;
+        }
+      }
+    } else {
+      // Navigation from current level
+      newPath = [...selectedPath, category];
+    }
     
+    console.log('📍 New selected path:', newPath.map(cat => cat.category_name).join(' > '));
+    setSelectedPath(newPath);
+    
+    // Load and show children
+    const children = await loadChildCategories(category.ebay_category_id);
+    console.log('👶 Loaded children for', category.category_name, ':', children.length);
     setCurrentLevel(children);
     setSearchQuery('');
-  }, [selectedPath, categories, onChange, buildSelectedPath, getCategoryPath, loadChildCategories]);
+  }, [selectedPath, categories, onChange, getCategoryPath, loadChildCategories]);
 
   const handleUseThisCategory = useCallback((category: EbayCategory) => {
     const newPath = [...selectedPath, category];
@@ -564,9 +564,21 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
 
 
   const getDisplayValue = useCallback(() => {
-    if (selectedPath.length === 0) return "Select eBay Category";
-    return selectedPath.map(cat => cat.category_name).join(' > ');
-  }, [selectedPath]);
+    // If we have a value prop, try to find the category and build its path
+    if (value && categories.length > 0) {
+      const category = categories.find(cat => cat.ebay_category_id === value);
+      if (category) {
+        return getCategoryPath(category);
+      }
+    }
+    
+    // Fallback to selectedPath for navigation display
+    if (selectedPath.length > 0) {
+      return selectedPath.map(cat => cat.category_name).join(' > ');
+    }
+    
+    return "Select eBay Category";
+  }, [value, categories, selectedPath, getCategoryPath]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -717,16 +729,15 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
                     )}
                   </div>
                ) : (
-                 <div className="space-y-1">
+                 <div>
                    <div className="text-sm font-medium text-muted-foreground px-3 py-2">
                      {selectedPath.length === 0 ? `Categories (${currentLevel.length})` : `Subcategories (${currentLevel.length})`}
-                     <div className="text-xs opacity-70">Debug: Rendering {currentLevel.length} items</div>
                    </div>
                    {currentLevel.map((category) => (
-                    <div key={category.ebay_category_id} className="space-y-1">
+                    <div key={category.ebay_category_id}>
                       <div
                         onClick={() => handleCategorySelect(category)}
-                        className="p-3 rounded-lg hover:bg-muted cursor-pointer border border-transparent hover:border-border transition-colors"
+                        className="p-3 rounded-lg hover:bg-muted cursor-pointer border border-transparent hover:border-border transition-colors mx-2"
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{category.category_name}</span>
@@ -750,7 +761,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
                       
                       {/* Use This Category option for non-leaf categories */}
                       {!category.leaf_category && (
-                        <div className="px-3">
+                        <div className="px-5 pb-2">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
