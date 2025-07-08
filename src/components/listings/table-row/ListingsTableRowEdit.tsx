@@ -186,19 +186,31 @@ const ListingsTableRowEdit = ({ listing, visibleColumns, onSave, onCancel }: Lis
             category={editData.category}
             ebayCategory={editData.ebay_category_id}
             ebayPath={detailedListing.ebay_category_path}
-            onSave={(categoryId, categoryPath) => {
+            onSave={async (categoryId, categoryPath) => {
               console.log('🔄 ListingsTableRowEdit: Category selected', { categoryId, categoryPath });
               handleFieldUpdate('ebay_category_id', categoryId);
               handleFieldUpdate('ebay_category_path', categoryPath);
               // Also update the legacy category field for backward compatibility
               const firstCategory = categoryPath.split(' > ')[0] || '';
               handleFieldUpdate('category', firstCategory);
-              console.log('✅ ListingsTableRowEdit: Updated fields', { 
-                ebay_category_id: categoryId, 
-                ebay_category_path: categoryPath,
-                category: firstCategory 
-              });
+              
+              // Auto-save the category selection
+              setIsSaving(true);
+              try {
+                const updates: Partial<Listing> = {
+                  ebay_category_id: categoryId,
+                  ebay_category_path: categoryPath,
+                  category: firstCategory
+                };
+                await onSave(updates);
+                console.log('✅ ListingsTableRowEdit: Category auto-saved');
+              } catch (error) {
+                console.error('❌ Failed to auto-save category:', error);
+              } finally {
+                setIsSaving(false);
+              }
             }}
+            disabled={isSaving}
           />
         </TableCell>
       )}
