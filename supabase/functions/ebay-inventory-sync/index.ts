@@ -457,6 +457,44 @@ Deno.serve(async (req) => {
     requestData = await req.json();
     const { listingId, action = 'sync_listing', dryRun = false } = requestData;
     
+    // 🧪 PHASE 2 TESTING: Query eBay API for valid shipping services
+    if (action === 'test_ebay_shipping_api') {
+      logStep('🧪 PHASE 2 - Testing eBay shipping services API');
+      
+      try {
+        const ebayApi = new EbayInventoryAPI(false, supabaseClient, user.id);
+        const accessToken = await ebayApi.getAccessToken();
+        
+        const ebayServicesData = await EbayShippingServices.queryEbayShippingServices(accessToken);
+        
+        return new Response(JSON.stringify({
+          status: 'phase2_complete',
+          ebayServicesData,
+          summary: {
+            totalServices: ebayServicesData.shippingServices?.length || 0,
+            domesticServices: ebayServicesData.shippingServices?.filter((s: any) => 
+              s.shippingCategory === 'DOMESTIC' || s.category === 'DOMESTIC'
+            ).length || 0,
+            serviceCodeSamples: ebayServicesData.shippingServices?.slice(0, 10).map((s: any) => 
+              s.shippingServiceCode || s.serviceCode
+            ) || []
+          }
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return new Response(JSON.stringify({
+          status: 'phase2_error',
+          error: errorMessage
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        });
+      }
+    }
+
     // 🧪 ISOLATION TESTING: Test shipping service module independently
     if (action === 'test_shipping_service') {
       const { userPreference = 'usps_priority' } = requestData;
