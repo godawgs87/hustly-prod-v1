@@ -450,23 +450,72 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       setSelectedPath(newPath);
     }
     
-    // Show children of selected category
+    // Show children of selected category - Enhanced debugging
     const parentId = String(category.ebay_category_id).trim();
-    console.log('🔍 Looking for children of category:', category.category_name, 'with ID:', parentId);
+    console.log('🔍 ENHANCED: Looking for children of category:', category.category_name, 'with ID:', parentId);
+    console.log('🔍 ENHANCED: Total categories to search through:', categories.length);
     
+    // Log first 10 categories with their parent IDs for comparison
+    console.log('🔍 ENHANCED: Sample categories with parent IDs:', 
+      categories.slice(0, 10).map(c => ({ 
+        name: c.category_name, 
+        id: c.ebay_category_id,
+        parentId: c.parent_ebay_category_id, 
+        parentIdType: typeof c.parent_ebay_category_id,
+        parentIdString: c.parent_ebay_category_id ? String(c.parent_ebay_category_id).trim() : null
+      }))
+    );
+    
+    // Enhanced filtering with detailed logging
     const children = categories.filter(cat => {
-      const childParentId = cat.parent_ebay_category_id ? String(cat.parent_ebay_category_id).trim() : null;
-      const isMatch = childParentId === parentId;
-      if (cat.category_name.includes('Baby') || cat.category_name.includes('Men') || cat.category_name.includes('Women')) {
-        console.log('🧩 Child check:', cat.category_name, 'parentId:', childParentId, 'targetId:', parentId, 'match:', isMatch);
+      // More robust null/undefined checking
+      if (!cat.parent_ebay_category_id) {
+        return false;
       }
+      
+      const childParentId = String(cat.parent_ebay_category_id).trim();
+      const isMatch = childParentId === parentId;
+      
+      // Log specific categories we're interested in
+      if (cat.category_name.includes('Baby') || 
+          cat.category_name.includes('Men') || 
+          cat.category_name.includes('Women') ||
+          cat.category_name.includes('Kids') ||
+          cat.category_name.includes('Specialty')) {
+        console.log('🧩 DETAILED Child check:', {
+          name: cat.category_name,
+          childParentId,
+          targetParentId: parentId,
+          rawParentId: cat.parent_ebay_category_id,
+          isMatch,
+          childParentIdType: typeof childParentId,
+          targetParentIdType: typeof parentId
+        });
+      }
+      
       return isMatch;
     });
     
-    console.log('👶 Found children for', category.category_name, ':', children.length, 'children');
-    console.log('👶 Children names:', children.map(c => c.category_name));
-    console.log('🔍 Parent ID used:', parentId, 'Type:', typeof parentId);
-    console.log('🔍 Sample child parent IDs:', categories.slice(0, 5).map(c => ({ name: c.category_name, parentId: c.parent_ebay_category_id, type: typeof c.parent_ebay_category_id })));
+    console.log('👶 ENHANCED: Found children for', category.category_name, ':', children.length, 'children');
+    console.log('👶 ENHANCED: Children names:', children.map(c => c.category_name));
+    
+    // Log all categories that have parent ID = 11450 specifically
+    if (parentId === '11450') {
+      const allWithParent11450 = categories.filter(cat => 
+        cat.parent_ebay_category_id && String(cat.parent_ebay_category_id).trim() === '11450'
+      );
+      console.log('🎯 SPECIFIC: All categories with parent_ebay_category_id = "11450":', 
+        allWithParent11450.map(c => ({ name: c.category_name, id: c.ebay_category_id }))
+      );
+      
+      // Also check for numeric comparison
+      const allWithParentNumeric11450 = categories.filter(cat => 
+        cat.parent_ebay_category_id === '11450'
+      );
+      console.log('🎯 NUMERIC CHECK: Categories with parent = 11450 (string only):', 
+        allWithParentNumeric11450.map(c => ({ name: c.category_name, id: c.ebay_category_id, parentId: c.parent_ebay_category_id, type: typeof c.parent_ebay_category_id }))
+      );
+    }
     
     setCurrentLevel(children);
     setSearchQuery('');
