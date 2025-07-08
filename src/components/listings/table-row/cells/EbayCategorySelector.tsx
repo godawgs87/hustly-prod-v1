@@ -404,8 +404,24 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         cat.category_name.trim() !== ''
       );
 
-      // Separate root categories for navigation
-      const validRootCategories = validAllCategories.filter(cat => !cat.parent_ebay_category_id);
+      // Debug: Check what parent_ebay_category_id values look like
+      console.log('🔍 First 10 categories parent IDs:', validAllCategories.slice(0, 10).map(cat => ({
+        name: cat.category_name,
+        parentId: cat.parent_ebay_category_id,
+        parentType: typeof cat.parent_ebay_category_id,
+        isNull: cat.parent_ebay_category_id === null,
+        isUndefined: cat.parent_ebay_category_id === undefined,
+        isEmpty: cat.parent_ebay_category_id === '',
+        isStringNull: cat.parent_ebay_category_id === 'null'
+      })));
+
+      // Separate root categories for navigation - handle various null representations
+      const validRootCategories = validAllCategories.filter(cat => 
+        !cat.parent_ebay_category_id || 
+        cat.parent_ebay_category_id === null || 
+        cat.parent_ebay_category_id === 'null' || 
+        cat.parent_ebay_category_id === ''
+      );
 
       console.log('🌳 Valid categories:', {
         total: validAllCategories.length,
