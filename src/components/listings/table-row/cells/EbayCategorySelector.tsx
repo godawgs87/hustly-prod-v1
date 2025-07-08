@@ -227,18 +227,40 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
   };
 
   const buildSelectedPath = useCallback((categoryId: string) => {
-    if (!categoryId || !categories.length) return;
+    if (!categoryId || !categories.length) {
+      console.log('🚫 BuildSelectedPath early return:', { categoryId, categoriesLength: categories.length });
+      return;
+    }
 
     try {
+      console.log('🔄 Building path for categoryId:', categoryId);
       const path: EbayCategory[] = [];
-      let currentCat = categories.find(cat => cat.ebay_category_id === categoryId);
+      
+      // Convert categoryId to string to ensure consistent comparison
+      const targetId = String(categoryId).trim();
+      let currentCat = categories.find(cat => String(cat.ebay_category_id).trim() === targetId);
+      
+      if (!currentCat) {
+        console.error('❌ Category not found:', targetId, 'Available categories:', categories.slice(0, 5).map(c => ({ id: c.ebay_category_id, name: c.category_name })));
+        return;
+      }
+      
+      console.log('✅ Found starting category:', currentCat.category_name);
       
       // Build path from selected category to root
       while (currentCat) {
         path.unshift(currentCat);
+        console.log('📝 Added to path:', currentCat.category_name, 'Path length:', path.length);
+        
         if (currentCat.parent_ebay_category_id) {
-          currentCat = categories.find(cat => cat.ebay_category_id === currentCat!.parent_ebay_category_id);
+          const parentId = String(currentCat.parent_ebay_category_id).trim();
+          currentCat = categories.find(cat => String(cat.ebay_category_id).trim() === parentId);
+          if (!currentCat) {
+            console.error('❌ Parent category not found:', parentId);
+            break;
+          }
         } else {
+          console.log('🌳 Reached root category');
           break;
         }
       }
@@ -249,9 +271,18 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       // Set current level based on selected path
       if (path.length > 0) {
         const lastSelected = path[path.length - 1];
+        console.log('🎯 Last selected category:', lastSelected.category_name, 'Is leaf:', lastSelected.leaf_category);
+        
         if (!lastSelected.leaf_category) {
-          const children = categories.filter(cat => cat.parent_ebay_category_id === lastSelected.ebay_category_id);
+          const parentId = String(lastSelected.ebay_category_id).trim();
+          const children = categories.filter(cat => {
+            const childParentId = cat.parent_ebay_category_id ? String(cat.parent_ebay_category_id).trim() : null;
+            return childParentId === parentId;
+          });
+          console.log('👶 Found children for', lastSelected.category_name, ':', children.length, children.map(c => c.category_name));
           setCurrentLevel(children);
+        } else {
+          console.log('🍃 Leaf category, no children to show');
         }
       }
     } catch (error) {
@@ -420,9 +451,14 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     }
     
     // Show children of selected category
-    const children = categories.filter(cat => cat.parent_ebay_category_id === category.ebay_category_id);
+    const parentId = String(category.ebay_category_id).trim();
+    const children = categories.filter(cat => {
+      const childParentId = cat.parent_ebay_category_id ? String(cat.parent_ebay_category_id).trim() : null;
+      return childParentId === parentId;
+    });
     console.log('👶 Found children for', category.category_name, ':', children.length, 'children');
     console.log('👶 Children names:', children.map(c => c.category_name));
+    console.log('🔍 Parent ID:', parentId, 'Child parent IDs:', children.map(c => c.parent_ebay_category_id));
     
     setCurrentLevel(children);
     setSearchQuery('');
@@ -441,7 +477,12 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
   const navigateToCategory = useCallback((category: EbayCategory, index: number) => {
     const newPath = selectedPath.slice(0, index + 1);
     setSelectedPath(newPath);
-    const children = categories.filter(c => c.parent_ebay_category_id === category.ebay_category_id);
+    
+    const parentId = String(category.ebay_category_id).trim();
+    const children = categories.filter(cat => {
+      const childParentId = cat.parent_ebay_category_id ? String(cat.parent_ebay_category_id).trim() : null;
+      return childParentId === parentId;
+    });
     setCurrentLevel(children);
     setSearchQuery('');
   }, [selectedPath, categories]);
@@ -458,7 +499,11 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     } else {
       // Show children of the new last category
       const lastCategory = newPath[newPath.length - 1];
-      const children = categories.filter(cat => cat.parent_ebay_category_id === lastCategory.ebay_category_id);
+      const parentId = String(lastCategory.ebay_category_id).trim();
+      const children = categories.filter(cat => {
+        const childParentId = cat.parent_ebay_category_id ? String(cat.parent_ebay_category_id).trim() : null;
+        return childParentId === parentId;
+      });
       setCurrentLevel(children);
     }
   }, [selectedPath, categories, rootCategories]);
@@ -530,7 +575,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       </div>
 
       {/* Breadcrumb and Back Button */}
-      {selectedPath.length > 0 && (
+      {(selectedPath.length > 0 || (currentLevel.length > 0 && currentLevel !== rootCategories)) && (
         <div className="p-4 border-b bg-muted/30 flex-shrink-0">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
             <button onClick={resetToRoot} className="hover:text-foreground hover:underline">
