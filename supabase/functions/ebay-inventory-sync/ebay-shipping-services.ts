@@ -36,31 +36,20 @@ export interface FulfillmentDetails {
   };
 }
 
-// eBay Trading API shipping service codes - Updated with correct codes from Trading API reference
-// Source: eBay Trading API GeteBayDetails - ShippingServiceDetails
+// eBay Individual Seller Compatible Shipping Service Codes
+// Simplified for inline fulfillment - these work for individual accounts without business policies
 const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
-  'USPSPriority': {
-    serviceCode: 'USPSPriority',
-    displayName: 'USPS Priority',
-    estimatedDays: { min: 1, max: 3 },
+  // Primary individual seller compatible services
+  'US_Postal': {
+    serviceCode: 'US_Postal',
+    displayName: 'USPS Standard',
+    estimatedDays: { min: 3, max: 7 },
     isValid: true
   },
-  'USPSFirstClass': {
-    serviceCode: 'USPSFirstClass',
-    displayName: 'USPS First Class',
-    estimatedDays: { min: 1, max: 3 },
-    isValid: true
-  },
-  'USPSGround': {
-    serviceCode: 'USPSGround',
-    displayName: 'US Postal Service Ground',
+  'USPSMedia': {
+    serviceCode: 'USPSMedia',
+    displayName: 'USPS Media Mail',
     estimatedDays: { min: 2, max: 8 },
-    isValid: true
-  },
-  'USPSExpressMail': {
-    serviceCode: 'USPSExpressMail',
-    displayName: 'USPS Priority Mail Express',
-    estimatedDays: { min: 1, max: 2 },
     isValid: true
   },
   'USPSPriorityFlatRateBox': {
@@ -69,29 +58,42 @@ const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
     estimatedDays: { min: 1, max: 3 },
     isValid: true
   },
-  'USPSMedia': {
-    serviceCode: 'USPSMedia',
-    displayName: 'USPS Media',
-    estimatedDays: { min: 2, max: 8 },
+  'USPSExpressFlatRateBox': {
+    serviceCode: 'USPSExpressFlatRateBox',
+    displayName: 'USPS Express Flat Rate Box',
+    estimatedDays: { min: 1, max: 2 },
+    isValid: true
+  },
+  // Fallback options - most basic USPS services
+  'USPSGround': {
+    serviceCode: 'USPSGround',
+    displayName: 'USPS Ground Advantage',
+    estimatedDays: { min: 2, max: 5 },
+    isValid: true
+  },
+  'Other': {
+    serviceCode: 'Other',
+    displayName: 'Standard Shipping',
+    estimatedDays: { min: 3, max: 7 },
     isValid: true
   }
 };
 
-// User preference to eBay Trading API service mapping
+// User preference to individual seller compatible eBay service mapping
 const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
-  'usps_priority': 'USPSPriority',
-  'usps_first_class': 'USPSFirstClass',
+  'usps_priority': 'US_Postal',
+  'usps_first_class': 'US_Postal', 
   'usps_ground': 'USPSGround',
   'usps_media': 'USPSMedia',
-  'standard': 'USPSPriority',
-  'expedited': 'USPSPriority',
-  'overnight': 'USPSExpressMail',
-  'express': 'USPSExpressMail',
+  'standard': 'US_Postal',
+  'expedited': 'USPSGround',
+  'overnight': 'USPSExpressFlatRateBox',
+  'express': 'USPSExpressFlatRateBox',
   'flat_rate': 'USPSPriorityFlatRateBox'
 };
 
-const DEFAULT_SERVICE = 'USPSPriority'; // eBay Trading API service code
-const FALLBACK_SERVICE = 'USPSPriority';
+const DEFAULT_SERVICE = 'US_Postal'; // Most basic individual seller compatible service
+const FALLBACK_SERVICE = 'Other'; // Ultimate fallback - generic "Other" service
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
@@ -270,6 +272,106 @@ export class EbayShippingServices {
     });
 
     return { isValid, errors };
+  }
+
+  /**
+   * Creates fulfillment details with fallback logic for failed service codes
+   */
+  static createFulfillmentDetailsWithFallback(
+    userProfile: any,
+    options: {
+      domesticCost?: number;
+      handlingTimeDays?: number;
+      attemptedService?: string;
+    } = {}
+  ): FulfillmentDetails {
+    const domesticCost = options.domesticCost || userProfile.shipping_cost_domestic || 9.95;
+    const handlingTime = options.handlingTimeDays || userProfile.handling_time_days || 1;
+    const preferredService = userProfile.preferred_shipping_service;
+    
+    // Define fallback service priority order
+    const fallbackOrder = [
+      'US_Postal',     // Most basic and widely accepted
+      'USPSGround',    // USPS Ground Advantage
+      'Other',         // Generic fallback
+      'USPSMedia'      // Last resort for media items
+    ];
+    
+    let serviceCode: string;
+    
+    // If we've already attempted a service and it failed, try the next in fallback order
+    if (options.attemptedService) {
+      this.logStep('Attempting fallback service selection', { 
+        failedService: options.attemptedService,
+        fallbackOrder 
+      });
+      
+      const failedIndex = fallbackOrder.indexOf(options.attemptedService);
+      const nextServiceIndex = failedIndex + 1;
+      
+      if (nextServiceIndex < fallbackOrder.length) {
+        serviceCode = fallbackOrder[nextServiceIndex];
+        this.logStep('Using next fallback service', { 
+          selectedService: serviceCode,
+          position: nextServiceIndex + 1,
+          totalOptions: fallbackOrder.length
+        });
+      } else {
+        serviceCode = 'Other'; // Ultimate fallback
+        this.logStep('Using ultimate fallback service', { selectedService: serviceCode });
+      }
+    } else {
+      // Normal service selection
+      serviceCode = this.mapUserPreferenceToEbayService(preferredService);
+    }
+    
+    const serviceConfig = this.getServiceConfig(serviceCode);
+    
+    this.logStep('Creating fulfillment details with fallback logic', {
+      preferredService,
+      selectedService: serviceCode,
+      serviceConfig: serviceConfig?.displayName,
+      domesticCost,
+      handlingTime,
+      isFallbackAttempt: !!options.attemptedService
+    });
+
+    const fulfillmentDetails: FulfillmentDetails = {
+      handlingTime: {
+        value: handlingTime,
+        unit: "DAY"
+      },
+      shippingOptions: [{
+        optionType: "DOMESTIC",
+        costType: "FLAT_RATE",
+        shippingServices: [{
+          serviceCode: serviceCode,
+          shippingCost: {
+            value: domesticCost.toFixed(2),
+            currency: "USD"
+          },
+          additionalShippingCost: {
+            value: (userProfile.shipping_cost_additional || 2.00).toFixed(2),
+            currency: "USD"
+          }
+        }]
+      }],
+      shipToLocations: {
+        regionIncluded: [{
+          regionName: "United States",
+          regionType: "COUNTRY"
+        }]
+      }
+    };
+
+    this.logStep('✅ Fallback fulfillment details created', {
+      serviceCode,
+      cost: domesticCost.toFixed(2),
+      handlingTime,
+      isRetryAttempt: !!options.attemptedService
+    });
+
+    return fulfillmentDetails;
   }
 
   /**
