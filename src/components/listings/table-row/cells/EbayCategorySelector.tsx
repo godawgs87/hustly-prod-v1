@@ -36,19 +36,26 @@ interface EbayCategorySelectorProps {
 }
 
 // Enhanced search with special patterns for common terms
-const SEARCH_ENHANCEMENTS = {
-  'toy': ['Toys & Hobbies', 'Games'],
-  'game': ['Toys & Hobbies', 'Games', 'Video Games'],
-  'clothing': ['Clothing, Shoes & Accessories', 'Women', 'Men', 'Kids'],
-  'clothes': ['Clothing, Shoes & Accessories', 'Women', 'Men', 'Kids'],
-  'shoe': ['Clothing, Shoes & Accessories', 'Athletic Shoes', 'Casual Shoes'],
-  'car': ['eBay Motors', 'Automotive', 'Parts & Accessories'],
-  'book': ['Books', 'Textbooks', 'Fiction & Literature'],
-  'electronic': ['Electronics', 'Cell Phones', 'Computers'],
-  'jewelry': ['Jewelry & Watches', 'Fine Jewelry', 'Fashion Jewelry'],
-  'art': ['Art', 'Paintings', 'Antiques'],
-  'music': ['Music', 'CDs', 'Vinyl Records', 'Musical Instruments'],
-  'sport': ['Sporting Goods', 'Exercise & Fitness', 'Outdoor Sports']
+const SEARCH_ENHANCEMENTS: Record<string, string[]> = {
+  'toy': ['Toys & Hobbies', 'toy', 'game'],
+  'toys': ['Toys & Hobbies', 'toy', 'game'],
+  'game': ['Toys & Hobbies', 'Games', 'Video Games', 'game'],
+  'games': ['Toys & Hobbies', 'Games', 'Video Games', 'game'],
+  'clothing': ['Clothing, Shoes & Accessories', 'Women', 'Men', 'Kids', 'cloth'],
+  'clothes': ['Clothing, Shoes & Accessories', 'Women', 'Men', 'Kids', 'cloth'],
+  'shoe': ['Clothing, Shoes & Accessories', 'Athletic Shoes', 'Casual Shoes', 'shoe'],
+  'shoes': ['Clothing, Shoes & Accessories', 'Athletic Shoes', 'Casual Shoes', 'shoe'],
+  'car': ['eBay Motors', 'Automotive', 'Parts & Accessories', 'motor'],
+  'cars': ['eBay Motors', 'Automotive', 'Parts & Accessories', 'motor'],
+  'book': ['Books', 'Textbooks', 'Fiction & Literature', 'book'],
+  'books': ['Books', 'Textbooks', 'Fiction & Literature', 'book'],
+  'electronic': ['Electronics', 'Cell Phones', 'Computers', 'electronic'],
+  'electronics': ['Electronics', 'Cell Phones', 'Computers', 'electronic'],
+  'jewelry': ['Jewelry & Watches', 'Fine Jewelry', 'Fashion Jewelry', 'jewelry'],
+  'art': ['Art', 'Paintings', 'Antiques', 'art'],
+  'music': ['Music', 'CDs', 'Vinyl Records', 'Musical Instruments', 'music'],
+  'sport': ['Sporting Goods', 'Exercise & Fitness', 'Outdoor Sports', 'sport'],
+  'sports': ['Sporting Goods', 'Exercise & Fitness', 'Outdoor Sports', 'sport']
 };
 
 const useDebounce = (value: string, delay: number) => {
@@ -126,7 +133,7 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         leaves: validCategories.filter(cat => cat.leaf_category).length
       });
       
-      console.log('🌳 Sample root categories:', rootCategories.slice(0, 5).map(cat => cat.category_name));
+      console.log('🌳 All root categories:', rootCategories.map(cat => cat.category_name));
       
       setCategories(validCategories);
       setCurrentLevel(rootCategories);
@@ -134,12 +141,11 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
     } catch (error) {
       console.error('❌ Error loading categories:', error);
       toast({
-        title: "Loading Failed",
+        title: "Loading Failed", 
         description: "Could not load eBay categories. Please try again.",
         variant: "destructive"
       });
       
-      // Set empty state to prevent infinite loading
       setCategories([]);
       setCurrentLevel([]);
     } finally {
@@ -185,27 +191,33 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
     if (!debouncedSearchQuery.trim()) return [];
     
     const query = debouncedSearchQuery.toLowerCase().trim();
+    console.log('🔍 Search query:', query, 'Categories count:', categories.length);
     const results: Array<EbayCategory & { score: number; fullPath: string; matchType: string }> = [];
     
-    // Check for enhanced search patterns
+    // Check for enhanced search patterns first
     const enhancedTerms = SEARCH_ENHANCEMENTS[query] || [];
+    console.log('🎯 Enhanced terms for query:', enhancedTerms);
     
     categories.forEach(category => {
       const categoryName = category.category_name.toLowerCase();
       let score = 0;
       let matchType = '';
       
-      // Enhanced pattern matching for common search terms
+      // Enhanced pattern matching for common search terms - more aggressive matching
       if (enhancedTerms.length > 0) {
-        const isEnhancedMatch = enhancedTerms.some(term => 
-          categoryName.includes(term.toLowerCase())
-        );
+        const isEnhancedMatch = enhancedTerms.some(term => {
+          const termLower = term.toLowerCase();
+          return categoryName.includes(termLower) || 
+                 categoryName.split(/[\s&-]+/).some(word => word.includes(termLower)) ||
+                 termLower.includes(categoryName);
+        });
         if (isEnhancedMatch) {
           score = 95;
           matchType = 'enhanced';
         }
       }
       
+      // Direct matching patterns
       // Exact match gets highest score
       if (categoryName === query) {
         score = Math.max(score, 100);
@@ -227,19 +239,19 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         matchType = matchType || 'word';
       }
       // Partial word match for longer queries
-      else if (query.length >= 3 && categoryName.split(/[\s&-]+/).some(word => word.includes(query))) {
+      else if (query.length >= 2 && categoryName.split(/[\s&-]+/).some(word => word.includes(query))) {
         score = Math.max(score, 30);
         matchType = matchType || 'partial';
       }
       
       // Boost score for root categories
       if (!category.parent_ebay_category_id && score > 0) {
-        score += 20;
+        score += 15;
       }
       
       // Boost score for leaf categories (final selectable)
       if (category.leaf_category && score > 0) {
-        score += 10;
+        score += 5;
       }
       
       if (score > 0) {
@@ -265,6 +277,11 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
       }
     });
     
+    console.log('🔍 Search results count:', results.length, 'for query:', query);
+    if (results.length > 0) {
+      console.log('🎯 Top 3 results:', results.slice(0, 3).map(r => ({ name: r.category_name, score: r.score, type: r.matchType })));
+    }
+    
     // Sort by score (descending), then by category level (root first), then by name
     return results
       .sort((a, b) => {
@@ -273,7 +290,7 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
         if (a.parent_ebay_category_id && !b.parent_ebay_category_id) return 1;
         return a.category_name.localeCompare(b.category_name);
       })
-      .slice(0, 100);
+      .slice(0, 50);
   }, [debouncedSearchQuery, categories]);
 
   const handleCategorySelect = useCallback((category: EbayCategory, fromSearch = false) => {
@@ -387,9 +404,9 @@ const EbayCategorySelector = ({ value, onChange, disabled }: EbayCategorySelecto
   }, [selectedPath]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setSearchQuery(e.target.value);
+    const newValue = e.target.value;
+    console.log('🔍 Search input changed:', newValue);
+    setSearchQuery(newValue);
   }, []);
 
   const clearSearch = useCallback(() => {
