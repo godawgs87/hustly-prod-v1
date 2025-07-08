@@ -170,6 +170,10 @@ export class EbayShippingServices {
       shippingCost: {
         value: domesticCost.toFixed(2),
         currency: "USD"
+      },
+      additionalShippingCost: {
+        value: (userProfile.shipping_cost_additional || 2.00).toFixed(2),
+        currency: "USD"
       }
     };
 
@@ -182,7 +186,13 @@ export class EbayShippingServices {
         optionType: "DOMESTIC",
         costType: "FLAT_RATE",
         shippingServices: [shippingService]
-      }]
+      }],
+      shipToLocations: {
+        regionIncluded: [{
+          regionName: "United States",
+          regionType: "COUNTRY"
+        }]
+      }
     };
 
     this.logStep('✅ Fulfillment details created successfully', {
