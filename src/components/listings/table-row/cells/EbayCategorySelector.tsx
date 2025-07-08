@@ -105,21 +105,26 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     }
   }, [value, categories]);
 
-  // Reset to root when dialog opens (only for non-controlled mode)
+  // Single unified effect to handle dialog opening and category management
   useEffect(() => {
-    if (open && categories.length > 0 && !value && !isControlled) {
-      console.log('🔄 Dialog opened - resetting to root categories');
-      resetToRoot();
+    console.log('🔄 Dialog state changed:', { 
+      open, 
+      categoriesLength: categories.length, 
+      value, 
+      currentLevelLength: currentLevel.length,
+      isControlled 
+    });
+    
+    if (open && categories.length > 0) {
+      if (value) {
+        console.log('📍 Building selected path for value:', value);
+        buildSelectedPath(value);
+      } else {
+        console.log('🌳 No value, resetting to root categories');
+        resetToRoot();
+      }
     }
-  }, [open, categories, value, isControlled]);
-
-  // For controlled mode, always reset to root when opening
-  useEffect(() => {
-    if (isControlled && open && categories.length > 0) {
-      console.log('🔄 Controlled dialog opened - resetting to root categories');
-      resetToRoot();
-    }
-  }, [isControlled, open, categories]);
+  }, [open, categories.length, value]);
 
   const loadCategories = async () => {
     try {
