@@ -72,7 +72,7 @@ const UserBusinessTab = () => {
     return_method: 'REPLACEMENT',
     international_shipping_enabled: false,
     default_markup_percentage: 100,
-    preferred_shipping_service: 'usps_priority',
+    preferred_shipping_service: 'other',
     shipping_cost_domestic: 9.95,
     shipping_cost_additional: 2.00
   });
@@ -123,7 +123,7 @@ const UserBusinessTab = () => {
           return_method: data.return_method || 'REPLACEMENT',
           international_shipping_enabled: data.international_shipping_enabled || false,
           default_markup_percentage: data.default_markup_percentage || 100,
-          preferred_shipping_service: data.preferred_shipping_service || 'usps_priority',
+          preferred_shipping_service: data.preferred_shipping_service || 'other',
           shipping_cost_domestic: data.shipping_cost_domestic || 9.95,
           shipping_cost_additional: data.shipping_cost_additional || 2.00
         });
@@ -487,10 +487,11 @@ const UserBusinessTab = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="usps_priority">USPS Priority Mail</SelectItem>
+                  <SelectItem value="other">Standard Shipping (Most Compatible)</SelectItem>
+                  <SelectItem value="usps_media">USPS Media Mail</SelectItem>
+                  <SelectItem value="usps_priority_flat">USPS Priority Flat Rate Box</SelectItem>
+                  <SelectItem value="usps_express_flat">USPS Express Flat Rate Box</SelectItem>
                   <SelectItem value="usps_ground">USPS Ground Advantage</SelectItem>
-                  <SelectItem value="ups_ground">UPS Ground</SelectItem>
-                  <SelectItem value="fedex_ground">FedEx Ground</SelectItem>
                 </SelectContent>
               </Select>
             </div>

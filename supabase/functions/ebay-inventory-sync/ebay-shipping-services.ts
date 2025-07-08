@@ -81,15 +81,22 @@ const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
 
 // User preference to individual seller compatible eBay service mapping
 const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
-  'usps_priority': 'US_Postal',
-  'usps_first_class': 'US_Postal', 
-  'usps_ground': 'USPSGround',
-  'usps_media': 'USPSMedia',
-  'standard': 'US_Postal',
-  'expedited': 'USPSGround',
-  'overnight': 'USPSExpressFlatRateBox',
-  'express': 'USPSExpressFlatRateBox',
-  'flat_rate': 'USPSPriorityFlatRateBox'
+  // New eBay-validated mappings
+  'other': 'Other',                    // ✅ Universal fallback
+  'usps_media': 'USPSMedia',           // ✅ Media mail
+  'usps_priority_flat': 'USPSPriorityFlatRateBox', // ✅ Flat rate
+  'usps_express_flat': 'USPSExpressFlatRateBox',   // ✅ Express
+  'usps_ground': 'USPSGround',         // ✅ Ground
+  // Legacy mappings for existing users (all map to safe "Other")
+  'usps_priority': 'Other',           // ✅ Map old to safe option
+  'usps_first_class': 'Other',        // ✅ Map old to safe option 
+  'standard': 'Other',                // ✅ Map old to safe option
+  'expedited': 'Other',               // ✅ Map old to safe option
+  'overnight': 'USPSExpressFlatRateBox', // ✅ Keep express mapping
+  'express': 'USPSExpressFlatRateBox',   // ✅ Keep express mapping
+  'flat_rate': 'USPSPriorityFlatRateBox', // ✅ Keep flat rate mapping
+  'ups_ground': 'Other',              // ✅ Map unsupported to safe option
+  'fedex_ground': 'Other'             // ✅ Map unsupported to safe option
 };
 
 const DEFAULT_SERVICE = 'Other'; // Most basic individual seller compatible service
