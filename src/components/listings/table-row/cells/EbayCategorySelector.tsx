@@ -127,11 +127,15 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     }
   }, [open, categories.length, value]);
 
+  // Cache for loaded categories to avoid re-fetching
+  const [categoryCache, setCategoryCache] = useState<Map<string, EbayCategory[]>>(new Map());
+  const [loadingChildren, setLoadingChildren] = useState<Set<string>>(new Set());
+
   const loadCategories = async () => {
     try {
-      console.log('🔍 Loading eBay categories...');
+      console.log('🔍 Loading root eBay categories...');
       
-      // First, load root categories specifically
+      // Only load root categories initially
       const { data: rootData, error: rootError } = await supabase
         .from('ebay_categories')
         .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
@@ -166,47 +170,10 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
         count: validRootCategories.length,
         names: validRootCategories.map(cat => cat.category_name)
       });
-
-      // Now load all categories for navigation
-      const { data: allData, error: allError } = await supabase
-        .from('ebay_categories')
-        .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
-        .eq('is_active', true)
-        .order('category_name')
-        .limit(25000);
-
-      console.log('📊 All categories query result:', { 
-        dataCount: allData?.length, 
-        error: allError,
-        limitApplied: true
-      });
-
-      if (allError) {
-        console.error('❌ All categories error:', allError);
-        // Still proceed with root categories if we have them
-        console.log('⚠️ Continuing with root categories only');
-        setCategories(validRootCategories);
-        setCurrentLevel(validRootCategories);
-        setLoading(false);
-        return;
-      }
-
-      const validAllCategories = allData?.filter(cat => 
-        cat.ebay_category_id && 
-        cat.category_name && 
-        cat.ebay_category_id.trim() !== '' &&
-        cat.category_name.trim() !== ''
-      ) || [];
-
-      console.log('✅ Categories processed:', {
-        allCategories: validAllCategories.length,
-        rootCategories: validRootCategories.length,
-        leaves: validAllCategories.filter(cat => cat.leaf_category).length
-      });
       
-      console.log('🔄 Setting state - categories:', validAllCategories.length, 'currentLevel:', validRootCategories.length);
-      setCategories(validAllCategories);
-      setRootCategories(validRootCategories); // Store root categories separately
+      // Initialize with root categories only
+      setCategories(validRootCategories);
+      setRootCategories(validRootCategories);
       setCurrentLevel(validRootCategories);
       
       console.log('🎯 State updated - currentLevel should now have:', validRootCategories.length, 'categories');
@@ -223,6 +190,64 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       setCurrentLevel([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadChildCategories = async (parentId: string): Promise<EbayCategory[]> => {
+    // Check cache first
+    if (categoryCache.has(parentId)) {
+      console.log('💾 Using cached children for:', parentId);
+      return categoryCache.get(parentId)!;
+    }
+
+    try {
+      setLoadingChildren(prev => new Set(prev).add(parentId));
+      console.log('🔍 Loading children for parent ID:', parentId);
+      
+      const { data, error } = await supabase
+        .from('ebay_categories')
+        .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
+        .eq('is_active', true)
+        .eq('parent_ebay_category_id', parentId)
+        .order('category_name');
+
+      if (error) {
+        console.error('❌ Error loading children:', error);
+        throw error;
+      }
+
+      const validChildren = (data || []).filter(cat => 
+        cat.ebay_category_id && 
+        cat.category_name && 
+        cat.ebay_category_id.trim() !== '' &&
+        cat.category_name.trim() !== ''
+      );
+
+      console.log('👶 Loaded children for', parentId, ':', {
+        count: validChildren.length,
+        names: validChildren.map(c => c.category_name)
+      });
+
+      // Cache the result
+      setCategoryCache(prev => new Map(prev).set(parentId, validChildren));
+      
+      // Add to main categories array
+      setCategories(prev => {
+        const existingIds = new Set(prev.map(cat => cat.ebay_category_id));
+        const newCategories = validChildren.filter(cat => !existingIds.has(cat.ebay_category_id));
+        return [...prev, ...newCategories];
+      });
+
+      return validChildren;
+    } catch (error) {
+      console.error('❌ Error loading child categories:', error);
+      return [];
+    } finally {
+      setLoadingChildren(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(parentId);
+        return newSet;
+      });
     }
   };
 
@@ -290,112 +315,132 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     }
   }, [categories]);
 
-  // Enhanced search with intelligent matching and hierarchical awareness
-  const searchResults = useMemo(() => {
-    if (!debouncedSearchQuery.trim()) return [];
-    
-    const query = debouncedSearchQuery.toLowerCase().trim();
-    console.log('🔍 Search query:', query, 'Categories count:', categories.length);
-    const results: Array<EbayCategory & { score: number; fullPath: string; matchType: string }> = [];
-    
-    // Check for enhanced search patterns first
-    const enhancedTerms = SEARCH_ENHANCEMENTS[query] || [];
-    console.log('🎯 Enhanced terms for query:', enhancedTerms);
-    
-    categories.forEach(category => {
-      const categoryName = category.category_name.toLowerCase();
-      let score = 0;
-      let matchType = '';
+  // State for search results
+  const [searchResults, setSearchResults] = useState<Array<EbayCategory & { score: number; fullPath: string; matchType: string }>>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Server-side search function
+  const performSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      console.log('🔍 Performing server-side search for:', query);
       
-      // Enhanced pattern matching for common search terms - more aggressive matching
-      if (enhancedTerms.length > 0) {
-        const isEnhancedMatch = enhancedTerms.some(term => {
-          const termLower = term.toLowerCase();
-          return categoryName.includes(termLower) || 
-                 categoryName.split(/[\s&-]+/).some(word => word.includes(termLower)) ||
-                 termLower.includes(categoryName);
-        });
-        if (isEnhancedMatch) {
-          score = 95;
-          matchType = 'enhanced';
-        }
+      // Search using database query for better performance
+      const { data, error } = await supabase
+        .from('ebay_categories')
+        .select('ebay_category_id, category_name, parent_ebay_category_id, leaf_category')
+        .eq('is_active', true)
+        .ilike('category_name', `%${query}%`)
+        .order('category_name')
+        .limit(100);
+
+      if (error) {
+        console.error('❌ Search error:', error);
+        setSearchResults([]);
+        return;
       }
-      
-      // Direct matching patterns
-      // Exact match gets highest score
-      if (categoryName === query) {
-        score = Math.max(score, 100);
-        matchType = matchType || 'exact';
-      }
-      // Starts with query gets high score
-      else if (categoryName.startsWith(query)) {
-        score = Math.max(score, 90);
-        matchType = matchType || 'starts';
-      }
-      // Contains query gets medium score
-      else if (categoryName.includes(query)) {
-        score = Math.max(score, 70);
-        matchType = matchType || 'contains';
-      }
-      // Word boundary match gets lower score
-      else if (categoryName.split(/[\s&-]+/).some(word => word.startsWith(query))) {
-        score = Math.max(score, 50);
-        matchType = matchType || 'word';
-      }
-      // Partial word match for longer queries
-      else if (query.length >= 2 && categoryName.split(/[\s&-]+/).some(word => word.includes(query))) {
-        score = Math.max(score, 30);
-        matchType = matchType || 'partial';
-      }
-      
-      // Boost score for root categories
-      if (!category.parent_ebay_category_id && score > 0) {
-        score += 15;
-      }
-      
-      // Boost score for leaf categories (final selectable)
-      if (category.leaf_category && score > 0) {
-        score += 5;
-      }
-      
-      if (score > 0) {
-        // Build full path for context
-        const path: string[] = [];
-        let currentCat: EbayCategory | undefined = category;
-        
-        while (currentCat) {
-          path.unshift(currentCat.category_name);
-          if (currentCat.parent_ebay_category_id) {
-            currentCat = categories.find(cat => cat.ebay_category_id === currentCat!.parent_ebay_category_id);
-          } else {
-            break;
+
+      console.log('📊 Search results from database:', data?.length || 0);
+
+      const validResults = (data || []).filter(cat => 
+        cat.ebay_category_id && 
+        cat.category_name && 
+        cat.ebay_category_id.trim() !== '' &&
+        cat.category_name.trim() !== ''
+      );
+
+      // Score and enhance search results
+      const scoredResults = validResults.map(category => {
+        const categoryName = category.category_name.toLowerCase();
+        const queryLower = query.toLowerCase();
+        let score = 0;
+        let matchType = '';
+
+        // Check for enhanced search patterns first
+        const enhancedTerms = SEARCH_ENHANCEMENTS[queryLower] || [];
+        if (enhancedTerms.length > 0) {
+          const isEnhancedMatch = enhancedTerms.some(term => {
+            const termLower = term.toLowerCase();
+            return categoryName.includes(termLower) || 
+                   categoryName.split(/[\s&-]+/).some(word => word.includes(termLower)) ||
+                   termLower.includes(categoryName);
+          });
+          if (isEnhancedMatch) {
+            score = 95;
+            matchType = 'enhanced';
           }
         }
-        
-        results.push({
+
+        // Direct matching patterns
+        if (categoryName === queryLower) {
+          score = Math.max(score, 100);
+          matchType = matchType || 'exact';
+        } else if (categoryName.startsWith(queryLower)) {
+          score = Math.max(score, 90);
+          matchType = matchType || 'starts';
+        } else if (categoryName.includes(queryLower)) {
+          score = Math.max(score, 70);
+          matchType = matchType || 'contains';
+        } else if (categoryName.split(/[\s&-]+/).some(word => word.startsWith(queryLower))) {
+          score = Math.max(score, 50);
+          matchType = matchType || 'word';
+        } else {
+          score = 30;
+          matchType = 'partial';
+        }
+
+        // Boost score for root categories and leaf categories
+        if (!category.parent_ebay_category_id) score += 15;
+        if (category.leaf_category) score += 5;
+
+        return {
           ...category,
           score,
-          fullPath: path.join(' > '),
+          fullPath: category.category_name, // Will be built properly below
           matchType
-        });
-      }
-    });
-    
-    console.log('🔍 Search results count:', results.length, 'for query:', query);
-    if (results.length > 0) {
-      console.log('🎯 Top 3 results:', results.slice(0, 3).map(r => ({ name: r.category_name, score: r.score, type: r.matchType })));
+        };
+      });
+
+      // Build full paths for context (this might need parent loading for complete paths)
+      const resultsWithPaths = scoredResults.map(result => ({
+        ...result,
+        fullPath: result.category_name // For now, just use category name
+      }));
+
+      // Sort by score
+      const sortedResults = resultsWithPaths
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          if (!a.parent_ebay_category_id && b.parent_ebay_category_id) return -1;
+          if (a.parent_ebay_category_id && !b.parent_ebay_category_id) return 1;
+          return a.category_name.localeCompare(b.category_name);
+        })
+        .slice(0, 50);
+
+      console.log('🎯 Top search results:', sortedResults.slice(0, 3).map(r => ({ name: r.category_name, score: r.score, type: r.matchType })));
+      setSearchResults(sortedResults);
+
+    } catch (error) {
+      console.error('❌ Search error:', error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
     }
-    
-    // Sort by score (descending), then by category level (root first), then by name
-    return results
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        if (!a.parent_ebay_category_id && b.parent_ebay_category_id) return -1;
-        if (a.parent_ebay_category_id && !b.parent_ebay_category_id) return 1;
-        return a.category_name.localeCompare(b.category_name);
-      })
-      .slice(0, 50);
-  }, [debouncedSearchQuery, categories]);
+  }, []);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (debouncedSearchQuery.trim()) {
+      performSearch(debouncedSearchQuery);
+    } else {
+      setSearchResults([]);
+    }
+  }, [debouncedSearchQuery, performSearch]);
 
   const getCategoryPath = useCallback((category: EbayCategory): string => {
     const path: string[] = [];
@@ -413,7 +458,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     return path.join(' > ');
   }, [categories]);
 
-  const handleCategorySelect = useCallback((category: EbayCategory, fromSearch = false) => {
+  const handleCategorySelect = useCallback(async (category: EbayCategory, fromSearch = false) => {
     console.log('🔄 Category selected:', category.category_name, 'Leaf:', category.leaf_category, 'FromSearch:', fromSearch);
     
     if (fromSearch) {
@@ -450,76 +495,20 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       setSelectedPath(newPath);
     }
     
-    // Show children of selected category - Enhanced debugging
+    // Load children of selected category using new hierarchical approach
     const parentId = String(category.ebay_category_id).trim();
-    console.log('🔍 ENHANCED: Looking for children of category:', category.category_name, 'with ID:', parentId);
-    console.log('🔍 ENHANCED: Total categories to search through:', categories.length);
+    console.log('🔍 Loading children for category:', category.category_name, 'with ID:', parentId);
     
-    // Log first 10 categories with their parent IDs for comparison
-    console.log('🔍 ENHANCED: Sample categories with parent IDs:', 
-      categories.slice(0, 10).map(c => ({ 
-        name: c.category_name, 
-        id: c.ebay_category_id,
-        parentId: c.parent_ebay_category_id, 
-        parentIdType: typeof c.parent_ebay_category_id,
-        parentIdString: c.parent_ebay_category_id ? String(c.parent_ebay_category_id).trim() : null
-      }))
-    );
-    
-    // Enhanced filtering with detailed logging
-    const children = categories.filter(cat => {
-      // More robust null/undefined checking
-      if (!cat.parent_ebay_category_id) {
-        return false;
-      }
-      
-      const childParentId = String(cat.parent_ebay_category_id).trim();
-      const isMatch = childParentId === parentId;
-      
-      // Log specific categories we're interested in
-      if (cat.category_name.includes('Baby') || 
-          cat.category_name.includes('Men') || 
-          cat.category_name.includes('Women') ||
-          cat.category_name.includes('Kids') ||
-          cat.category_name.includes('Specialty')) {
-        console.log('🧩 DETAILED Child check:', {
-          name: cat.category_name,
-          childParentId,
-          targetParentId: parentId,
-          rawParentId: cat.parent_ebay_category_id,
-          isMatch,
-          childParentIdType: typeof childParentId,
-          targetParentIdType: typeof parentId
-        });
-      }
-      
-      return isMatch;
+    // Use the new loadChildCategories function
+    const children = await loadChildCategories(parentId);
+    console.log('👶 Loaded children for', category.category_name, ':', {
+      count: children.length,
+      names: children.map(c => c.category_name)
     });
-    
-    console.log('👶 ENHANCED: Found children for', category.category_name, ':', children.length, 'children');
-    console.log('👶 ENHANCED: Children names:', children.map(c => c.category_name));
-    
-    // Log all categories that have parent ID = 11450 specifically
-    if (parentId === '11450') {
-      const allWithParent11450 = categories.filter(cat => 
-        cat.parent_ebay_category_id && String(cat.parent_ebay_category_id).trim() === '11450'
-      );
-      console.log('🎯 SPECIFIC: All categories with parent_ebay_category_id = "11450":', 
-        allWithParent11450.map(c => ({ name: c.category_name, id: c.ebay_category_id }))
-      );
-      
-      // Also check for numeric comparison
-      const allWithParentNumeric11450 = categories.filter(cat => 
-        cat.parent_ebay_category_id === '11450'
-      );
-      console.log('🎯 NUMERIC CHECK: Categories with parent = 11450 (string only):', 
-        allWithParentNumeric11450.map(c => ({ name: c.category_name, id: c.ebay_category_id, parentId: c.parent_ebay_category_id, type: typeof c.parent_ebay_category_id }))
-      );
-    }
     
     setCurrentLevel(children);
     setSearchQuery('');
-  }, [selectedPath, categories, onChange, buildSelectedPath, getCategoryPath]);
+  }, [selectedPath, categories, onChange, buildSelectedPath, getCategoryPath, loadChildCategories]);
 
   const handleUseThisCategory = useCallback((category: EbayCategory) => {
     const newPath = [...selectedPath, category];
@@ -531,20 +520,17 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     setSearchQuery('');
   }, [selectedPath, onChange]);
 
-  const navigateToCategory = useCallback((category: EbayCategory, index: number) => {
+  const navigateToCategory = useCallback(async (category: EbayCategory, index: number) => {
     const newPath = selectedPath.slice(0, index + 1);
     setSelectedPath(newPath);
     
-    const parentId = String(category.ebay_category_id).trim();
-    const children = categories.filter(cat => {
-      const childParentId = cat.parent_ebay_category_id ? String(cat.parent_ebay_category_id).trim() : null;
-      return childParentId === parentId;
-    });
+    // Load children using hierarchical approach
+    const children = await loadChildCategories(category.ebay_category_id);
     setCurrentLevel(children);
     setSearchQuery('');
-  }, [selectedPath, categories]);
+  }, [selectedPath, loadChildCategories]);
 
-  const handleGoBack = useCallback(() => {
+  const handleGoBack = useCallback(async () => {
     if (selectedPath.length === 0) return;
     
     const newPath = selectedPath.slice(0, -1);
@@ -556,14 +542,10 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     } else {
       // Show children of the new last category
       const lastCategory = newPath[newPath.length - 1];
-      const parentId = String(lastCategory.ebay_category_id).trim();
-      const children = categories.filter(cat => {
-        const childParentId = cat.parent_ebay_category_id ? String(cat.parent_ebay_category_id).trim() : null;
-        return childParentId === parentId;
-      });
+      const children = await loadChildCategories(lastCategory.ebay_category_id);
       setCurrentLevel(children);
     }
-  }, [selectedPath, categories, rootCategories]);
+  }, [selectedPath, rootCategories, loadChildCategories]);
 
   const resetToRoot = useCallback(() => {
     console.log('🔄 Resetting to root categories');
@@ -749,7 +731,9 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{category.category_name}</span>
                           <div className="flex items-center gap-2">
-                            {category.leaf_category ? (
+                            {loadingChildren.has(category.ebay_category_id) ? (
+                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                            ) : category.leaf_category ? (
                               <Badge variant="secondary" className="text-xs">
                                 <Check className="h-3 w-3 mr-1" />
                                 Final
