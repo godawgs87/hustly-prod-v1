@@ -36,71 +36,64 @@ export interface FulfillmentDetails {
   };
 }
 
-// eBay Individual Seller Compatible Shipping Service Codes - Trading API Format
-// Using official eBay Trading API service codes for individual accounts
+// eBay Inventory API Compatible Shipping Service Codes
+// These are specifically for the Inventory API (different from Trading API)
 const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
-  // Primary Trading API compatible services
-  'USPSPriority': {
-    serviceCode: 'USPSPriority',
-    displayName: 'USPS Priority Mail',
-    estimatedDays: { min: 1, max: 3 },
-    isValid: true
-  },
-  'USPSMedia': {
-    serviceCode: 'USPSMedia',
-    displayName: 'USPS Media Mail',
-    estimatedDays: { min: 2, max: 8 },
-    isValid: true
-  },
-  'USPSFirstClass': {
-    serviceCode: 'USPSFirstClass',
-    displayName: 'USPS First Class Mail',
-    estimatedDays: { min: 1, max: 3 },
-    isValid: true
-  },
-  'USPSParcel': {
-    serviceCode: 'USPSParcel',
-    displayName: 'USPS Parcel Post',
-    estimatedDays: { min: 2, max: 9 },
-    isValid: true
-  },
-  // Fallback options - basic Trading API services
-  'USPSGround': {
-    serviceCode: 'USPSGround',
-    displayName: 'USPS Ground Advantage',
-    estimatedDays: { min: 2, max: 5 },
-    isValid: true
-  },
+  // Most basic and widely accepted Inventory API service codes
   'Other': {
     serviceCode: 'Other',
     displayName: 'Standard Shipping',
     estimatedDays: { min: 3, max: 7 },
     isValid: true
+  },
+  'US_Postal': {
+    serviceCode: 'US_Postal',
+    displayName: 'USPS Standard',
+    estimatedDays: { min: 3, max: 7 },
+    isValid: true
+  },
+  'USPS_PRIORITY': {
+    serviceCode: 'USPS_PRIORITY',
+    displayName: 'USPS Priority Mail',
+    estimatedDays: { min: 1, max: 3 },
+    isValid: true
+  },
+  'USPS_FIRST_CLASS': {
+    serviceCode: 'USPS_FIRST_CLASS',
+    displayName: 'USPS First Class',
+    estimatedDays: { min: 1, max: 3 },
+    isValid: true
+  },
+  'USPS_MEDIA_MAIL': {
+    serviceCode: 'USPS_MEDIA_MAIL',
+    displayName: 'USPS Media Mail',
+    estimatedDays: { min: 2, max: 8 },
+    isValid: true
   }
 };
 
-// User preference to Trading API compatible eBay service mapping
+// User preference to Inventory API compatible eBay service mapping
 const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
-  // New Trading API validated mappings
-  'other': 'USPSPriority',             // ✅ Use Priority instead of Other
-  'usps_media': 'USPSMedia',           // ✅ Media mail
-  'usps_priority_flat': 'USPSPriority', // ✅ Map to Priority
-  'usps_express_flat': 'USPSPriority',  // ✅ Map to Priority  
-  'usps_ground': 'USPSPriority',       // ✅ Map to Priority
-  // Legacy mappings - all map to Trading API services
-  'usps_priority': 'USPSPriority',     // ✅ Direct mapping
-  'usps_first_class': 'USPSFirstClass', // ✅ Direct mapping
-  'standard': 'USPSPriority',          // ✅ Map to Priority
-  'expedited': 'USPSPriority',         // ✅ Map to Priority
-  'overnight': 'USPSPriority',         // ✅ Map to Priority
-  'express': 'USPSPriority',           // ✅ Map to Priority
-  'flat_rate': 'USPSPriority',         // ✅ Map to Priority
-  'ups_ground': 'USPSPriority',        // ✅ Map unsupported to Priority
-  'fedex_ground': 'USPSPriority'       // ✅ Map unsupported to Priority
+  // Inventory API validated mappings
+  'other': 'Other',                    // ✅ Most compatible fallback
+  'usps_media': 'USPS_MEDIA_MAIL',     // ✅ Media mail
+  'usps_priority_flat': 'USPS_PRIORITY', // ✅ Priority
+  'usps_express_flat': 'USPS_PRIORITY',  // ✅ Map to Priority  
+  'usps_ground': 'US_Postal',          // ✅ Map to basic USPS
+  // Legacy mappings - all map to Inventory API services
+  'usps_priority': 'USPS_PRIORITY',    // ✅ Direct mapping
+  'usps_first_class': 'USPS_FIRST_CLASS', // ✅ Direct mapping
+  'standard': 'Other',                 // ✅ Map to Other (most compatible)
+  'expedited': 'USPS_PRIORITY',        // ✅ Map to Priority
+  'overnight': 'USPS_PRIORITY',        // ✅ Map to Priority
+  'express': 'USPS_PRIORITY',          // ✅ Map to Priority
+  'flat_rate': 'USPS_PRIORITY',        // ✅ Map to Priority
+  'ups_ground': 'Other',               // ✅ Map unsupported to Other
+  'fedex_ground': 'Other'              // ✅ Map unsupported to Other
 };
 
-const DEFAULT_SERVICE = 'USPSPriority'; // Trading API Priority Mail - most compatible
-const FALLBACK_SERVICE = 'USPSMedia';   // Trading API Media Mail - ultimate fallback
+const DEFAULT_SERVICE = 'Other';       // Most basic and compatible service
+const FALLBACK_SERVICE = 'US_Postal'; // USPS fallback
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
