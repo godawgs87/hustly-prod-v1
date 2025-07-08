@@ -59,21 +59,22 @@ export class EbayOfferManager {
   /**
    * Builds offer data for individual accounts using fulfillmentDetails
    */
-  static buildIndividualAccountOffer(
+  static async buildIndividualAccountOffer(
     listing: any,
     sku: string,
     userProfile: any,
-    ebayLocationKey: string
-  ): EbayOfferData {
-    EbayOfferManager.logStep('🔍 Building individual account offer with enhanced shipping', {
+    ebayLocationKey: string,
+    userId: string
+  ): Promise<EbayOfferData> {
+    EbayOfferManager.logStep('🔍 Building individual account offer with eBay API validated shipping', {
       sku,
       title: listing.title,
       shipping_cost_domestic: userProfile.shipping_cost_domestic,
       handling_time_days: userProfile.handling_time_days
     });
 
-    // 🔥 DEPLOYMENT VERSION: v1.62 - Use EbayShippingServices for complete fulfillment details
-    const fulfillmentDetails = EbayShippingServices.createFulfillmentDetails(userProfile);
+    // 🔥 DEPLOYMENT VERSION: v1.70 - Use eBay API to get valid shipping services
+    const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(userProfile, { userId });
 
     // 🔍 CRITICAL DEBUG - Verify service code before returning
     console.log('🚨 DEPLOYMENT VERIFICATION v1.62 - Service code being used:', {
@@ -205,12 +206,12 @@ export class EbayOfferManager {
   /**
    * Creates the appropriate offer data based on account type
    */
-  static createOfferData(
+  async createOfferData(
     listing: any,
     sku: string,
     userProfile: any,
     ebayLocationKey: string
-  ): EbayOfferData {
+  ): Promise<EbayOfferData> {
     // 🔍 CRITICAL DEBUG - Account type detection
     console.log('🔍 CRITICAL DEBUG - Account type detection:', {
       hasPaymentPolicy: !!userProfile.ebay_payment_policy_id,
@@ -224,7 +225,7 @@ export class EbayOfferManager {
     });
 
     if (this.isIndividualAccount(userProfile)) {
-      return this.buildIndividualAccountOffer(listing, sku, userProfile, ebayLocationKey);
+      return await this.buildIndividualAccountOffer(listing, sku, userProfile, ebayLocationKey, this.userId);
     } else {
       return this.buildBusinessAccountOffer(listing, sku, userProfile, ebayLocationKey);
     }

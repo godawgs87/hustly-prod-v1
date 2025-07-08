@@ -102,11 +102,85 @@ export class EbayShippingServices {
   }
 
   /**
-   * Maps user shipping preference to valid eBay service code
+   * Fetches valid shipping services from eBay API
    */
-  static mapUserPreferenceToEbayService(userPreference?: string): string {
-    // Use basic mapping to standard eBay service codes
-    const serviceCode = PREFERENCE_TO_EBAY_SERVICE[userPreference || 'standard'] || DEFAULT_SERVICE;
+  static async fetchValidServices(userId: string, forceRefresh = false): Promise<any[]> {
+    try {
+      this.logStep('Fetching valid services from eBay API', { userId, forceRefresh });
+      
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.50.3');
+      const supabase = createClient(
+        // @ts-ignore - Deno env access
+        Deno.env.get('SUPABASE_URL') ?? '',
+        // @ts-ignore - Deno env access  
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      const response = await supabase.functions.invoke('ebay-shipping-services-fetcher', {
+        body: { userId, forceRefresh }
+      });
+
+      if (response.error) {
+        throw new Error(`Failed to fetch services: ${response.error.message}`);
+      }
+
+      this.logStep('✅ Successfully fetched valid services', {
+        serviceCount: response.data?.services?.length || 0,
+        cached: response.data?.cached
+      });
+
+      return response.data?.services || [];
+    } catch (error) {
+      this.logStep('❌ Error fetching valid services, using fallbacks', { error: error.message });
+      return [];
+    }
+  }
+
+  /**
+   * Maps user shipping preference to valid eBay service code with dynamic validation
+   */
+  static async mapUserPreferenceToEbayService(
+    userPreference?: string, 
+    userId?: string
+  ): Promise<string> {
+    let serviceCode = PREFERENCE_TO_EBAY_SERVICE[userPreference || 'standard'] || DEFAULT_SERVICE;
+    
+    // Try to get valid services from eBay if userId provided
+    if (userId) {
+      try {
+        const validServices = await this.fetchValidServices(userId);
+        
+        if (validServices.length > 0) {
+          // Find best matching service from eBay's valid list
+          const preferredService = validServices.find(s => 
+            s.service_code === serviceCode || 
+            s.service_name.toLowerCase().includes(userPreference?.toLowerCase() || 'priority')
+          );
+          
+          if (preferredService) {
+            serviceCode = preferredService.service_code;
+            this.logStep('✅ Using eBay-validated service', {
+              userPreference,
+              validatedService: serviceCode,
+              serviceName: preferredService.service_name
+            });
+          } else {
+            // Use first available domestic service
+            const fallbackService = validServices.find(s => s.is_domestic);
+            if (fallbackService) {
+              serviceCode = fallbackService.service_code;
+              this.logStep('🔄 Using eBay fallback service', {
+                userPreference,
+                fallbackService: serviceCode,
+                serviceName: fallbackService.service_name
+              });
+            }
+          }
+        }
+      } catch (error) {
+        this.logStep('⚠️ Failed to validate with eBay, using hardcoded mapping', { error: error.message });
+      }
+    }
     
     this.logStep('Mapping user preference to eBay service', {
       userPreference: userPreference || 'none',
@@ -134,19 +208,20 @@ export class EbayShippingServices {
   /**
    * Creates fulfillment details for individual eBay accounts
    */
-  static createFulfillmentDetails(
+  static async createFulfillmentDetails(
     userProfile: any,
     options: {
       domesticCost?: number;
       handlingTimeDays?: number;
+      userId?: string;
     } = {}
-  ): FulfillmentDetails {
+  ): Promise<FulfillmentDetails> {
     const domesticCost = options.domesticCost || userProfile.shipping_cost_domestic || 9.95;
     const handlingTime = options.handlingTimeDays || userProfile.handling_time_days || 1;
     const preferredService = userProfile.preferred_shipping_service;
 
-    // Get validated eBay service code
-    const serviceCode = this.mapUserPreferenceToEbayService(preferredService);
+    // Get validated eBay service code (now async with eBay API validation)
+    const serviceCode = await this.mapUserPreferenceToEbayService(preferredService, options.userId);
     const serviceConfig = this.getServiceConfig(serviceCode);
 
     this.logStep('Creating fulfillment details', {

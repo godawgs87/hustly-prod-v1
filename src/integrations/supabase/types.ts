@@ -275,6 +275,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ebay_valid_services: {
+        Row: {
+          account_type: string | null
+          category: string | null
+          cost_type: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean
+          is_domestic: boolean
+          is_international: boolean
+          last_validated: string | null
+          service_code: string
+          service_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_type?: string | null
+          category?: string | null
+          cost_type?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_domestic?: boolean
+          is_international?: boolean
+          last_validated?: string | null
+          service_code: string
+          service_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_type?: string | null
+          category?: string | null
+          cost_type?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_domestic?: boolean
+          is_international?: boolean
+          last_validated?: string | null
+          service_code?: string
+          service_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       listing_analytics: {
         Row: {
           click_through_rate: number | null

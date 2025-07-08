@@ -1,1 +1,4 @@
 project_id = "ekzaaptxfwixgmbrooqr"
+
+[functions.ebay-shipping-services-fetcher]
+verify_jwt = false

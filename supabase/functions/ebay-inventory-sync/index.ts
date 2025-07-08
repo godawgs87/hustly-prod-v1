@@ -370,8 +370,8 @@ async function syncListingToEbay(supabaseClient: any, userId: string, listingId:
       offerId = offerResult.alreadyPublished.offerId;
       ebayListingId = offerResult.alreadyPublished.listingId;
     } else if (offerResult.shouldCreateNew) {
-      // Create new offer with proper account type detection
-      const offerData = EbayOfferManager.createOfferData(listing, listingId, userProfile, ebayLocationKey);
+      // Create new offer with eBay API validated shipping services
+      const offerData = await ebayApi.offerManager.createOfferData(listing, listingId, userProfile, ebayLocationKey);
       
       // Enhanced logging for troubleshooting
       const fulfillmentValidation = EbayShippingServices.validateFulfillmentDetails(offerData.fulfillmentDetails || {});
@@ -457,28 +457,17 @@ Deno.serve(async (req) => {
     requestData = await req.json();
     const { listingId, action = 'sync_listing', dryRun = false } = requestData;
     
-    // 🧪 PHASE 2 TESTING: Query eBay API for valid shipping services
-    if (action === 'test_ebay_shipping_api') {
-      logStep('🧪 PHASE 2 - Testing eBay shipping services API');
+    // Test fetching valid shipping services if requested
+    if (action === 'test_shipping_service_fetcher') {
+      logStep('🧪 Testing eBay shipping service fetcher');
       
       try {
-        const ebayApi = new EbayInventoryAPI(false, supabaseClient, user.id);
-        const accessToken = await ebayApi.getAccessToken();
-        
-        const ebayServicesData = await EbayShippingServices.queryEbayShippingServices(accessToken);
+        const services = await EbayShippingServices.fetchValidServices(user.id, requestData.forceRefresh);
         
         return new Response(JSON.stringify({
-          status: 'phase2_complete',
-          ebayServicesData,
-          summary: {
-            totalServices: ebayServicesData.shippingServices?.length || 0,
-            domesticServices: ebayServicesData.shippingServices?.filter((s: any) => 
-              s.shippingCategory === 'DOMESTIC' || s.category === 'DOMESTIC'
-            ).length || 0,
-            serviceCodeSamples: ebayServicesData.shippingServices?.slice(0, 10).map((s: any) => 
-              s.shippingServiceCode || s.serviceCode
-            ) || []
-          }
+          status: 'test_complete',
+          services,
+          serviceCount: services.length
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
@@ -486,57 +475,13 @@ Deno.serve(async (req) => {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         return new Response(JSON.stringify({
-          status: 'phase2_error',
+          status: 'test_error',
           error: errorMessage
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 500,
         });
       }
-    }
-
-    // 🧪 ISOLATION TESTING: Test shipping service module independently
-    if (action === 'test_shipping_service') {
-      const { userPreference = 'usps_priority' } = requestData;
-      
-      logStep('🧪 ISOLATION TEST - Testing shipping service module', { userPreference });
-      
-      // Test preference mapping
-      const mappedService = EbayShippingServices.mapUserPreferenceToEbayService(userPreference);
-      const serviceConfig = EbayShippingServices.getServiceConfig(mappedService);
-      const isValid = EbayShippingServices.isValidService(mappedService);
-      
-      // Test fulfillment details generation
-      const mockUserProfile = {
-        preferred_shipping_service: userPreference,
-        shipping_cost_domestic: 9.95,
-        handling_time_days: 1
-      };
-      
-      const fulfillmentDetails = EbayShippingServices.createFulfillmentDetails(mockUserProfile);
-      const validation = EbayShippingServices.validateFulfillmentDetails(fulfillmentDetails);
-      
-      const testResult = {
-        status: 'test_complete',
-        input: { userPreference },
-        mapping: {
-          originalPreference: userPreference,
-          mappedService,
-          serviceConfig,
-          isValid
-        },
-        fulfillmentDetails,
-        validation,
-        exactServiceCodeToBeSent: fulfillmentDetails.shippingOptions[0]?.shippingServices[0]?.serviceCode,
-        allAvailableServices: EbayShippingServices.getAvailableServices()
-      };
-      
-      logStep('🧪 ISOLATION TEST RESULTS', testResult);
-      
-      return new Response(JSON.stringify(testResult), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
     }
     
     if (!listingId) throw new Error('Listing ID required');
