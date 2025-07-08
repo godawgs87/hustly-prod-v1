@@ -75,20 +75,32 @@ export const useEbaySyncOperation = () => {
         return { success: false, error: 'Failed to fetch user profile' };
       }
 
-      // Determine account type using same logic as eBay offer manager
-      const isIndividualAccount = !userProfile.ebay_payment_policy_id || 
-                                  !userProfile.ebay_fulfillment_policy_id || 
-                                  !userProfile.ebay_return_policy_id ||
-                                  ['INDIVIDUAL_DEFAULT_PAYMENT', 'INDIVIDUAL_DEFAULT_RETURN', 'INDIVIDUAL_DEFAULT_FULFILLMENT'].includes(userProfile.ebay_payment_policy_id) ||
-                                  ['INDIVIDUAL_DEFAULT_PAYMENT', 'INDIVIDUAL_DEFAULT_RETURN', 'INDIVIDUAL_DEFAULT_FULFILLMENT'].includes(userProfile.ebay_return_policy_id) ||
-                                  ['INDIVIDUAL_DEFAULT_PAYMENT', 'INDIVIDUAL_DEFAULT_RETURN', 'INDIVIDUAL_DEFAULT_FULFILLMENT'].includes(userProfile.ebay_fulfillment_policy_id);
+      // 🔍 FIXED: Use exact same logic as backend EbayOfferManager.isIndividualAccount()
+      const individualPolicyIds = [
+        'INDIVIDUAL_DEFAULT_PAYMENT',
+        'INDIVIDUAL_DEFAULT_RETURN', 
+        'INDIVIDUAL_DEFAULT_FULFILLMENT'
+      ];
+      
+      const hasNullPolicies = !userProfile.ebay_payment_policy_id || 
+                             !userProfile.ebay_fulfillment_policy_id || 
+                             !userProfile.ebay_return_policy_id;
+      
+      const hasIndividualPolicy = individualPolicyIds.includes(userProfile.ebay_payment_policy_id) ||
+             individualPolicyIds.includes(userProfile.ebay_return_policy_id) ||
+             individualPolicyIds.includes(userProfile.ebay_fulfillment_policy_id);
+             
+      const isIndividualAccount = hasNullPolicies || hasIndividualPolicy;
 
-      console.log('🔍 Account type detection:', {
+      console.log('🔍 FIXED: Account type detection (consistent with backend):', {
         paymentPolicy: userProfile.ebay_payment_policy_id,
         fulfillmentPolicy: userProfile.ebay_fulfillment_policy_id,
         returnPolicy: userProfile.ebay_return_policy_id,
+        hasNullPolicies,
+        hasIndividualPolicy,
         isIndividualAccount,
-        accountType: isIndividualAccount ? 'Individual' : 'Business'
+        accountType: isIndividualAccount ? 'Individual' : 'Business',
+        syncPath: isIndividualAccount ? 'INDIVIDUAL_INLINE_FULFILLMENT' : 'BUSINESS_POLICIES'
       });
 
       // Only verify/create policies for business accounts
@@ -332,20 +344,32 @@ export const useEbaySyncOperation = () => {
         return { success: false, error: 'Failed to fetch user profile' };
       }
 
-      // Determine account type using same logic as eBay offer manager
-      const isIndividualAccount = !userProfile.ebay_payment_policy_id || 
-                                  !userProfile.ebay_fulfillment_policy_id || 
-                                  !userProfile.ebay_return_policy_id ||
-                                  ['INDIVIDUAL_DEFAULT_PAYMENT', 'INDIVIDUAL_DEFAULT_RETURN', 'INDIVIDUAL_DEFAULT_FULFILLMENT'].includes(userProfile.ebay_payment_policy_id) ||
-                                  ['INDIVIDUAL_DEFAULT_PAYMENT', 'INDIVIDUAL_DEFAULT_RETURN', 'INDIVIDUAL_DEFAULT_FULFILLMENT'].includes(userProfile.ebay_return_policy_id) ||
-                                  ['INDIVIDUAL_DEFAULT_PAYMENT', 'INDIVIDUAL_DEFAULT_RETURN', 'INDIVIDUAL_DEFAULT_FULFILLMENT'].includes(userProfile.ebay_fulfillment_policy_id);
+      // 🔍 FIXED: Use exact same logic as backend EbayOfferManager.isIndividualAccount()
+      const individualPolicyIds = [
+        'INDIVIDUAL_DEFAULT_PAYMENT',
+        'INDIVIDUAL_DEFAULT_RETURN', 
+        'INDIVIDUAL_DEFAULT_FULFILLMENT'
+      ];
+      
+      const hasNullPolicies = !userProfile.ebay_payment_policy_id || 
+                             !userProfile.ebay_fulfillment_policy_id || 
+                             !userProfile.ebay_return_policy_id;
+      
+      const hasIndividualPolicy = individualPolicyIds.includes(userProfile.ebay_payment_policy_id) ||
+             individualPolicyIds.includes(userProfile.ebay_return_policy_id) ||
+             individualPolicyIds.includes(userProfile.ebay_fulfillment_policy_id);
+             
+      const isIndividualAccount = hasNullPolicies || hasIndividualPolicy;
 
-      console.log('🔍 Bulk sync account type detection:', {
+      console.log('🔍 FIXED: Bulk sync account type detection (consistent with backend):', {
         paymentPolicy: userProfile.ebay_payment_policy_id,
         fulfillmentPolicy: userProfile.ebay_fulfillment_policy_id,
         returnPolicy: userProfile.ebay_return_policy_id,
+        hasNullPolicies,
+        hasIndividualPolicy,
         isIndividualAccount,
-        accountType: isIndividualAccount ? 'Individual' : 'Business'
+        accountType: isIndividualAccount ? 'Individual' : 'Business',
+        syncPath: isIndividualAccount ? 'INDIVIDUAL_INLINE_FULFILLMENT' : 'BUSINESS_POLICIES'
       });
 
       // Only verify/create policies for business accounts

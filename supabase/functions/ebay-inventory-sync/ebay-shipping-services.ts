@@ -102,28 +102,19 @@ export class EbayShippingServices {
   }
 
   /**
-   * Maps user shipping preference to valid eBay service code
+   * Maps user shipping preference to valid eBay service code - PHASE 2A: Ultra-minimal approach
    */
   static mapUserPreferenceToEbayService(userPreference?: string): string {
-    const preference = userPreference || 'standard';
-    const mappedService = PREFERENCE_TO_EBAY_SERVICE[preference] || DEFAULT_SERVICE;
+    // 🔥 PHASE 2A: Start with absolute minimal approach - just use "Other" for everything
+    const fallbackService = 'Other';
     
-    this.logStep('Mapping user preference to eBay service', {
-      userPreference: preference,
-      mappedService,
-      isValidService: this.isValidService(mappedService)
+    this.logStep('🔥 PHASE 2A: Using ultra-minimal service mapping', {
+      userPreference: userPreference || 'none',
+      forcedService: fallbackService,
+      reason: 'Testing minimal configuration to get ANY listing to sync'
     });
 
-    // Validate the mapped service exists in our validated list
-    if (!this.isValidService(mappedService)) {
-      this.logStep('Mapped service not valid, using fallback', {
-        invalidService: mappedService,
-        fallbackService: FALLBACK_SERVICE
-      });
-      return FALLBACK_SERVICE;
-    }
-
-    return mappedService;
+    return fallbackService;
   }
 
   /**
@@ -166,6 +157,7 @@ export class EbayShippingServices {
       handlingTime
     });
 
+    // 🔥 PHASE 2A: Ultra-minimal fulfillment configuration
     const fulfillmentDetails: FulfillmentDetails = {
       handlingTime: {
         value: handlingTime,
@@ -175,23 +167,15 @@ export class EbayShippingServices {
         optionType: "DOMESTIC",
         costType: "FLAT_RATE",
         shippingServices: [{
-          serviceCode: serviceCode, // FIXED: Use correct property name for eBay Inventory API
+          serviceCode: serviceCode, // Using "Other" service for maximum compatibility
           shippingCost: {
             value: domesticCost.toFixed(2),
             currency: "USD"
-          },
-          additionalShippingCost: {
-            value: (userProfile.shipping_cost_additional || 2.00).toFixed(2),
-            currency: "USD"
           }
+          // 🔥 REMOVED: additionalShippingCost to test minimal config
         }]
-      }],
-      shipToLocations: {
-        regionIncluded: [{
-          regionName: "United States",
-          regionType: "COUNTRY"
-        }]
-      }
+      }]
+      // 🔥 REMOVED: shipToLocations to test minimal config
     };
 
     this.logStep('✅ Fulfillment details created successfully', {
