@@ -476,7 +476,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
       console.log('✅ Final category selected:', { categoryId: category.ebay_category_id, pathString });
       onChange(category.ebay_category_id, pathString);
       setOpen(false);
-      setSearchQuery('');
+      setSearchQuery(''); // Only clear search on final selection
       return;
     }
     
@@ -507,7 +507,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     const children = await loadChildCategories(category.ebay_category_id);
     console.log('👶 Loaded children for', category.category_name, ':', children.length);
     setCurrentLevel(children);
-    setSearchQuery('');
+    // Don't clear search when navigating - let users keep their search term
   }, [selectedPath, categories, onChange, getCategoryPath, loadChildCategories]);
 
   const handleUseThisCategory = useCallback((category: EbayCategory) => {
@@ -517,7 +517,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     
     onChange(category.ebay_category_id, pathString);
     setOpen(false);
-    setSearchQuery('');
+    setSearchQuery(''); // Only clear search on final selection
   }, [selectedPath, onChange]);
 
   const navigateToCategory = useCallback(async (category: EbayCategory, index: number) => {
@@ -527,7 +527,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     // Load children using hierarchical approach
     const children = await loadChildCategories(category.ebay_category_id);
     setCurrentLevel(children);
-    setSearchQuery('');
+    // Don't clear search when navigating between levels
   }, [selectedPath, loadChildCategories]);
 
   const handleGoBack = useCallback(async () => {
@@ -553,8 +553,8 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     console.log('🌳 Root categories:', rootCategories.slice(0, 5).map(cat => cat.category_name));
     setSelectedPath([]);
     setCurrentLevel(rootCategories); // Use stored root categories instead of filtering
-    setSearchQuery('');
-  }, [rootCategories]); // Updated dependency
+    // Don't clear search when resetting to root - let users keep searching
+  }, [rootCategories]);
 
   const clearSelection = useCallback(() => {
     resetToRoot();
@@ -584,7 +584,7 @@ const EbayCategorySelector = ({ value, onChange, disabled, open: externalOpen, o
     const newValue = e.target.value;
     console.log('🔍 Search input changed from:', searchQuery, 'to:', newValue);
     setSearchQuery(newValue);
-  }, [searchQuery]);
+  }, []); // Remove searchQuery dependency to prevent input resets
 
   const clearSearch = useCallback(() => {
     setSearchQuery('');
