@@ -163,14 +163,27 @@ export class EbayShippingServices {
     userPreference?: string, 
     userId?: string
   ): Promise<string> {
+    this.logStep('🔍 CRITICAL DEBUG - Starting service mapping', {
+      userPreference,
+      userId,
+      hasUserId: !!userId
+    });
+
     let serviceCode = PREFERENCE_TO_EBAY_SERVICE[userPreference || 'standard'] || DEFAULT_SERVICE;
     
     // Try to get valid services from eBay if userId provided
     if (userId) {
+      this.logStep('🚀 CRITICAL DEBUG - About to fetch valid services from eBay', { userId });
       try {
         const validServices = await this.fetchValidServices(userId);
         
-        if (validServices.length > 0) {
+        this.logStep('📡 CRITICAL DEBUG - Received response from fetchValidServices', {
+          serviceCount: validServices?.length || 0,
+          services: validServices,
+          isArray: Array.isArray(validServices)
+        });
+        
+        if (validServices && validServices.length > 0) {
           // Find best matching service from eBay's valid list
           const preferredService = validServices.find(s => 
             s.service_code === serviceCode || 
@@ -194,12 +207,22 @@ export class EbayShippingServices {
                 fallbackService: serviceCode,
                 serviceName: fallbackService.service_name
               });
+            } else {
+              this.logStep('⚠️ No domestic services found in eBay response', { validServices });
             }
           }
+        } else {
+          this.logStep('⚠️ No valid services returned from eBay API', { validServices });
         }
       } catch (error) {
-        this.logStep('⚠️ Failed to validate with eBay, using hardcoded mapping', { error: error.message });
+        this.logStep('❌ CRITICAL ERROR - Failed to fetch eBay services', { 
+          error: error.message,
+          stack: error.stack,
+          errorType: error.constructor.name 
+        });
       }
+    } else {
+      this.logStep('⚠️ No userId provided, skipping eBay service fetch');
     }
     
     this.logStep('Mapping user preference to eBay service', {
