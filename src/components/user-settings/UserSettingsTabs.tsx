@@ -11,6 +11,7 @@ import UserSecurityTab from './UserSecurityTab';
 import UserBusinessTab from './UserBusinessTab';
 import UserIntegrationsTab from './UserIntegrationsTab';
 import UserSupportTab from './UserSupportTab';
+import UserAdvancedTab from './UserAdvancedTab';
 
 interface UserSettingsTabsProps {
   user: any;
@@ -19,7 +20,7 @@ interface UserSettingsTabsProps {
 const UserSettingsTabs = ({ user }: UserSettingsTabsProps) => {
   return (
     <Tabs defaultValue="profile" className="w-full">
-      <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10 gap-1 h-auto p-1">
+      <TabsList className="grid w-full grid-cols-6 lg:grid-cols-11 gap-1 h-auto p-1">
         <TabsTrigger value="profile" className="text-xs">Profile</TabsTrigger>
         <TabsTrigger value="connections" className="text-xs">Connections</TabsTrigger>
         <TabsTrigger value="financials" className="text-xs">Financials</TabsTrigger>
@@ -30,6 +31,7 @@ const UserSettingsTabs = ({ user }: UserSettingsTabsProps) => {
         <TabsTrigger value="business" className="text-xs">Business</TabsTrigger>
         <TabsTrigger value="integrations" className="text-xs">Automation</TabsTrigger>
         <TabsTrigger value="support" className="text-xs">Support</TabsTrigger>
+        <TabsTrigger value="advanced" className="text-xs">Advanced</TabsTrigger>
       </TabsList>
       
       <TabsContent value="profile" className="mt-6">
@@ -70,6 +72,10 @@ const UserSettingsTabs = ({ user }: UserSettingsTabsProps) => {
       
       <TabsContent value="support" className="mt-6">
         <UserSupportTab />
+      </TabsContent>
+      
+      <TabsContent value="advanced" className="mt-6">
+        <UserAdvancedTab />
       </TabsContent>
     </Tabs>
   );
