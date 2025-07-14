@@ -50,9 +50,70 @@ export const USER_REVIEW_STATUS = {
 
 export const SUBSCRIPTION_TIERS = {
   TRIAL: 'trial',
-  STARTER: 'starter',
-  PROFESSIONAL: 'professional',
-  ENTERPRISE: 'enterprise'
+  FREE: 'free',
+  SIDE_HUSTLER: 'side_hustler',
+  SERIOUS_SELLER: 'serious_seller',
+  FULL_TIME_FLIPPER: 'full_time_flipper',
+  FOUNDERS: 'founders'
+} as const;
+
+export const SUBSCRIPTION_FEATURES = {
+  BULK_UPLOAD: 'bulk_upload',
+  ADVANCED_ANALYTICS: 'advanced_analytics',
+  TEAM_COLLABORATION: 'team_collaboration',
+  API_ACCESS: 'api_access',
+  PRIORITY_SUPPORT: 'priority_support',
+  DEDICATED_SUPPORT: 'dedicated_support'
+} as const;
+
+// Feature limits by subscription tier
+export const TIER_LIMITS = {
+  [SUBSCRIPTION_TIERS.FREE]: {
+    listings_per_month: 15,
+    marketplace_connections: 1,
+    allowed_platforms: [PLATFORMS.EBAY],
+    photo_analyses_per_month: 5,
+    features: [] as const,
+    price: 0,
+    name: 'Free'
+  },
+  [SUBSCRIPTION_TIERS.SIDE_HUSTLER]: {
+    listings_per_month: 100,
+    marketplace_connections: 2,
+    allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
+    photo_analyses_per_month: 50,
+    features: [] as const,
+    price: 19,
+    name: 'Side Hustler'
+  },
+  [SUBSCRIPTION_TIERS.SERIOUS_SELLER]: {
+    listings_per_month: -1, // unlimited
+    marketplace_connections: 4,
+    allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
+    photo_analyses_per_month: 200,
+    features: ['bulk_upload', 'advanced_analytics', 'priority_support'] as const,
+    price: 49,
+    name: 'Serious Seller'
+  },
+  [SUBSCRIPTION_TIERS.FULL_TIME_FLIPPER]: {
+    listings_per_month: -1, // unlimited
+    marketplace_connections: -1, // unlimited
+    allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP, PLATFORMS.WHATNOT],
+    photo_analyses_per_month: -1, // unlimited
+    features: ['bulk_upload', 'advanced_analytics', 'team_collaboration', 'api_access', 'dedicated_support'] as const,
+    price: 89,
+    name: 'Full-Time Flipper'
+  },
+  [SUBSCRIPTION_TIERS.FOUNDERS]: {
+    listings_per_month: -1, // unlimited
+    marketplace_connections: 4,
+    allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
+    photo_analyses_per_month: 200,
+    features: ['bulk_upload', 'advanced_analytics', 'priority_support'] as const,
+    price: 39.99,
+    name: 'Founders',
+    is_founders: true
+  }
 } as const;
 
 export const STORAGE_KEYS = {
