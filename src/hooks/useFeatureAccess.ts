@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useSubscriptionManagement } from './useSubscriptionManagement';
 import { SUBSCRIPTION_TIERS, SUBSCRIPTION_FEATURES, TIER_LIMITS } from '@/utils/constants';
-// Commented out for now - we'll get user data from profile later
-// import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface FeatureAccess {
   hasAccess: boolean;
@@ -20,10 +20,25 @@ export interface FeatureGateProps {
 
 export const useFeatureAccess = () => {
   const { subscriptionStatus } = useSubscriptionManagement();
-  // For now, we'll use a simple check - you can enhance this later with actual user profile data
+  
+  const { data: userProfile } = useQuery({
+    queryKey: ['userProfile'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return null;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('user_role, subscription_tier, subscription_status')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      return profile;
+    },
+  });
+
   const isAdminOrTester = (): boolean => {
-    // TODO: Replace with actual user profile check
-    return false; // Will be updated when we connect user profiles
+    return userProfile?.user_role === 'admin' || userProfile?.user_role === 'tester';
   };
   
   const currentTier = useMemo(() => {
@@ -36,7 +51,7 @@ export const useFeatureAccess = () => {
       return SUBSCRIPTION_TIERS.FREE;
     }
     return subscriptionStatus.subscription_tier as keyof typeof TIER_LIMITS;
-  }, [subscriptionStatus]);
+  }, [subscriptionStatus, userProfile]);
 
   const tierLimits = useMemo(() => {
     return TIER_LIMITS[currentTier] || TIER_LIMITS[SUBSCRIPTION_TIERS.FREE];

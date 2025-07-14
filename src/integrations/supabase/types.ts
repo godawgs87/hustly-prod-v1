@@ -1256,6 +1256,10 @@ export type Database = {
           leaf_category: boolean
         }[]
       }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_listing_with_photos: {
         Args: { listing_id_param: string }
         Returns: {
