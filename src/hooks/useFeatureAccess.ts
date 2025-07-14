@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useSubscriptionManagement } from './useSubscriptionManagement';
 import { SUBSCRIPTION_TIERS, SUBSCRIPTION_FEATURES, TIER_LIMITS } from '@/utils/constants';
+// Commented out for now - we'll get user data from profile later
+// import { useAuth } from '@/contexts/AuthContext';
 
 export interface FeatureAccess {
   hasAccess: boolean;
@@ -18,8 +20,18 @@ export interface FeatureGateProps {
 
 export const useFeatureAccess = () => {
   const { subscriptionStatus } = useSubscriptionManagement();
+  // For now, we'll use a simple check - you can enhance this later with actual user profile data
+  const isAdminOrTester = (): boolean => {
+    // TODO: Replace with actual user profile check
+    return false; // Will be updated when we connect user profiles
+  };
   
   const currentTier = useMemo(() => {
+    // Admin and testers get founders plan access
+    if (isAdminOrTester()) {
+      return SUBSCRIPTION_TIERS.FOUNDERS;
+    }
+    
     if (!subscriptionStatus?.subscription_tier) {
       return SUBSCRIPTION_TIERS.FREE;
     }
@@ -31,6 +43,18 @@ export const useFeatureAccess = () => {
   }, [currentTier]);
 
   const checkFeatureAccess = (feature: FeatureGateProps['feature'], currentUsage: number = 0): FeatureAccess => {
+    // Admin and testers have unlimited access
+    if (isAdminOrTester()) {
+      return {
+        hasAccess: true,
+        isAtLimit: false,
+        currentUsage,
+        limit: -1,
+        upgradeRequired: '',
+        tierName: 'Admin/Tester Access'
+      };
+    }
+    
     const limits = tierLimits;
     
     switch (feature) {
@@ -161,6 +185,7 @@ export const useFeatureAccess = () => {
     checkFeatureAccess,
     canAccessPlatform,
     isFoundersPlan,
+    isAdminOrTester,
     subscriptionStatus
   };
 };

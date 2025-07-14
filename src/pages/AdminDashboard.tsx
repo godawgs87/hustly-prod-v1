@@ -20,6 +20,10 @@ import {
 const AdminDashboard = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+  const [users, setUsers] = useState([]);
+  const [selectedUserEmail, setSelectedUserEmail] = useState('');
+  const [selectedRole, setSelectedRole] = useState('user');
+  const [loading, setLoading] = useState(false);
 
   // Mock data for demonstration
   const systemStats = {

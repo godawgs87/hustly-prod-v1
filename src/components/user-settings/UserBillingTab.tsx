@@ -6,9 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { CreditCard, Download, Calendar, ExternalLink } from 'lucide-react';
 import { useSubscriptionManagement } from '@/hooks/useSubscriptionManagement';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { TIER_LIMITS, SUBSCRIPTION_TIERS } from '@/utils/constants';
 
 const UserBillingTab = () => {
   const { subscriptionStatus, createCheckout, openCustomerPortal, checking, creating } = useSubscriptionManagement();
+  const { currentTier, tierLimits, isAdminOrTester } = useFeatureAccess();
   const [planName, setPlanName] = useState('Free Plan');
 
   useEffect(() => {
@@ -37,90 +40,124 @@ const UserBillingTab = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h4 className="text-lg font-medium">Current Plan</h4>
-              <p className="text-sm text-gray-600">Manage your subscription</p>
+              <p className="text-sm text-gray-600">
+                {tierLimits.listings_per_month === -1 ? 'Unlimited listings with AI analysis' : 
+                 `${tierLimits.listings_per_month} listings with AI analysis per month`}
+              </p>
+              {isAdminOrTester() && (
+                <p className="text-xs text-blue-600 font-medium">Admin/Tester Access - Unlimited Features</p>
+              )}
             </div>
-            <Badge className={subscriptionStatus?.subscribed ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
-              {planName}
+            <Badge className={subscriptionStatus?.subscribed || isAdminOrTester() ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+              {tierLimits.name}
             </Badge>
           </div>
 
-          {subscriptionStatus?.subscribed ? (
+          {subscriptionStatus?.subscribed || isAdminOrTester() ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="p-4 border rounded-lg">
-                  <p className="text-lg font-semibold text-green-600">Active Subscription</p>
+                  <p className="text-lg font-semibold text-green-600">
+                    {isAdminOrTester() ? 'Admin/Tester Access' : 'Active Subscription'}
+                  </p>
                   <p className="text-sm text-gray-600">
-                    {subscriptionStatus.subscription_end 
-                      ? `Renews ${new Date(subscriptionStatus.subscription_end).toLocaleDateString()}`
-                      : 'Subscription active'
+                    {isAdminOrTester() 
+                      ? 'Unlimited access to all features'
+                      : subscriptionStatus.subscription_end 
+                        ? `Renews ${new Date(subscriptionStatus.subscription_end).toLocaleDateString()}`
+                        : 'Subscription active'
                     }
                   </p>
                 </div>
                 <div className="p-4 border rounded-lg">
-                  <p className="text-lg font-semibold">Unlimited</p>
-                  <p className="text-sm text-gray-600">Monthly listings</p>
+                  <p className="text-lg font-semibold">
+                    {tierLimits.listings_per_month === -1 ? 'Unlimited' : tierLimits.listings_per_month}
+                  </p>
+                  <p className="text-sm text-gray-600">Monthly listings with AI analysis</p>
                 </div>
               </div>
 
               <div className="flex space-x-2">
-                <Button 
-                  onClick={handleManageSubscription}
-                  className="flex items-center space-x-2"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Manage Subscription</span>
-                </Button>
+                {!isAdminOrTester() && (
+                  <Button 
+                    onClick={handleManageSubscription}
+                    className="flex items-center space-x-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Manage Subscription</span>
+                  </Button>
+                )}
               </div>
             </>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold">$0</p>
+                  <p className="text-2xl font-bold">${tierLimits.price}</p>
                   <p className="text-sm text-gray-600">per month</p>
                 </div>
                 <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold">10</p>
-                  <p className="text-sm text-gray-600">monthly limit</p>
+                  <p className="text-2xl font-bold">
+                    {tierLimits.listings_per_month === -1 ? '∞' : tierLimits.listings_per_month}
+                  </p>
+                  <p className="text-sm text-gray-600">listings with AI analysis</p>
                 </div>
                 <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold">Basic</p>
-                  <p className="text-sm text-gray-600">features</p>
+                  <p className="text-2xl font-bold">
+                    {tierLimits.marketplace_connections === -1 ? '∞' : tierLimits.marketplace_connections}
+                  </p>
+                  <p className="text-sm text-gray-600">marketplace connections</p>
                 </div>
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                <h5 className="font-medium text-blue-900 mb-2">Upgrade to unlock more features:</h5>
+                <h5 className="font-medium text-blue-900 mb-2">Current plan features:</h5>
                 <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• Unlimited listings</li>
-                  <li>• Multiple marketplace integrations</li>
-                  <li>• Advanced analytics</li>
-                  <li>• Priority support</li>
+                  {tierLimits.features.map((feature, index) => (
+                    <li key={index}>• {feature}</li>
+                  ))}
                 </ul>
               </div>
 
-              <div className="flex space-x-2">
-                <Button 
-                  onClick={() => handleUpgrade('starter')}
-                  disabled={creating}
-                  variant="outline"
-                >
-                  {creating ? 'Processing...' : 'Side Hustler - $19/mo'}
-                </Button>
-                <Button 
-                  onClick={() => handleUpgrade('professional')}
-                  disabled={creating}
-                >
-                  {creating ? 'Processing...' : 'Serious Seller - $49/mo'}
-                </Button>
-                <Button 
-                  onClick={() => handleUpgrade('enterprise')}
-                  disabled={creating}
-                  variant="outline"
-                >
-                  {creating ? 'Processing...' : 'Full-Time Flipper - $89/mo'}
-                </Button>
-              </div>
+              {currentTier !== SUBSCRIPTION_TIERS.FOUNDERS && (
+                <div className="bg-green-50 p-4 rounded-lg mb-4">
+                  <h5 className="font-medium text-green-900 mb-2">Upgrade to unlock more features:</h5>
+                  <ul className="text-sm text-green-800 space-y-1">
+                    <li>• More listings with AI analysis per month</li>
+                    <li>• Additional marketplace integrations</li>
+                    <li>• Advanced analytics and reporting</li>
+                    <li>• Priority support</li>
+                  </ul>
+                </div>
+              )}
+
+              {currentTier !== SUBSCRIPTION_TIERS.FOUNDERS && (
+                <div className="flex space-x-2 flex-wrap gap-2">
+                  {Object.entries(TIER_LIMITS).map(([tier, limits]) => {
+                    if (tier === SUBSCRIPTION_TIERS.FREE || tier === currentTier) return null;
+                    
+                    const tierDisplayName = tier === SUBSCRIPTION_TIERS.SIDE_HUSTLER ? 'Side Hustler' :
+                                          tier === SUBSCRIPTION_TIERS.SERIOUS_SELLER ? 'Serious Seller' :
+                                          tier === SUBSCRIPTION_TIERS.FULL_TIME_FLIPPER ? 'Full-Time Flipper' : 
+                                          'Premium';
+                    
+                    const planType = tier === SUBSCRIPTION_TIERS.SIDE_HUSTLER ? 'starter' :
+                                   tier === SUBSCRIPTION_TIERS.SERIOUS_SELLER ? 'professional' :
+                                   tier === SUBSCRIPTION_TIERS.FULL_TIME_FLIPPER ? 'enterprise' : 'starter';
+                    
+                    return (
+                      <Button 
+                        key={tier}
+                        onClick={() => handleUpgrade(planType as 'starter' | 'professional' | 'enterprise')}
+                        disabled={creating}
+                        variant={tier === SUBSCRIPTION_TIERS.SERIOUS_SELLER ? "default" : "outline"}
+                      >
+                        {creating ? 'Processing...' : `${tierDisplayName} - $${limits.price}/mo`}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
         </div>

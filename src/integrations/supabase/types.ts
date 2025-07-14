@@ -1087,6 +1087,7 @@ export type Database = {
           trial_ends_at: string | null
           updated_at: string | null
           use_different_return_address: boolean | null
+          user_role: string | null
         }
         Insert: {
           accepts_returns?: boolean | null
@@ -1152,6 +1153,7 @@ export type Database = {
           trial_ends_at?: string | null
           updated_at?: string | null
           use_different_return_address?: boolean | null
+          user_role?: string | null
         }
         Update: {
           accepts_returns?: boolean | null
@@ -1217,6 +1219,7 @@ export type Database = {
           trial_ends_at?: string | null
           updated_at?: string | null
           use_different_return_address?: boolean | null
+          user_role?: string | null
         }
         Relationships: []
       }
