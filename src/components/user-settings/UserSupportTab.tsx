@@ -8,9 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { HelpCircle, MessageCircle, Book, FileText } from 'lucide-react';
+import { HelpCircle, MessageCircle, Book, FileText, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const UserSupportTab = () => {
+  const navigate = useNavigate();
   return (
     <Card className="p-6">
       <div className="flex items-center space-x-3 mb-6">
@@ -158,6 +160,26 @@ const UserSupportTab = () => {
               <Switch defaultChecked />
             </div>
           </div>
+        </div>
+
+        <Separator />
+
+        <div>
+          <Label className="text-base font-medium">Advanced Settings</Label>
+          <p className="text-sm text-gray-600 mb-3">Administrative tools and settings</p>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/admin')}
+            className="justify-start h-auto p-4 w-full"
+          >
+            <div className="text-left">
+              <div className="flex items-center space-x-2 mb-1">
+                <Settings className="w-4 h-4" />
+                <span className="font-medium">Open Admin Dashboard</span>
+              </div>
+              <p className="text-sm text-gray-600">Access administrative features and settings</p>
+            </div>
+          </Button>
         </div>
       </div>
     </Card>
