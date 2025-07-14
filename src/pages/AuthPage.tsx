@@ -93,7 +93,7 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
       period: '/mo',
       description: 'Test the tools with no risk',
       features: [
-        '10 listings/month',
+        '15 listings with AI analysis/month',
         '1 marketplace integration',
         'AI listing generator',
         'Basic inventory tools'
@@ -109,8 +109,8 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
       period: '/mo',
       description: 'For new resellers testing the platform',
       features: [
-        '50 AI photo analyses/month',
-        'Single marketplace connection (eBay)',
+        '100 listings with AI analysis/month',
+        '2 marketplace connections',
         'Basic inventory management',
         'Standard email support'
       ],
@@ -125,7 +125,7 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
       period: '/mo',
       description: 'Best for serious resellers with growing businesses',
       features: [
-        '200 AI photo analyses/month',
+        'Unlimited listings with AI analysis',
         '4 marketplace integrations (eBay, Poshmark, Mercari, Depop)',
         'Bulk upload and processing',
         'Advanced analytics and reporting',
@@ -142,7 +142,7 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
       period: '/mo',
       description: 'Advanced tools for power sellers and reselling teams',
       features: [
-        'Unlimited AI photo analyses',
+        'Unlimited listings with AI analysis',
         'All marketplace integrations + future platforms',
         'Team collaboration features',
         'API access and webhooks',
@@ -280,7 +280,7 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
           </div>
 
           <div className="mt-12 text-center text-sm text-gray-500">
-            All plans include unlimited AI-generated listings, mobile PWA access, and full inventory tools.
+            All plans include AI analysis with every listing, mobile PWA access, and full inventory tools.
           </div>
         </div>
       </section>
