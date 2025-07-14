@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Settings as SettingsIcon } from 'lucide-react';
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 
 const UserAdvancedTab = () => {
+  const { isAdminOrTester } = useFeatureAccess();
+
   return (
     <Card className="p-6">
       <div className="flex items-center space-x-3 mb-6">
@@ -30,19 +33,23 @@ const UserAdvancedTab = () => {
 
         <Separator />
 
-        <div>
-          <Label>Admin Access</Label>
-          <p className="text-sm text-gray-600 mb-3">Access advanced admin features</p>
-          <Button 
-            variant="outline"
-            onClick={() => window.location.href = '/admin'}
-            className="w-full justify-start"
-          >
-            Open Admin Dashboard
-          </Button>
-        </div>
+        {isAdminOrTester() && (
+          <>
+            <div>
+              <Label>Admin Access</Label>
+              <p className="text-sm text-gray-600 mb-3">Access advanced admin features</p>
+              <Button 
+                variant="outline"
+                onClick={() => window.location.href = '/admin'}
+                className="w-full justify-start"
+              >
+                Open Admin Dashboard
+              </Button>
+            </div>
 
-        <Separator />
+            <Separator />
+          </>
+        )}
 
         <div>
           <Label className="text-red-600">Danger Zone</Label>

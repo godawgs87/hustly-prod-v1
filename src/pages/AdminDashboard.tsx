@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import AdminUserManagement from '@/components/admin/AdminUserManagement';
 import { 
   Users, 
   Database, 
@@ -128,10 +129,7 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="users">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">User Management</h3>
-              <p className="text-gray-600">User management features coming soon...</p>
-            </Card>
+            <AdminUserManagement />
           </TabsContent>
 
           <TabsContent value="system">
