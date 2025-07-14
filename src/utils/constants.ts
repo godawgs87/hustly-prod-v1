@@ -72,7 +72,7 @@ export const TIER_LIMITS = {
     listings_per_month: 15,
     marketplace_connections: 1,
     allowed_platforms: [PLATFORMS.EBAY],
-    photo_analyses_per_month: 5,
+    photo_analyses_per_month: 15, // Same as listings since AI analysis is automatic
     features: [] as const,
     price: 0,
     name: 'Free'
@@ -81,7 +81,7 @@ export const TIER_LIMITS = {
     listings_per_month: 100,
     marketplace_connections: 2,
     allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
-    photo_analyses_per_month: 50,
+    photo_analyses_per_month: 100, // Same as listings since AI analysis is automatic
     features: [] as const,
     price: 19,
     name: 'Side Hustler'
@@ -90,7 +90,7 @@ export const TIER_LIMITS = {
     listings_per_month: -1, // unlimited
     marketplace_connections: 4,
     allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
-    photo_analyses_per_month: 200,
+    photo_analyses_per_month: -1, // unlimited - same as listings
     features: ['bulk_upload', 'advanced_analytics', 'priority_support'] as const,
     price: 49,
     name: 'Serious Seller'
@@ -108,7 +108,7 @@ export const TIER_LIMITS = {
     listings_per_month: -1, // unlimited
     marketplace_connections: 4,
     allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
-    photo_analyses_per_month: 200,
+    photo_analyses_per_month: -1, // unlimited - same as listings
     features: ['bulk_upload', 'advanced_analytics', 'priority_support'] as const,
     price: 39.99,
     name: 'Founders',
