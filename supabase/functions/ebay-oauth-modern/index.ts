@@ -27,7 +27,7 @@ class EbayModernOAuth {
 
   async getAuthUrl(state: string, scopes: string[] = ['https://api.ebay.com/oauth/api_scope', 'https://api.ebay.com/oauth/api_scope/sell.inventory']): Promise<string> {
     // Use frontend URL for OAuth callback
-    const redirectUri = `https://lovable.dev/projects/ekzaaptxfwixgmbrooqr/ebay-callback`;
+    const redirectUri = `https://preview--hustly-mvp3.lovable.app/ebay/callback`;
     
     const params = new URLSearchParams({
       client_id: this.clientId,
@@ -45,7 +45,7 @@ class EbayModernOAuth {
 
   async exchangeCodeForToken(code: string, userId: string): Promise<any> {
     // Use same redirect URI as in OAuth URL generation
-    const redirectUri = `https://lovable.dev/projects/ekzaaptxfwixgmbrooqr/ebay-callback`;
+    const redirectUri = `https://preview--hustly-mvp3.lovable.app/ebay/callback`;
     
     const tokenEndpoint = 'https://api.ebay.com/identity/v1/oauth2/token';
     const credentials = btoa(`${this.clientId}:${this.clientSecret}`);
