@@ -184,33 +184,95 @@ serve(async (req) => {
   }
 
   try {
-    logStep("Modern eBay OAuth function started");
+    logStep("Modern eBay OAuth function started", { method: req.method, url: req.url });
 
+    // Enhanced environment variable checking
     const ebayClientId = Deno.env.get('EBAY_CLIENT_ID');
     const ebayClientSecret = Deno.env.get('EBAY_CLIENT_SECRET');
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    logStep("Environment check", { 
+      hasEbayId: !!ebayClientId,
+      hasEbaySecret: !!ebayClientSecret,
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey,
+      ebayIdLength: ebayClientId?.length || 0
+    });
 
     if (!ebayClientId || !ebayClientSecret) {
-      throw new Error('eBay OAuth credentials not configured');
+      const errorMsg = `Missing eBay credentials: ${!ebayClientId ? 'CLIENT_ID' : ''} ${!ebayClientSecret ? 'CLIENT_SECRET' : ''}`.trim();
+      logStep("ERROR: Missing credentials", { error: errorMsg });
+      throw new Error(errorMsg);
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
+    if (!supabaseUrl || !supabaseServiceKey) {
+      const errorMsg = 'Missing Supabase configuration';
+      logStep("ERROR: Missing Supabase config", { error: errorMsg });
+      throw new Error(errorMsg);
+    }
 
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, { 
+      auth: { persistSession: false } 
+    });
+
+    // Enhanced auth header validation
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header provided");
+    logStep("Auth header check", { 
+      hasAuthHeader: !!authHeader,
+      headerLength: authHeader?.length || 0,
+      headerPrefix: authHeader?.substring(0, 10) || 'none'
+    });
+
+    if (!authHeader) {
+      const errorMsg = "Missing Authorization header - ensure user is logged in";
+      logStep("ERROR: No auth header", { error: errorMsg });
+      throw new Error(errorMsg);
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      const errorMsg = "Invalid Authorization header format - must start with 'Bearer '";
+      logStep("ERROR: Invalid auth format", { error: errorMsg });
+      throw new Error(errorMsg);
+    }
 
     const token = authHeader.replace("Bearer ", "");
+    if (!token || token.length < 10) {
+      const errorMsg = "Invalid or empty auth token";
+      logStep("ERROR: Invalid token", { tokenLength: token?.length || 0 });
+      throw new Error(errorMsg);
+    }
+
+    logStep("Authenticating user", { tokenLength: token.length });
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
+    
+    if (userError) {
+      const errorMsg = `Authentication failed: ${userError.message}`;
+      logStep("ERROR: Auth failed", { error: errorMsg });
+      throw new Error(errorMsg);
+    }
     
     const user = userData.user;
-    if (!user?.id) throw new Error("User not authenticated");
+    if (!user?.id) {
+      const errorMsg = "No user found in token";
+      logStep("ERROR: No user", { userData: !!userData });
+      throw new Error(errorMsg);
+    }
 
-    const { action, ...params } = await req.json();
-    logStep("Processing OAuth action", { action });
+    logStep("User authenticated", { userId: user.id });
+
+    // Enhanced request parsing
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      const errorMsg = "Invalid JSON in request body";
+      logStep("ERROR: JSON parse failed", { error: parseError });
+      throw new Error(errorMsg);
+    }
+
+    const { action, ...params } = requestBody;
+    logStep("Processing OAuth action", { action, paramsCount: Object.keys(params).length });
 
     const oauthClient = new EbayModernOAuth(ebayClientId, ebayClientSecret, supabaseClient);
 
