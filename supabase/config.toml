@@ -1,9 +1,54 @@
 project_id = "ekzaaptxfwixgmbrooqr"
 
-[functions.ebay-oauth-modern]
+[functions.ai-style-analysis]
+verify_jwt = false
+
+[functions.ebay-api-client]
+verify_jwt = false
+
+[functions.ebay-category-suggestions]
+verify_jwt = false
+
+[functions.ebay-category-sync]
+verify_jwt = false
+
+[functions.ebay-inventory]
+verify_jwt = false
+
+[functions.ebay-inventory-item]
+verify_jwt = false
+
+[functions.ebay-inventory-location]
+verify_jwt = false
+
+[functions.ebay-inventory-operations]
+verify_jwt = false
+
+[functions.ebay-inventory-sync]
+verify_jwt = false
+
+[functions.ebay-item-aspects]
+verify_jwt = false
+
+[functions.ebay-oauth]
+verify_jwt = false
+
+[functions.ebay-policy-manager]
 verify_jwt = false
 
 [functions.ebay-shipping-services-fetcher]
+verify_jwt = false
+
+[functions.ebay-sync]
+verify_jwt = false
+
+[functions.ebay-token-refresh]
+verify_jwt = false
+
+[functions.list-to-ebay]
+verify_jwt = false
+
+[functions.posting-queue]
 verify_jwt = false
 
 [functions.subscription-management]

@@ -136,7 +136,7 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
         console.log('✅ Session verified, exchanging code for token...');
 
         // Exchange code for access token via our edge function
-        const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
+        const { data, error } = await supabase.functions.invoke('ebay-oauth', {
           body: JSON.stringify({ action: 'exchange_code', code }),
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -151,7 +151,7 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
           throw new Error(`Token exchange failed: ${error.message || 'Unknown error'}`);
         }
 
-        if (data?.status !== 'success') {
+        if (!data?.success) {
           console.error('❌ Unexpected response format:', data);
           throw new Error('Unexpected response from eBay connection service');
         }
@@ -209,7 +209,7 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
       console.log('✅ User session verified, calling edge function...');
 
       // Get OAuth URL from our edge function with proper auth headers
-      const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
+      const { data, error } = await supabase.functions.invoke('ebay-oauth', {
         body: JSON.stringify({ action: 'get_auth_url', state: 'ebay_oauth' }),
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
