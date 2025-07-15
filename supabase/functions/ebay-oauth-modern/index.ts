@@ -287,9 +287,8 @@ serve(async (req) => {
 
     logStep("User authenticated", { userId: user.id });
 
-    // Enhanced request parsing with fallback methods
+    // Enhanced request parsing for supabase.functions.invoke()
     let requestBody: any = {};
-    let requestText = '';
     
     try {
       // Log raw request details for debugging
@@ -303,46 +302,62 @@ serve(async (req) => {
         hasBody: contentLength !== '0'
       });
       
-      // First try to get the raw text
-      requestText = await req.text();
-      logStep("Raw request body", { 
-        body: requestText.substring(0, 200),
-        bodyLength: requestText.length 
-      });
-      
-      // Try to parse as JSON if we have content
-      if (requestText.trim()) {
+      // supabase.functions.invoke() sends JSON in the body
+      if (req.method === 'POST') {
         try {
-          requestBody = JSON.parse(requestText);
-          logStep("Successfully parsed JSON", { keys: Object.keys(requestBody) });
+          requestBody = await req.json();
+          logStep("Successfully parsed JSON from invoke", { keys: Object.keys(requestBody || {}) });
         } catch (jsonError) {
-          logStep("JSON parse failed, trying URL-encoded", { error: jsonError });
+          logStep("JSON parse failed, checking for empty body", { error: jsonError });
           
-          // Try as URL-encoded form data
-          const urlParams = new URLSearchParams(requestText);
-          requestBody = Object.fromEntries(urlParams.entries());
+          // If JSON parsing fails, try text
+          const text = await req.text();
+          logStep("Raw text received", { text: text.substring(0, 100), length: text.length });
           
-          if (Object.keys(requestBody).length === 0) {
-            throw new Error(`Unable to parse request body. Raw content: ${requestText.substring(0, 100)}`);
+          if (text.trim()) {
+            try {
+              requestBody = JSON.parse(text);
+            } catch (retryError) {
+              // Try URL-encoded
+              const urlParams = new URLSearchParams(text);
+              requestBody = Object.fromEntries(urlParams.entries());
+            }
           }
           
-          logStep("Parsed as URL-encoded", { keys: Object.keys(requestBody) });
+          if (!requestBody || Object.keys(requestBody).length === 0) {
+            throw new Error(`Request parsing failed: Empty request body - action parameter required`);
+          }
         }
       } else {
-        logStep("Empty request body received");
-        throw new Error("Empty request body - action parameter required");
+        throw new Error("Only POST method is supported");
       }
       
     } catch (parseError) {
       const errorMsg = `Request parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`;
-      logStep("ERROR: Request parse failed", { 
-        error: parseError,
-        rawBody: requestText.substring(0, 100)
+      logStep("ERROR", { message: errorMsg });
+      return new Response(JSON.stringify({ 
+        error: errorMsg,
+        details: "Ensure you're sending a JSON body with an 'action' parameter"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
       });
-      throw new Error(errorMsg);
     }
 
     const { action, ...params } = requestBody;
+    if (!action) {
+      const errorMsg = "Missing 'action' parameter in request body";
+      logStep("ERROR", { message: errorMsg, receivedParams: Object.keys(requestBody) });
+      return new Response(JSON.stringify({ 
+        error: errorMsg,
+        received: Object.keys(requestBody),
+        expected: "action parameter is required"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+    
     logStep("Processing OAuth action", { action, paramsCount: Object.keys(params).length });
 
     const oauthClient = new EbayModernOAuth(ebayClientId, ebayClientSecret, supabaseClient);
