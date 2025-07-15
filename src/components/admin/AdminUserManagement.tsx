@@ -199,6 +199,7 @@ const AdminUserManagement = () => {
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="canceled">Canceled</SelectItem>
                       <SelectItem value="past_due">Past Due</SelectItem>
+                      <SelectItem value="trialing">Trialing</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
