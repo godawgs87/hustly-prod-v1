@@ -12,9 +12,115 @@ const logStep = (step: string, details?: any) => {
   console.log(`[SUBSCRIPTION-MANAGEMENT] ${step}${detailsStr}`);
 };
 
+// Health check endpoint
+const handleHealthCheck = () => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: {
+      hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+      hasServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      hasStripeKey: !!Deno.env.get('STRIPE_SECRET_KEY'),
+    }
+  }
+  
+  logStep('Health check', health)
+  
+  return new Response(JSON.stringify(health), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status: 200,
+  })
+}
+
+// Create user profile if it doesn't exist
+const ensureUserProfile = async (supabaseClient: any, userId: string, email: string) => {
+  try {
+    logStep('Checking/creating user profile for:', userId)
+    
+    // Check if profile exists
+    const { data: existingProfile, error: checkError } = await supabaseClient
+      .from('user_profiles')
+      .select('id')
+      .eq('id', userId)
+      .single()
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      logStep('Error checking profile:', checkError)
+      throw checkError
+    }
+
+    if (!existingProfile) {
+      logStep('Creating new user profile')
+      
+      // Reset photo count if new month
+      const now = new Date()
+      const currentDate = now.toISOString().split('T')[0]
+      
+      const { error: createError } = await supabaseClient
+        .from('user_profiles')
+        .insert({
+          id: userId,
+          email: email,
+          full_name: 'User',
+          subscription_tier: 'trial',
+          subscription_status: 'active',
+          monthly_photo_limit: 50,
+          photos_used_this_month: 0,
+          last_photo_reset_date: currentDate,
+          created_at: now.toISOString(),
+          updated_at: now.toISOString()
+        })
+
+      if (createError) {
+        logStep('Error creating profile:', createError)
+        throw createError
+      }
+
+      logStep('User profile created successfully')
+    } else {
+      logStep('User profile already exists')
+      
+      // Check if we need to reset monthly photo count
+      const { data: profile, error: getError } = await supabaseClient
+        .from('user_profiles')
+        .select('last_photo_reset_date, photos_used_this_month')
+        .eq('id', userId)
+        .single()
+
+      if (!getError && profile) {
+        const now = new Date()
+        const currentDate = now.toISOString().split('T')[0]
+        const lastResetDate = profile.last_photo_reset_date
+
+        // Reset if it's a new month
+        if (!lastResetDate || lastResetDate < currentDate.substring(0, 7) + '-01') {
+          logStep('Resetting monthly photo count')
+          
+          await supabaseClient
+            .from('user_profiles')
+            .update({
+              photos_used_this_month: 0,
+              last_photo_reset_date: currentDate,
+              updated_at: now.toISOString()
+            })
+            .eq('id', userId)
+        }
+      }
+    }
+  } catch (error) {
+    logStep('Error in ensureUserProfile:', error)
+    throw error
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Health check endpoint
+  if (req.url.includes('/health')) {
+    return handleHealthCheck()
   }
 
   try {
@@ -42,7 +148,25 @@ serve(async (req) => {
     if (!user?.id || !user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    const { action, ...params } = await req.json();
+    // Ensure user profile exists
+    await ensureUserProfile(supabaseClient, user.id, user.email)
+
+    // Parse request body with fallback for empty body
+    let requestBody = {}
+    try {
+      const bodyText = await req.text()
+      if (bodyText) {
+        requestBody = JSON.parse(bodyText)
+      }
+    } catch (parseError) {
+      logStep('JSON parse error:', parseError)
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      })
+    }
+
+    const { action, ...params } = requestBody as { action?: string, [key: string]: any }
 
     switch (action) {
       case 'create_checkout':
@@ -58,7 +182,8 @@ serve(async (req) => {
         return await updateUsageTracking(supabaseClient, user.id, params);
       
       default:
-        throw new Error(`Unknown action: ${action}`);
+        // Default to subscription check if no action specified
+        return await checkSubscriptionStatus(supabaseClient, user, stripeKey);
     }
 
   } catch (error) {

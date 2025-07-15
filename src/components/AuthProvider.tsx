@@ -52,7 +52,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       clearTimeout(debounceTimerRef.current);
     }
     
-    // Debounce auth state updates by 200ms to batch rapid changes
+    // Skip debounce for successful sign-ins to prevent double login
+    const isSuccessfulSignIn = source === 'SIGNED_IN' && newSession;
+    const delay = isSuccessfulSignIn ? 50 : 200; // Minimal delay for sign-ins
+    
     debounceTimerRef.current = setTimeout(() => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
@@ -62,7 +65,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setTimeout(() => {
         lastAuthEventRef.current = null;
       }, 1000);
-    }, 200);
+    }, delay);
   };
 
   useEffect(() => {

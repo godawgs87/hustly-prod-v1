@@ -178,9 +178,35 @@ class EbayModernOAuth {
   }
 }
 
+// Health check endpoint
+const handleHealthCheck = () => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: {
+      hasEbayClientId: !!Deno.env.get('EBAY_CLIENT_ID'),
+      hasEbayClientSecret: !!Deno.env.get('EBAY_CLIENT_SECRET'),
+      hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+      hasServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+    }
+  }
+  
+  logStep('Health check', health)
+  
+  return new Response(JSON.stringify(health), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status: 200,
+  })
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Health check endpoint
+  if (req.url.includes('/health')) {
+    return handleHealthCheck()
   }
 
   try {
