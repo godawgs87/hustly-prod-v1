@@ -51,20 +51,16 @@ const CategorySelector = ({
 
   const loadRootCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from('ebay_categories')
-        .select('*')
-        .eq('is_active', true)
-        .is('parent_ebay_category_id', null)
-        .not('ebay_category_id', 'is', null)
-        .not('category_name', 'is', null)
-        .order('category_name');
+      const { data, error } = await supabase.rpc('get_root_categories');
 
       if (error) throw error;
 
       const validCategories = (data || []).filter(cat => 
         cat.ebay_category_id && cat.category_name
-      );
+      ).map(cat => ({
+        ...cat,
+        parent_ebay_category_id: null // Root categories have no parent
+      }));
 
       setCategories(validCategories);
       setCurrentLevel(validCategories);
@@ -82,14 +78,9 @@ const CategorySelector = ({
 
   const loadChildCategories = async (parentId: string): Promise<EbayCategory[]> => {
     try {
-      const { data, error } = await supabase
-        .from('ebay_categories')
-        .select('*')
-        .eq('is_active', true)
-        .eq('parent_ebay_category_id', parentId)
-        .not('ebay_category_id', 'is', null)
-        .not('category_name', 'is', null)
-        .order('category_name');
+      const { data, error } = await supabase.rpc('get_child_categories', {
+        parent_id: parentId
+      });
 
       if (error) return [];
 

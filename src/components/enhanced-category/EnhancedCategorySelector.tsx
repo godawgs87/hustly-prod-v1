@@ -94,19 +94,28 @@ const EnhancedCategorySelector = ({
 
   const loadCategories = async () => {
     try {
-      const { data, error } = await supabase
+      // Load all categories for building paths and relationships
+      const { data: allCategoriesData, error: allCategoriesError } = await supabase
         .from('ebay_categories')
         .select('*')
         .eq('is_active', true)
         .order('category_name');
 
-      if (error) throw error;
+      if (allCategoriesError) throw allCategoriesError;
       
-      setCategories(data || []);
+      setCategories(allCategoriesData || []);
       
-      // Load root categories
-      const rootCategories = data?.filter(cat => !cat.parent_ebay_category_id) || [];
-      setCurrentLevel(rootCategories);
+      // Load root categories using optimized function
+      const { data: rootData, error: rootError } = await supabase.rpc('get_root_categories');
+      
+      if (rootError) throw rootError;
+      
+      const formattedRootData = (rootData || []).map((cat: any) => ({
+        ...cat,
+        parent_ebay_category_id: null // Root categories have no parent
+      }));
+      
+      setCurrentLevel(formattedRootData);
     } catch (error) {
       console.error('Error loading categories:', error);
       toast({
