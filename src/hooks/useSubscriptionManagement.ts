@@ -126,9 +126,15 @@ export const useSubscriptionManagement = () => {
     }
   }, [toast]);
 
-  // Auto-check subscription on mount
+  // Check subscription only when user is authenticated
   useEffect(() => {
-    checkSubscription();
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        checkSubscription();
+      }
+    };
+    checkAuth();
   }, [checkSubscription]);
 
   return {

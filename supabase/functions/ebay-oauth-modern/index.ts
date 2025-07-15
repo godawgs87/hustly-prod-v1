@@ -287,57 +287,18 @@ serve(async (req) => {
 
     logStep("User authenticated", { userId: user.id });
 
-    // Enhanced request parsing for supabase.functions.invoke()
+    // Parse request body - supabase.functions.invoke() sends JSON
     let requestBody: any = {};
     
     try {
-      // Log raw request details for debugging
-      const contentType = req.headers.get('content-type') || 'none';
-      const contentLength = req.headers.get('content-length') || '0';
-      
-      logStep("Request details", { 
-        method: req.method,
-        contentType,
-        contentLength,
-        hasBody: contentLength !== '0'
-      });
-      
-      // supabase.functions.invoke() sends JSON in the body
-      if (req.method === 'POST') {
-        try {
-          requestBody = await req.json();
-          logStep("Successfully parsed JSON from invoke", { keys: Object.keys(requestBody || {}) });
-        } catch (jsonError) {
-          logStep("JSON parse failed, checking for empty body", { error: jsonError });
-          
-          // If JSON parsing fails, try text
-          const text = await req.text();
-          logStep("Raw text received", { text: text.substring(0, 100), length: text.length });
-          
-          if (text.trim()) {
-            try {
-              requestBody = JSON.parse(text);
-            } catch (retryError) {
-              // Try URL-encoded
-              const urlParams = new URLSearchParams(text);
-              requestBody = Object.fromEntries(urlParams.entries());
-            }
-          }
-          
-          if (!requestBody || Object.keys(requestBody).length === 0) {
-            throw new Error(`Request parsing failed: Empty request body - action parameter required`);
-          }
-        }
-      } else {
-        throw new Error("Only POST method is supported");
-      }
-      
+      requestBody = await req.json();
+      logStep("Successfully parsed JSON", { keys: Object.keys(requestBody || {}) });
     } catch (parseError) {
-      const errorMsg = `Request parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`;
-      logStep("ERROR", { message: errorMsg });
+      const errorMsg = "Failed to parse JSON request body";
+      logStep("ERROR", { message: errorMsg, error: parseError });
       return new Response(JSON.stringify({ 
         error: errorMsg,
-        details: "Ensure you're sending a JSON body with an 'action' parameter"
+        details: "Ensure you're sending a valid JSON body with an 'action' parameter"
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
