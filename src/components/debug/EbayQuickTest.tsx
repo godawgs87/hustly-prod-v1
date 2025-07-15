@@ -59,16 +59,16 @@ const EbayQuickTest = () => {
       }
       addLog(`✅ eBay account: ${ebayAccount.account_username} (token: ${ebayAccount.oauth_token.length} chars)`);
 
-      // Step 3: Call eBay integration function
-      addLog('🚀 Calling eBay integration function...');
+      // Step 3: Call eBay listing sync function
+      addLog('🚀 Calling eBay listing sync function...');
       const startTime = Date.now();
       const {
         data,
         error
-      } = await supabase.functions.invoke('ebay-integration', {
+      } = await supabase.functions.invoke('ebay-listing-sync', {
         body: {
-          action: 'publish_listing',
-          listingId: listing.id
+          listingId: listing.id,
+          dryRun: false
         }
       });
       const duration = Date.now() - startTime;

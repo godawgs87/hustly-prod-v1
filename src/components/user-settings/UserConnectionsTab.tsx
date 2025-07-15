@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Link } from 'lucide-react';
-import { useEbayIntegration } from '@/hooks/useEbayIntegration';
+
 import EbayOAuthConnection from './connections/EbayOAuthConnection';
 import EbayPolicyStatusCard from './connections/EbayPolicyStatusCard';
 import EbayCategorySync from './connections/EbayCategorySync';
@@ -15,7 +15,7 @@ interface Platform {
   icon: string;
 }
 const UserConnectionsTab = () => {
-  // const { importSoldListings, importing } = useEbayIntegration(); // Temporarily disabled - using newer sync operation
+  
 
   const [platforms, setPlatforms] = useState<Platform[]>([{
     name: 'Mercari',
