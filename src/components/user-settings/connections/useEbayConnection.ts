@@ -50,7 +50,7 @@ export const useEbayConnection = () => {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
-          const response = await fetch(`https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth`, {
+          const response = await fetch(`https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth-modern`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
@@ -100,7 +100,7 @@ export const useEbayConnection = () => {
       console.log('Starting eBay connection process...');
       
       // Test the function first - FIXED: Use direct fetch
-      const testResponse = await fetch(`https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth`, {
+      const testResponse = await fetch(`https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth-modern`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ export const useEbayConnection = () => {
       console.log('Function test successful:', testData);
       
       // Let's also test the debug endpoint - FIXED: Use direct fetch
-      const debugResponse = await fetch(`https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth`, {
+      const debugResponse = await fetch(`https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth-modern`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,7 +158,7 @@ export const useEbayConnection = () => {
       }
 
       // Now proceed with OAuth - FIXED: Use direct fetch
-      const authResponse = await fetch(`https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth`, {
+      const authResponse = await fetch(`https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth-modern`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

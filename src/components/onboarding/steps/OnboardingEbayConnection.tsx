@@ -17,7 +17,7 @@ const OnboardingEbayConnection = ({ isConnected, onConnectionChange }: Onboardin
   const initiateEbayConnection = async () => {
     setConnecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('ebay-oauth', {
+      const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
         body: { 
           action: 'get_auth_url',
           state: 'onboarding_flow'

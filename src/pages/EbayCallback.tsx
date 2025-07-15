@@ -85,7 +85,7 @@ const EbayCallback = () => {
         console.log('Sending request to ebay-oauth with body:', requestBody);
 
         // Use Supabase function invoke for proper authentication
-        const { data: responseData, error: functionError } = await supabase.functions.invoke('ebay-oauth', {
+        const { data: responseData, error: functionError } = await supabase.functions.invoke('ebay-oauth-modern', {
           body: {
             action: 'exchange_code',
             code: code,
@@ -102,20 +102,20 @@ const EbayCallback = () => {
 
         console.log('Token exchange response:', responseData);
         
-        if (responseData?.success) {
+        if (responseData?.status === 'success') {
           // Clear any pending OAuth data
           localStorage.removeItem('ebay_oauth_pending');
           
           toast({
             title: "eBay Connected Successfully",
-            description: `Your eBay account (${responseData.username}) is now connected and ready to use`
+            description: "Your eBay account is now connected and ready to use"
           });
 
           // Redirect to settings page
           navigate('/settings');
         } else {
-          console.error('eBay connection failed - missing success flag in response:', responseData);
-          throw new Error('Failed to complete eBay connection');
+          console.error('eBay connection failed - unexpected response:', responseData);
+          throw new Error(responseData?.error || 'Failed to complete eBay connection');
         }
 
       } catch (error: any) {

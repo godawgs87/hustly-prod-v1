@@ -76,7 +76,7 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
       setLoading(true);
       try {
         // Exchange code for access token via our edge function
-        const { data, error } = await supabase.functions.invoke('ebay-oauth', {
+        const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
           body: { action: 'exchange_code', code }
         });
 
@@ -111,7 +111,7 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
     setLoading(true);
     try {
       // Get OAuth URL from our edge function
-      const { data, error } = await supabase.functions.invoke('ebay-oauth', {
+      const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
         body: { action: 'get_auth_url', state: 'ebay_oauth' }
       });
 
