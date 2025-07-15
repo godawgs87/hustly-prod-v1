@@ -137,11 +137,7 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
 
         // Exchange code for access token via our edge function
         const { data, error } = await supabase.functions.invoke('ebay-oauth', {
-          body: JSON.stringify({ action: 'exchange_code', code }),
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
+          body: { action: 'exchange_code', code }
         });
 
         console.log('📡 Token exchange response:', { data, error });
@@ -210,11 +206,7 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
 
       // Get OAuth URL from our edge function with proper auth headers
       const { data, error } = await supabase.functions.invoke('ebay-oauth', {
-        body: JSON.stringify({ action: 'get_auth_url', state: 'ebay_oauth' }),
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
+        body: { action: 'get_auth_url', state: 'ebay_oauth' }
       });
 
       console.log('📡 Edge function response:', { data, error });
