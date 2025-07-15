@@ -7,15 +7,6 @@ verify_jwt = false
 [functions.analyze-photos]
 verify_jwt = false
 
-[functions.generate-listing]
-verify_jwt = false
-
-[functions.process-photo-upload]
-verify_jwt = false
-
-[functions.validate-listing]
-verify_jwt = false
-
 # eBay Core Integration
 [functions.ebay-api-client]
 verify_jwt = false
@@ -41,50 +32,6 @@ verify_jwt = false
 [functions.ebay-shipping-services-fetcher]
 verify_jwt = false
 
-[functions.ebay-token-refresh]
-verify_jwt = false
-
-# Listing & Queue Management
-[functions.list-to-ebay]
-verify_jwt = false
-
-[functions.posting-queue]
-verify_jwt = false
-
 # Subscription Management
 [functions.subscription-management]
-verify_jwt = false
-
-# Legacy/Unused Functions (keeping for compatibility)
-[functions.ebay-auth]
-verify_jwt = false
-
-[functions.ebay-batch-publisher]
-verify_jwt = false
-
-[functions.ebay-integration]
-verify_jwt = false
-
-[functions.ebay-inventory]
-verify_jwt = false
-
-[functions.ebay-inventory-item]
-verify_jwt = false
-
-[functions.ebay-inventory-location]
-verify_jwt = false
-
-[functions.ebay-item-aspects]
-verify_jwt = false
-
-[functions.ebay-listing-publisher]
-verify_jwt = false
-
-[functions.ebay-listing-sync]
-verify_jwt = false
-
-[functions.ebay-offer-manager]
-verify_jwt = false
-
-[functions.ebay-sync]
 verify_jwt = false
