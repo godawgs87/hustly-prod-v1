@@ -1,6 +1,5 @@
 
-import React, { useState } from 'react';
-import { useAuth } from '@/components/AuthProvider';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useInventoryStore } from '@/stores/inventoryStore';
 import { ListingService } from '@/services/ListingService';
 import { PlatformService } from '@/services/PlatformService';
@@ -19,28 +18,32 @@ interface SalesOperationsManagerProps {
 }
 
 const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManagerProps) => {
-  const { user, session, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [platforms, setPlatforms] = useState([]);
   const [rules, setRules] = useState([]);
   const [offers, setOffers] = useState([]);
   const [platformListings, setPlatformListings] = useState([]);
   const [platformLoading, setPlatformLoading] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [platformError, setPlatformError] = useState<string | null>(null);
   const { toast } = useToast();
   
-  const { listings, isLoading: loading, error, stats, refetch } = useInventoryStore();
+  const { listings, isLoading, error, stats, fetchListings } = useInventoryStore();
 
-  // Load platform data on mount, but only if authenticated
-  React.useEffect(() => {
-    if (authLoading || !user || !session) {
+  // Load data on mount - similar pattern to inventory manager
+  useEffect(() => {
+    fetchListings();
+  }, [fetchListings]);
+
+  // Load platform data after inventory loads
+  useEffect(() => {
+    if (isLoading || listings.length === 0) {
       return;
     }
 
     const loadPlatformData = async () => {
       try {
         setPlatformLoading(true);
-        setAuthError(null);
+        setPlatformError(null);
         
         const [platformsRes, rulesRes, offersRes, listingsRes] = await Promise.all([
           PlatformService.getPlatforms(),
@@ -55,23 +58,14 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
         setPlatformListings(listingsRes);
       } catch (error: any) {
         console.error('Failed to load platform data:', error);
-        
-        if (error.message?.includes('Authentication required') || error.message?.includes('invalid claim')) {
-          setAuthError('Authentication failed. Please sign in again.');
-        } else {
-          toast({
-            title: "Error",
-            description: "Failed to load platform data: " + error.message,
-            variant: "destructive"
-          });
-        }
+        setPlatformError(error.message || 'Failed to load platform data');
       } finally {
         setPlatformLoading(false);
       }
     };
 
     loadPlatformData();
-  }, [authLoading, user, session, toast]);
+  }, [isLoading, listings.length]);
 
   // Mock handlers for platform operations
   const handlePlatformToggle = (platformId: string, enabled: boolean) => {
@@ -114,27 +108,8 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
     console.log('Cancel offer:', offerId);
   };
 
-  // Show auth error if authentication failed
-  if (authError) {
-    return (
-      <div className="max-w-7xl mx-auto p-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <p className="text-red-600 mb-4">{authError}</p>
-              <Button onClick={() => window.location.href = '/auth'} variant="outline">
-                Sign In Again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Show loading state
-  if (authLoading || loading || platformLoading) {
+  // Handle loading states - similar to inventory manager
+  if (isLoading && listings.length === 0) {
     return (
       <div className="max-w-7xl mx-auto p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -160,7 +135,7 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
           <CardContent className="p-6">
             <div className="text-center">
               <p className="text-red-600 mb-4">Error loading sales data: {error}</p>
-              <Button onClick={refetch} variant="outline">
+              <Button onClick={fetchListings} variant="outline">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Retry
               </Button>
@@ -171,13 +146,22 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
     );
   }
 
-  // Load inventory on mount, but only if authenticated
-  React.useEffect(() => {
-    if (authLoading || !user || !session) {
-      return;
-    }
-    refetch();
-  }, [authLoading, user, session, refetch]);
+  if (!isLoading && listings.length === 0) {
+    return (
+      <div className="max-w-7xl mx-auto p-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <p className="text-gray-600 mb-4">No inventory found. Create some listings first.</p>
+              <Button onClick={onNavigateToInventory}>
+                Go to Inventory
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const activeListings = listings.filter(l => l.status === 'active');
   const totalValue = activeListings.reduce((sum, listing) => sum + (listing.price || 0), 0);
