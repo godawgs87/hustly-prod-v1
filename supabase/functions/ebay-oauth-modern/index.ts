@@ -287,13 +287,58 @@ serve(async (req) => {
 
     logStep("User authenticated", { userId: user.id });
 
-    // Enhanced request parsing
-    let requestBody;
+    // Enhanced request parsing with fallback methods
+    let requestBody: any = {};
+    let requestText = '';
+    
     try {
-      requestBody = await req.json();
+      // Log raw request details for debugging
+      const contentType = req.headers.get('content-type') || 'none';
+      const contentLength = req.headers.get('content-length') || '0';
+      
+      logStep("Request details", { 
+        method: req.method,
+        contentType,
+        contentLength,
+        hasBody: contentLength !== '0'
+      });
+      
+      // First try to get the raw text
+      requestText = await req.text();
+      logStep("Raw request body", { 
+        body: requestText.substring(0, 200),
+        bodyLength: requestText.length 
+      });
+      
+      // Try to parse as JSON if we have content
+      if (requestText.trim()) {
+        try {
+          requestBody = JSON.parse(requestText);
+          logStep("Successfully parsed JSON", { keys: Object.keys(requestBody) });
+        } catch (jsonError) {
+          logStep("JSON parse failed, trying URL-encoded", { error: jsonError });
+          
+          // Try as URL-encoded form data
+          const urlParams = new URLSearchParams(requestText);
+          requestBody = Object.fromEntries(urlParams.entries());
+          
+          if (Object.keys(requestBody).length === 0) {
+            throw new Error(`Unable to parse request body. Raw content: ${requestText.substring(0, 100)}`);
+          }
+          
+          logStep("Parsed as URL-encoded", { keys: Object.keys(requestBody) });
+        }
+      } else {
+        logStep("Empty request body received");
+        throw new Error("Empty request body - action parameter required");
+      }
+      
     } catch (parseError) {
-      const errorMsg = "Invalid JSON in request body";
-      logStep("ERROR: JSON parse failed", { error: parseError });
+      const errorMsg = `Request parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`;
+      logStep("ERROR: Request parse failed", { 
+        error: parseError,
+        rawBody: requestText.substring(0, 100)
+      });
       throw new Error(errorMsg);
     }
 
@@ -345,12 +390,25 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
+    
+    // Determine appropriate error status
+    let statusCode = 500;
+    if (errorMessage.includes('Authentication') || errorMessage.includes('Authorization')) {
+      statusCode = 401;
+    } else if (errorMessage.includes('parsing') || errorMessage.includes('Invalid')) {
+      statusCode = 400;
+    } else if (errorMessage.includes('Missing')) {
+      statusCode = 400;
+    }
+    
     return new Response(JSON.stringify({ 
       status: 'error',
-      error: errorMessage 
+      error: errorMessage,
+      timestamp: new Date().toISOString(),
+      function: 'ebay-oauth-modern'
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: statusCode,
     });
   }
 });

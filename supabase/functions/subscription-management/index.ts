@@ -151,19 +151,67 @@ serve(async (req) => {
     // Ensure user profile exists
     await ensureUserProfile(supabaseClient, user.id, user.email)
 
-    // Parse request body with fallback for empty body
-    let requestBody = {}
+    // Enhanced request parsing with detailed logging
+    let requestBody: any = {};
+    let requestText = '';
+    
     try {
-      const bodyText = await req.text()
-      if (bodyText) {
-        requestBody = JSON.parse(bodyText)
+      // Log request details for debugging
+      const contentType = req.headers.get('content-type') || 'none';
+      const contentLength = req.headers.get('content-length') || '0';
+      
+      logStep("Request details", { 
+        method: req.method,
+        contentType,
+        contentLength,
+        hasBody: contentLength !== '0'
+      });
+      
+      // Get raw request text
+      requestText = await req.text();
+      logStep("Raw request body", { 
+        body: requestText.substring(0, 200),
+        bodyLength: requestText.length 
+      });
+      
+      // Parse request body with multiple fallback methods
+      if (requestText.trim()) {
+        try {
+          requestBody = JSON.parse(requestText);
+          logStep("Successfully parsed JSON", { keys: Object.keys(requestBody) });
+        } catch (jsonError) {
+          logStep("JSON parse failed, trying URL-encoded", { error: jsonError });
+          
+          // Try as URL-encoded form data
+          const urlParams = new URLSearchParams(requestText);
+          requestBody = Object.fromEntries(urlParams.entries());
+          
+          if (Object.keys(requestBody).length === 0) {
+            logStep("All parsing methods failed", { rawBody: requestText.substring(0, 100) });
+            // For subscription management, empty body defaults to check_subscription
+            requestBody = { action: 'check_subscription' };
+          } else {
+            logStep("Parsed as URL-encoded", { keys: Object.keys(requestBody) });
+          }
+        }
+      } else {
+        logStep("Empty request body - defaulting to subscription check");
+        requestBody = { action: 'check_subscription' };
       }
+      
     } catch (parseError) {
-      logStep('JSON parse error:', parseError)
-      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+      const errorMsg = `Request parsing failed: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`;
+      logStep("ERROR: Request parse failed", { 
+        error: parseError,
+        rawBody: requestText.substring(0, 100)
+      });
+      return new Response(JSON.stringify({ 
+        error: errorMsg,
+        details: { rawBody: requestText.substring(0, 100) }
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
-      })
+      });
     }
 
     const { action, ...params } = requestBody as { action?: string, [key: string]: any }
@@ -189,9 +237,25 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    
+    // Determine appropriate error status
+    let statusCode = 500;
+    if (errorMessage.includes('Authentication') || errorMessage.includes('Auth session missing')) {
+      statusCode = 401;
+    } else if (errorMessage.includes('not configured') || errorMessage.includes('Missing')) {
+      statusCode = 503; // Service Unavailable
+    } else if (errorMessage.includes('parsing') || errorMessage.includes('Invalid')) {
+      statusCode = 400;
+    }
+    
+    return new Response(JSON.stringify({ 
+      error: errorMessage,
+      timestamp: new Date().toISOString(),
+      function: 'subscription-management',
+      details: 'Check edge function logs for more information'
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: statusCode,
     });
   }
 });

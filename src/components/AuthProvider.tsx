@@ -33,39 +33,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const debounceTimerRef = useRef<NodeJS.Timeout>();
-  const lastAuthEventRef = useRef<string | null>(null);
 
-  // Debounced state update to prevent rapid API calls
+  // Immediate state update - no delays to prevent race conditions
   const updateAuthState = (newSession: Session | null, source: string) => {
-    const eventKey = `${source}-${!!newSession}`;
+    console.log(`🔄 Auth state change: ${source}`, !!newSession, new Date().toISOString());
     
-    // Skip duplicate events within short timeframe
-    if (lastAuthEventRef.current === eventKey) {
-      return;
-    }
-    
-    console.log(`Auth state change: ${source}`, !!newSession);
-    lastAuthEventRef.current = eventKey;
-    
-    // Clear existing debounce timer
+    // Clear any existing timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = undefined;
     }
     
-    // Skip debounce for successful sign-ins to prevent double login
-    const isSuccessfulSignIn = source === 'SIGNED_IN' && newSession;
-    const delay = isSuccessfulSignIn ? 50 : 200; // Minimal delay for sign-ins
+    // Set state immediately - no delays
+    setSession(newSession);
+    setUser(newSession?.user ?? null);
+    setLoading(false);
     
-    debounceTimerRef.current = setTimeout(() => {
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      setLoading(false);
-      
-      // Reset event tracking after update
-      setTimeout(() => {
-        lastAuthEventRef.current = null;
-      }, 1000);
-    }, delay);
+    // Track auth history for debugging
+    const authEvent = {
+      timestamp: Date.now(),
+      source,
+      hasSession: !!newSession,
+      hasUser: !!newSession?.user
+    };
+    
+    console.log('🔍 Auth event:', authEvent);
   };
 
   useEffect(() => {
