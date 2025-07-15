@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import { useInventoryStore } from '@/stores/inventoryStore';
 import { ListingService } from '@/services/ListingService';
 import { PlatformService } from '@/services/PlatformService';
@@ -7,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, Package, DollarSign, Clock, ArrowUpRight, RefreshCw } from 'lucide-react';
+import { TrendingUp, Package, DollarSign, Clock, ArrowUpRight, RefreshCw, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PlatformManager from './PlatformManager';
 import OfferManager from './OfferManager';
@@ -18,21 +19,29 @@ interface SalesOperationsManagerProps {
 }
 
 const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManagerProps) => {
+  const { user, session, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [platforms, setPlatforms] = useState([]);
   const [rules, setRules] = useState([]);
   const [offers, setOffers] = useState([]);
   const [platformListings, setPlatformListings] = useState([]);
   const [platformLoading, setPlatformLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const { toast } = useToast();
   
   const { listings, isLoading: loading, error, stats, refetch } = useInventoryStore();
 
-  // Load platform data on mount
+  // Load platform data on mount, but only if authenticated
   React.useEffect(() => {
+    if (authLoading || !user || !session) {
+      return;
+    }
+
     const loadPlatformData = async () => {
       try {
         setPlatformLoading(true);
+        setAuthError(null);
+        
         const [platformsRes, rulesRes, offersRes, listingsRes] = await Promise.all([
           PlatformService.getPlatforms(),
           PlatformService.getCrossListingRules(),
@@ -46,18 +55,23 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
         setPlatformListings(listingsRes);
       } catch (error: any) {
         console.error('Failed to load platform data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load platform data",
-          variant: "destructive"
-        });
+        
+        if (error.message?.includes('Authentication required') || error.message?.includes('invalid claim')) {
+          setAuthError('Authentication failed. Please sign in again.');
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to load platform data: " + error.message,
+            variant: "destructive"
+          });
+        }
       } finally {
         setPlatformLoading(false);
       }
     };
 
     loadPlatformData();
-  }, [toast]);
+  }, [authLoading, user, session, toast]);
 
   // Mock handlers for platform operations
   const handlePlatformToggle = (platformId: string, enabled: boolean) => {
@@ -100,7 +114,27 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
     console.log('Cancel offer:', offerId);
   };
 
-  if (loading || platformLoading) {
+  // Show auth error if authentication failed
+  if (authError) {
+    return (
+      <div className="max-w-7xl mx-auto p-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <p className="text-red-600 mb-4">{authError}</p>
+              <Button onClick={() => window.location.href = '/auth'} variant="outline">
+                Sign In Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show loading state
+  if (authLoading || loading || platformLoading) {
     return (
       <div className="max-w-7xl mx-auto p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -137,10 +171,13 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
     );
   }
 
-  // Load inventory on mount
+  // Load inventory on mount, but only if authenticated
   React.useEffect(() => {
+    if (authLoading || !user || !session) {
+      return;
+    }
     refetch();
-  }, [refetch]);
+  }, [authLoading, user, session, refetch]);
 
   const activeListings = listings.filter(l => l.status === 'active');
   const totalValue = activeListings.reduce((sum, listing) => sum + (listing.price || 0), 0);
