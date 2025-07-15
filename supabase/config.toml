@@ -1,4 +1,10 @@
 project_id = "ekzaaptxfwixgmbrooqr"
 
+[functions.ebay-oauth-modern]
+verify_jwt = false
+
 [functions.ebay-shipping-services-fetcher]
+verify_jwt = false
+
+[functions.subscription-management]
 verify_jwt = false
