@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/AuthProvider';
 import StreamlinedHeader from '@/components/StreamlinedHeader';
 import { Card } from '@/components/ui/card';
@@ -20,6 +21,7 @@ import {
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [users, setUsers] = useState([]);
   const [selectedUserEmail, setSelectedUserEmail] = useState('');
@@ -40,12 +42,17 @@ const AdminDashboard = () => {
     { id: 3, user: 'mike@example.com', action: 'Deleted listing', timestamp: '8 mins ago' }
   ];
 
+  const handleBack = () => {
+    navigate('/settings');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <StreamlinedHeader 
         title="Admin Dashboard" 
         userEmail={user?.email}
-        showBack={false}
+        showBack={true}
+        onBack={handleBack}
       />
       
       <div className="max-w-7xl mx-auto p-6">
