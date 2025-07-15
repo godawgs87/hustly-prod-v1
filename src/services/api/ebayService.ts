@@ -46,7 +46,7 @@ export class EbayService {
   }
 
   static async syncListing(listingId: string, options: { dryRun?: boolean } = {}) {
-    const { data, error } = await supabase.functions.invoke('ebay-listing-sync', {
+    const { data, error } = await supabase.functions.invoke('ebay-inventory-sync', {
       body: { listingId, ...options }
     });
 
@@ -55,5 +55,47 @@ export class EbayService {
     }
 
     return data;
+  }
+
+  static async validateListing(listing: any): Promise<{ isValid: boolean; errors: string[] }> {
+    const errors = [];
+    
+    if (!listing.title) errors.push('title');
+    if (!listing.price) errors.push('price'); 
+    if (!listing.description) errors.push('description');
+    if (!listing.condition) errors.push('condition');
+    if (!listing.ebay_category_id) errors.push('eBay category');
+    
+    return { isValid: errors.length === 0, errors };
+  }
+
+  static async bulkSyncListings(listings: any[], options: { batchSize?: number } = {}) {
+    const batchSize = options.batchSize || 5;
+    const results = [];
+    
+    for (let i = 0; i < listings.length; i += batchSize) {
+      const batch = listings.slice(i, i + batchSize);
+      const batchPromises = batch.map(listing => 
+        this.syncListing(listing.id, { dryRun: false })
+          .then(result => ({ listingId: listing.id, status: 'success', data: result }))
+          .catch(error => ({ listingId: listing.id, status: 'error', error: error.message }))
+      );
+      
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+      
+      // Add delay between batches to avoid rate limiting
+      if (i + batchSize < listings.length) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
+    return {
+      success: true,
+      results,
+      totalProcessed: results.length,
+      successCount: results.filter(r => r.status === 'success').length,
+      errorCount: results.filter(r => r.status === 'error').length
+    };
   }
 }

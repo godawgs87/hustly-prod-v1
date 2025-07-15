@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { EbayService } from '@/services/api/ebayService';
 import type { Listing } from '@/types/Listing';
-import PlatformSetupNotifications from '@/components/notifications/PlatformSetupNotifications';
 
 export const useEbaySyncOperation = () => {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -212,26 +212,11 @@ export const useEbaySyncOperation = () => {
 
       console.log('✅ Listing validation passed');
 
-      // Call the proven eBay inventory sync service
-      console.log('📤 Calling ebay-inventory-sync with listing:', listing.id);
-      const { data, error } = await supabase.functions.invoke('ebay-inventory-sync', {
-        body: {
-          listingId: listing.id,
-          dryRun: false
-        }
-      });
+      // Call the proven eBay inventory sync service through EbayService
+      console.log('📤 Calling EbayService.syncListing with listing:', listing.id);
+      const data = await EbayService.syncListing(listing.id, { dryRun: false });
 
-      console.log('📥 eBay inventory sync response:', { data, error, listingId: listing.id });
-
-      if (error) {
-        console.error('❌ eBay sync error:', error);
-        toast({
-          title: "Sync Failed",
-          description: `Failed to sync to eBay: ${error.message}`,
-          variant: "destructive"
-        });
-        return { success: false, error: error.message };
-      }
+      console.log('📥 EbayService sync response:', { data, listingId: listing.id });
 
       if (data?.status !== 'success') {
         const errorMsg = data?.error || 'Unknown error occurred';
@@ -329,169 +314,18 @@ export const useEbaySyncOperation = () => {
         return { success: false, error: 'eBay account not connected' };
       }
 
-      // Check user profile and determine account type
-      const { data: userProfile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('ebay_payment_policy_id, ebay_return_policy_id, ebay_fulfillment_policy_id')
-        .single();
-
-      if (profileError || !userProfile) {
-        toast({
-          title: "Profile Error",
-          description: "Unable to verify account settings",
-          variant: "destructive"
-        });
-        return { success: false, error: 'Failed to fetch user profile' };
-      }
-
-      // 🔍 FIXED: Use exact same logic as backend EbayOfferManager.isIndividualAccount()
-      const individualPolicyIds = [
-        'INDIVIDUAL_DEFAULT_PAYMENT',
-        'INDIVIDUAL_DEFAULT_RETURN', 
-        'INDIVIDUAL_DEFAULT_FULFILLMENT'
-      ];
+      // Use EbayService for bulk operations with proper batching
+      console.log('📤 Calling EbayService.bulkSyncListings...');
+      const result = await EbayService.bulkSyncListings(listings, { batchSize: 3 });
       
-      const hasNullPolicies = !userProfile.ebay_payment_policy_id || 
-                             !userProfile.ebay_fulfillment_policy_id || 
-                             !userProfile.ebay_return_policy_id;
-      
-      const hasIndividualPolicy = individualPolicyIds.includes(userProfile.ebay_payment_policy_id) ||
-             individualPolicyIds.includes(userProfile.ebay_return_policy_id) ||
-             individualPolicyIds.includes(userProfile.ebay_fulfillment_policy_id);
-             
-      const isIndividualAccount = hasNullPolicies || hasIndividualPolicy;
-
-      console.log('🔍 FIXED: Bulk sync account type detection (consistent with backend):', {
-        paymentPolicy: userProfile.ebay_payment_policy_id,
-        fulfillmentPolicy: userProfile.ebay_fulfillment_policy_id,
-        returnPolicy: userProfile.ebay_return_policy_id,
-        hasNullPolicies,
-        hasIndividualPolicy,
-        isIndividualAccount,
-        accountType: isIndividualAccount ? 'Individual' : 'Business',
-        syncPath: isIndividualAccount ? 'INDIVIDUAL_INLINE_FULFILLMENT' : 'BUSINESS_POLICIES'
-      });
-
-      // Only verify/create policies for business accounts
-      if (!isIndividualAccount) {
-        const hasValidPolicies = !!(
-          userProfile.ebay_payment_policy_id && 
-          userProfile.ebay_return_policy_id && 
-          userProfile.ebay_fulfillment_policy_id &&
-          userProfile.ebay_payment_policy_id !== 'DEFAULT_PAYMENT_POLICY' &&
-          userProfile.ebay_return_policy_id !== 'DEFAULT_RETURN_POLICY' &&
-          userProfile.ebay_fulfillment_policy_id !== 'DEFAULT_FULFILLMENT_POLICY'
-        );
-
-        if (!hasValidPolicies) {
-          console.log('🔧 Bulk sync: Business account eBay policies missing or invalid - automatically creating/fixing...');
-          
-          toast({
-            title: "Setting up eBay policies...",
-            description: "Configuring your eBay business account for bulk sync. This will take a moment.",
-          });
-
-          try {
-            const { data: policyData, error: policyError } = await supabase.functions.invoke('ebay-policy-manager', {
-              body: {}
-            });
-
-            if (policyError) throw policyError;
-            if (policyData?.error) throw new Error(policyData.error);
-
-            console.log('✅ Bulk sync: eBay business policies ready');
-            toast({
-              title: "eBay Business Policies Created! 🎉",
-              description: "Starting bulk sync now...",
-            });
-
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-          } catch (policyError: any) {
-            console.error('❌ Bulk sync policy setup failed:', policyError);
-            toast({
-              title: "Bulk Sync Failed",
-              description: `Policy setup failed: ${policyError.message}`,
-              variant: "destructive"
-            });
-            return { success: false, error: `Policy setup failed: ${policyError.message}` };
-          }
-        } else {
-          console.log('✅ Bulk sync: Business policies verified');
-        }
-      } else {
-        console.log('✅ Bulk sync: Individual account - using inline fulfillment');
-      }
-      
-      // Implement bulk sync using individual ebay-inventory-sync calls
-      console.log('🔄 Processing', listings.length, 'listings individually...');
-      
-      let successCount = 0;
-      let failureCount = 0;
-      const results = [];
-      
-      for (let i = 0; i < listings.length; i++) {
-        const listing = listings[i];
-        console.log(`📤 Processing listing ${i + 1}/${listings.length}: ${listing.title}`);
-        
-        try {
-          const { data: syncResult, error: syncError } = await supabase.functions.invoke('ebay-inventory-sync', {
-            body: {
-              listingId: listing.id,
-              dryRun: false
-            }
-          });
-
-          if (syncError || syncResult?.status === 'error') {
-            const errorMsg = syncError?.message || syncResult?.error || 'Sync failed';
-            console.error(`❌ Bulk sync item failed:`, { 
-              listingId: listing.id, 
-              error: errorMsg,
-              fullError: syncError,
-              fullResponse: syncResult 
-            });
-            throw new Error(errorMsg);
-          }
-
-          successCount++;
-          results.push({
-            listingId: listing.id,
-            status: 'success',
-            data: syncResult
-          });
-          
-          console.log(`✅ Successfully synced: ${listing.title}`);
-          
-          // Add delay between requests to avoid rate limiting
-          if (i < listings.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-          
-        } catch (error: any) {
-          failureCount++;
-          results.push({
-            listingId: listing.id,
-            status: 'failed',
-            error: error.message
-          });
-          console.error(`❌ Failed to sync: ${listing.title} - ${error.message}`);
-        }
-      }
-      
+      // Show summary toast
       toast({
-        title: "Bulk Sync Complete",
-        description: `${successCount}/${listings.length} items synced successfully`,
-        variant: successCount === listings.length ? "default" : "destructive"
+        title: `Bulk Sync ${result.success ? 'Completed' : 'Failed'}`,
+        description: `${result.successCount}/${result.totalProcessed} listings synced successfully`,
+        variant: result.success && result.errorCount === 0 ? "default" : "destructive"
       });
-      
-      return { 
-        success: true, 
-        results: results,
-        successCount: successCount,
-        failureCount: failureCount,
-        batchId: `bulk_${Date.now()}`
-      };
-      
+
+      return result;
     } catch (error: any) {
       console.error('❌ Bulk sync exception:', error);
       toast({

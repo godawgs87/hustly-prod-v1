@@ -37,15 +37,15 @@ const BulkEbaySyncManager = ({ selectedListings, onSyncComplete }: BulkEbaySyncM
     
     const result = await bulkSyncToEbay(selectedListings);
     
-    if (result.success && result.results) {
+    if (result.success && 'results' in result && result.results) {
       // Convert results to our format
       const formattedResults: SyncResult[] = result.results.map((r: any) => ({
         listingId: r.listingId,
         title: selectedListings.find(l => l.id === r.listingId)?.title || 'Untitled',
-        success: r.success,
-        platformListingId: r.success ? r.data?.platform_listing_id : undefined,
-        platformUrl: r.success ? r.data?.platform_url : undefined,
-        error: r.success ? undefined : r.error
+        success: r.status === 'success',
+        platformListingId: r.status === 'success' ? r.data?.platform_listing_id : undefined,
+        platformUrl: r.status === 'success' ? r.data?.platform_url : undefined,
+        error: r.status === 'success' ? undefined : r.error
       }));
       
       setSyncResults(formattedResults);
@@ -57,7 +57,7 @@ const BulkEbaySyncManager = ({ selectedListings, onSyncComplete }: BulkEbaySyncM
     } else {
       toast({
         title: "Bulk Sync Failed",
-        description: result.error || "Unknown error occurred",
+        description: ('error' in result) ? result.error : "Unknown error occurred",
         variant: "destructive"
       });
     }
