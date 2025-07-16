@@ -96,6 +96,8 @@ serve(async (req) => {
 
 async function createAddonCheckout(user: any, params: any, stripeKey: string, supabaseClient: any, req: Request) {
   logStep("Creating add-on checkout", { userId: user.id, addonType: params.addon_type, params });
+  logStep("Available ADDON_PRICING keys", { keys: Object.keys(ADDON_PRICING) });
+  logStep("Received addon_type", { addonType: params.addon_type, type: typeof params.addon_type });
 
   const addon = ADDON_PRICING[params.addon_type as keyof typeof ADDON_PRICING];
   if (!addon) {
