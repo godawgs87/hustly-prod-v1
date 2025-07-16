@@ -30,7 +30,7 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
     }
 
     setIsLoading(true);
-    console.log('Auth form submit:', isSignUp ? 'signup' : 'signin', email);
+    // Auth form submit
 
     try {
       if (isSignUp) {
@@ -69,7 +69,7 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
             variant: "destructive"
           });
         } else if (data.user) {
-          console.log('Sign in successful:', data.user.id);
+          // Sign in successful
           toast({
             title: "Welcome Back!",
             description: "You've successfully signed in."

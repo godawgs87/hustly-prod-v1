@@ -94,7 +94,7 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
   }, [state.currentStep]);
 
   const handlePhotosUploaded = useCallback((uploadedPhotos: File[]) => {
-    console.log('📸 Photos uploaded for bulk processing:', uploadedPhotos.length);
+    // Photos uploaded for bulk processing
     state.setPhotos(uploadedPhotos);
   }, [state.setPhotos]);
 

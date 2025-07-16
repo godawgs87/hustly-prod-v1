@@ -38,29 +38,18 @@ const PricingResearch = ({ productTitle, condition, onPriceSelect }: PricingRese
     setIsResearching(true);
     
     try {
-      // Simulate API call for pricing research
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock pricing data - in real app, this would come from eBay/Amazon APIs
-      const mockData: PricingData = {
-        suggestedPrice: Math.floor(Math.random() * 200) + 50,
-        priceRange: { min: 30, max: 180 },
-        marketTrend: ['up', 'down', 'stable'][Math.floor(Math.random() * 3)] as any,
-        competitors: [
-          { source: 'eBay', price: 89.99, condition: 'Used' },
-          { source: 'Amazon', price: 120.00, condition: 'New' },
-          { source: 'Mercari', price: 75.50, condition: 'Like New' }
-        ],
-        confidence: ['high', 'medium', 'low'][Math.floor(Math.random() * 3)] as any
-      };
-      
-      setPricingData(mockData);
+      // TODO: Implement real pricing research API
+      // This should call your pricing research service/API
+      // await supabase.functions.invoke('pricing-research', { body: { query, condition } });
       
       toast({
-        title: "Pricing Research Complete",
-        description: `Found ${mockData.competitors.length} comparable listings`
+        title: "Feature Coming Soon",
+        description: "Pricing research integration is in development. Please research prices manually for now.",
+        variant: "default"
       });
       
+      // Clear any existing data since this is a placeholder
+      setPricingData(null);
     } catch (error) {
       toast({
         title: "Research Failed",

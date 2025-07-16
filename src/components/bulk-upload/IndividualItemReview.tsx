@@ -42,7 +42,7 @@ const IndividualItemReview = ({
   }, [group]);
 
   const handleListingDataUpdate = (updates: Partial<ListingData>) => {
-    console.log('Updating listing data:', updates);
+    // Updating listing data
     setEditedGroup(prev => ({
       ...prev,
       listingData: {
@@ -53,7 +53,7 @@ const IndividualItemReview = ({
   };
 
   const handleConsignmentUpdate = (field: string, value: any) => {
-    console.log('Updating consignment field:', field, value);
+    // Updating consignment field
     setEditedGroup(prev => ({
       ...prev,
       listingData: {
@@ -64,7 +64,7 @@ const IndividualItemReview = ({
   };
 
   const handleShippingSelect = (option: any) => {
-    console.log('Shipping option selected:', option);
+    // Shipping option selected
     setEditedGroup(prev => ({
       ...prev,
       selectedShipping: {
@@ -77,7 +77,7 @@ const IndividualItemReview = ({
   };
 
   const handleApprove = () => {
-    console.log('Approving item with data:', editedGroup);
+    // Approving item with data
     
     // Validation matching single item upload exactly
     const errors = [];
@@ -100,7 +100,7 @@ const IndividualItemReview = ({
   };
 
   const handleSaveDraft = () => {
-    console.log('Saving draft with data:', editedGroup);
+    // Saving draft with data
     if (!editedGroup.listingData?.title?.trim()) {
       toast({
         title: "Title required",

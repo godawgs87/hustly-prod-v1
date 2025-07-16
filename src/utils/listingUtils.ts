@@ -97,18 +97,7 @@ export const getDimensionsFromListing = (listingData: any) => {
   };
 };
 
-// Legacy functions for backward compatibility (can be removed if not used elsewhere)
-export const getWeight = (): number => {
-  return 3.0;
-};
-
-export const getDimensions = () => {
-  return {
-    length: 10,
-    width: 6, 
-    height: 4
-  };
-};
+// Legacy functions removed - use getWeightFromListing() and getDimensionsFromListing() instead
 
 // Helper function to get measurement strings from listing data
 export const getMeasurementStrings = (listingData?: any) => {
@@ -117,11 +106,12 @@ export const getMeasurementStrings = (listingData?: any) => {
   }
   
   // Fallback to default measurements
-  const dims = getDimensions();
+  const dims = getDimensionsFromListing(listingData);
+  const weight = getWeightFromListing(listingData);
   return {
     length: `${dims.length} inches`,
     width: `${dims.width} inches`, 
     height: `${dims.height} inches`,
-    weight: `${getWeight()} lbs`
+    weight: `${weight} lbs`
   };
 };

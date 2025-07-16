@@ -23,45 +23,45 @@ const ActiveListingsManager = ({
 }: ActiveListingsManagerProps) => {
   const [activeTab, setActiveTab] = useState('platforms');
 
-  // Mock handlers - these would connect to your backend
+  // TODO: Connect to backend services
   const handlePlatformToggle = (platformId: string, enabled: boolean) => {
-    console.log('Toggle platform:', platformId, enabled);
+    // Toggle platform functionality
   };
 
   const handlePlatformSettings = (platformId: string) => {
-    console.log('Open platform settings:', platformId);
+    // Open platform settings
   };
 
   const handleAddPlatform = () => {
-    console.log('Add new platform');
+    // Add new platform
   };
 
   const handleCreateRule = () => {
-    console.log('Create new cross-listing rule');
+    // Create new cross-listing rule
   };
 
   const handleEditRule = (ruleId: string) => {
-    console.log('Edit rule:', ruleId);
+    // Edit rule functionality
   };
 
   const handleDeleteRule = (ruleId: string) => {
-    console.log('Delete rule:', ruleId);
+    // Delete rule functionality
   };
 
   const handleToggleRule = (ruleId: string, enabled: boolean) => {
-    console.log('Toggle rule:', ruleId, enabled);
+    // Toggle rule functionality
   };
 
   const handleCreateOffer = (offer: any) => {
-    console.log('Create offer:', offer);
+    // Create offer functionality
   };
 
   const handleSendOffer = (offerId: string) => {
-    console.log('Send offer:', offerId);
+    // Send offer functionality
   };
 
   const handleCancelOffer = (offerId: string) => {
-    console.log('Cancel offer:', offerId);
+    // Cancel offer functionality
   };
 
   const getTabCount = (tab: string) => {

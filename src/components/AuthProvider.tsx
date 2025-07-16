@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Immediate state update - no delays to prevent race conditions
   const updateAuthState = (newSession: Session | null, source: string) => {
-    console.log(`🔄 Auth state change: ${source}`, !!newSession, new Date().toISOString());
+    // Auth state change logged
     
     // Clear any existing timer
     if (debounceTimerRef.current) {
@@ -57,11 +57,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       hasUser: !!newSession?.user
     };
     
-    console.log('🔍 Auth event:', authEvent);
+    // Auth event tracked
   };
 
   useEffect(() => {
-    console.log('AuthProvider: Setting up auth listener');
+    // Setting up auth listener
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (error) {
           console.error('Error getting initial session:', error);
         }
-        console.log('Initial session:', !!session);
+        // Initial session checked
         updateAuthState(session, 'INITIAL_SESSION');
       } catch (error) {
         console.error('Failed to get initial session:', error);
@@ -88,7 +88,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     getInitialSession();
 
     return () => {
-      console.log('AuthProvider: Cleaning up subscription');
+      // Cleaning up subscription
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signOut = async () => {
     try {
-      console.log('Signing out...');
+      // Signing out...
       setLoading(true);
       await supabase.auth.signOut();
     } catch (error) {

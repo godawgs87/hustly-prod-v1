@@ -34,7 +34,7 @@ const EditableListingForm = ({
   hideBackButton = false
 }: EditableListingFormProps) => {
   const handleConsignmentUpdate = (field: string, value: any) => {
-    console.log('Updating consignment field:', field, 'with value:', value);
+    // Updating consignment field
     onUpdate({ [field]: value });
   };
 
@@ -43,7 +43,7 @@ const EditableListingForm = ({
     onEdit(); // This will set current step to 'shipping' in the parent component
   };
 
-  console.log('🔍 EditableListingForm - Current listing data:', listingData);
+  // Rendering listing form with current data
 
   return (
     <div className="space-y-6">
