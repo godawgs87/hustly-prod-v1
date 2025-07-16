@@ -416,17 +416,17 @@ async function checkSubscriptionStatus(supabaseClient: any, user: any, stripeKey
     stripeSubscriptionId = subscription.id;
     subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
     
-    // Determine tier from price
+    // Determine tier from price - map to actual frontend tier names
     const priceId = subscription.items.data[0].price.id;
     const price = await stripe.prices.retrieve(priceId);
     const amount = price.unit_amount || 0;
     
     if (amount >= 8900) {
-      subscriptionTier = 'enterprise';
+      subscriptionTier = 'full_time_flipper';
     } else if (amount >= 4900) {
-      subscriptionTier = 'professional';
+      subscriptionTier = 'serious_seller';
     } else if (amount >= 1900) {
-      subscriptionTier = 'starter';
+      subscriptionTier = 'side_hustler';
     }
     
     logStep("Active subscription found", { 
@@ -451,18 +451,32 @@ async function checkSubscriptionStatus(supabaseClient: any, user: any, stripeKey
     logStep("No active subscription found");
   }
 
-  // Update user profile
+  // Update user profile - preserve existing database tier for admin/tester users
+  let finalTier = subscriptionTier;
+  
+  // Check if user has admin/tester role and existing database tier
+  if (existingProfile?.user_role === 'admin' || existingProfile?.user_role === 'tester') {
+    if (existingProfile?.subscription_tier && existingProfile.subscription_tier !== 'trial') {
+      logStep("Preserving existing admin/tester tier", { 
+        role: existingProfile.user_role,
+        existingTier: existingProfile.subscription_tier,
+        stripeTier: subscriptionTier
+      });
+      finalTier = existingProfile.subscription_tier;
+    }
+  }
+
   await supabaseClient.from("user_profiles").upsert({
     id: user.id,
     email: user.email,
-    subscription_tier: subscriptionTier,
+    subscription_tier: finalTier,
     subscription_status: hasActiveSub ? 'active' : 'inactive',
     subscription_ends_at: subscriptionEnd
   }, { onConflict: 'id' });
 
   return new Response(JSON.stringify({
     subscribed: hasActiveSub,
-    subscription_tier: subscriptionTier,
+    subscription_tier: finalTier,
     subscription_status: hasActiveSub ? 'active' : 'inactive',
     subscription_end: subscriptionEnd
   }), {
