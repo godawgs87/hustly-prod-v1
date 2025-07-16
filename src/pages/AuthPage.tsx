@@ -91,9 +91,9 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
       name: 'Free',
       price: '$0',
       period: '/mo',
-      description: 'Test the tools with no risk',
+      description: '7-day trial of Serious Seller features',
       features: [
-        '15 listings with AI analysis/month',
+        '10 listings with AI analysis/month',
         '1 marketplace integration',
         'AI listing generator',
         'Basic inventory tools'
@@ -123,12 +123,12 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
       name: 'Serious Seller',
       price: '$49',
       period: '/mo',
-      description: 'Best for serious resellers with growing businesses',
+      description: 'Save $240/year vs competitors',
       features: [
-        'Unlimited listings with AI analysis',
+        '300 listings with AI analysis/month',
         '4 marketplace integrations (eBay, Poshmark, Mercari, Depop)',
         'Bulk upload and processing',
-        'Advanced analytics and reporting',
+        'Profit tracking & sales analytics',
         'Priority support with live chat'
       ],
       buttonText: 'Start Free Trial',
