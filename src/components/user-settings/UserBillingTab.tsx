@@ -4,22 +4,47 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { CreditCard, Download, Calendar, ExternalLink } from 'lucide-react';
+import { CreditCard, Download, Calendar, ExternalLink, Loader2 } from 'lucide-react';
 import { useSubscriptionManagement } from '@/hooks/useSubscriptionManagement';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { TIER_LIMITS, SUBSCRIPTION_TIERS } from '@/utils/constants';
 import { AddonPurchase } from '@/components/addons/AddonPurchase';
 
 const UserBillingTab = () => {
-  const { subscriptionStatus, createCheckout, openCustomerPortal, checking, creating } = useSubscriptionManagement();
+  const { subscriptionStatus, createCheckout, openCustomerPortal, getPaymentMethods, getBillingHistory, checking, creating } = useSubscriptionManagement();
   const { currentTier, tierLimits, isAdminOrTester } = useFeatureAccess();
   const [planName, setPlanName] = useState('Free Plan');
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [billingHistory, setBillingHistory] = useState<any[]>([]);
+  const [loadingPayment, setLoadingPayment] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     if (subscriptionStatus?.subscribed) {
       setPlanName(subscriptionStatus.subscription_tier || 'Unknown Plan');
     }
   }, [subscriptionStatus]);
+
+  useEffect(() => {
+    const loadPaymentData = async () => {
+      if (subscriptionStatus?.subscribed && !isAdminOrTester()) {
+        setLoadingPayment(true);
+        setLoadingHistory(true);
+        
+        const [methods, history] = await Promise.all([
+          getPaymentMethods(),
+          getBillingHistory()
+        ]);
+        
+        setPaymentMethods(methods);
+        setBillingHistory(history);
+        setLoadingPayment(false);
+        setLoadingHistory(false);
+      }
+    };
+    
+    loadPaymentData();
+  }, [subscriptionStatus, getPaymentMethods, getBillingHistory, isAdminOrTester]);
 
   const handleUpgrade = async (plan: 'starter' | 'professional' | 'enterprise') => {
     await createCheckout(plan);
@@ -167,18 +192,35 @@ const UserBillingTab = () => {
 
         <div>
           <h4 className="text-lg font-medium mb-3">Payment Method</h4>
-          <div className="flex items-center justify-between p-3 border rounded-lg">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-6 bg-gray-800 rounded flex items-center justify-center text-white text-xs font-bold">
-                ••••
-              </div>
-              <div>
-                <p className="font-medium">•••• •••• •••• 4242</p>
-                <p className="text-sm text-gray-600">Expires 12/26</p>
-              </div>
+          {loadingPayment ? (
+            <div className="flex items-center justify-center p-4 border rounded-lg">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Loading payment methods...
             </div>
-            <Button variant="outline" size="sm">Update</Button>
-          </div>
+          ) : paymentMethods.length > 0 ? (
+            <div className="space-y-2">
+              {paymentMethods.map((method, index) => (
+                <div key={method.id || index} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-6 bg-gray-800 rounded flex items-center justify-center text-white text-xs font-bold">
+                      {method.brand?.toUpperCase() || '••••'}
+                    </div>
+                    <div>
+                      <p className="font-medium">•••• •••• •••• {method.last4}</p>
+                      <p className="text-sm text-gray-600">Expires {method.exp_month}/{method.exp_year}</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleManageSubscription}>
+                    Update
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-3 border rounded-lg text-center text-gray-500">
+              {isAdminOrTester() ? 'Admin/Tester account' : 'No payment method on file'}
+            </div>
+          )}
         </div>
 
         <Separator />
@@ -186,36 +228,53 @@ const UserBillingTab = () => {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-lg font-medium">Billing History</h4>
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Download All
-            </Button>
+            {billingHistory.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleManageSubscription}>
+                <Download className="w-4 h-4 mr-2" />
+                Download All
+              </Button>
+            )}
           </div>
 
-          <div className="space-y-2">
-            {[
-              { date: 'Dec 1, 2024', amount: '$29.00', status: 'Paid', invoice: 'INV-001' },
-              { date: 'Nov 1, 2024', amount: '$29.00', status: 'Paid', invoice: 'INV-002' },
-              { date: 'Oct 1, 2024', amount: '$29.00', status: 'Paid', invoice: 'INV-003' },
-            ].map((bill, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                  <div>
-                    <p className="font-medium">{bill.date}</p>
-                    <p className="text-sm text-gray-600">{bill.invoice}</p>
+          {loadingHistory ? (
+            <div className="flex items-center justify-center p-4 border rounded-lg">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Loading billing history...
+            </div>
+          ) : billingHistory.length > 0 ? (
+            <div className="space-y-2">
+              {billingHistory.map((invoice, index) => (
+                <div key={invoice.id || index} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <div>
+                      <p className="font-medium">{new Date(invoice.created * 1000).toLocaleDateString()}</p>
+                      <p className="text-sm text-gray-600">{invoice.number || `Invoice ${index + 1}`}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
+                      {invoice.status}
+                    </Badge>
+                    <p className="font-medium">
+                      ${(invoice.amount_paid / 100).toFixed(2)}
+                    </p>
+                    {invoice.invoice_pdf && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={invoice.invoice_pdf} target="_blank" rel="noopener noreferrer">
+                          <Download className="w-4 h-4" />
+                        </a>
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <Badge variant="secondary">{bill.status}</Badge>
-                  <p className="font-medium">{bill.amount}</p>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-3 border rounded-lg text-center text-gray-500">
+              {isAdminOrTester() ? 'Admin/Tester account' : 'No billing history found'}
+            </div>
+          )}
         </div>
 
         <Separator />
@@ -232,13 +291,14 @@ const UserBillingTab = () => {
 
         <div>
           <h4 className="text-lg font-medium mb-3">Billing Address</h4>
-          <div className="p-3 border rounded-lg">
-            <p className="font-medium">John Doe</p>
-            <p className="text-sm text-gray-600">123 Main Street</p>
-            <p className="text-sm text-gray-600">Anytown, ST 12345</p>
-            <p className="text-sm text-gray-600">United States</p>
+          <div className="p-3 border rounded-lg text-center text-gray-500">
+            {isAdminOrTester() ? 'Admin/Tester account' : 'Manage billing address through Stripe Customer Portal'}
           </div>
-          <Button variant="outline" className="mt-2">Edit Address</Button>
+          {!isAdminOrTester() && (
+            <Button variant="outline" className="mt-2" onClick={handleManageSubscription}>
+              Manage Billing Details
+            </Button>
+          )}
         </div>
       </div>
     </Card>

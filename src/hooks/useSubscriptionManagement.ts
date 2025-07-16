@@ -126,6 +126,34 @@ export const useSubscriptionManagement = () => {
     }
   }, [toast]);
 
+  const getPaymentMethods = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('subscription-management', {
+        body: { action: 'get_payment_methods' }
+      });
+
+      if (error) throw error;
+      return data.payment_methods || [];
+    } catch (error: any) {
+      console.error('Payment methods fetch failed:', error);
+      return [];
+    }
+  }, []);
+
+  const getBillingHistory = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('subscription-management', {
+        body: { action: 'get_billing_history' }
+      });
+
+      if (error) throw error;
+      return data.invoices || [];
+    } catch (error: any) {
+      console.error('Billing history fetch failed:', error);
+      return [];
+    }
+  }, []);
+
   // Check subscription only when user is authenticated
   useEffect(() => {
     const checkAuth = async () => {
@@ -143,6 +171,8 @@ export const useSubscriptionManagement = () => {
     createCheckout,
     openCustomerPortal,
     updateUsage,
+    getPaymentMethods,
+    getBillingHistory,
     checking,
     creating
   };

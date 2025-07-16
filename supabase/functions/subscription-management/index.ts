@@ -226,8 +226,14 @@ serve(async (req) => {
       case 'check_subscription':
         return await checkSubscriptionStatus(supabaseClient, user, stripeKey);
       
-      case 'customer_portal':
-        return await createCustomerPortalSession(user, stripeKey);
+    case 'customer_portal':
+      return await createCustomerPortalSession(user, stripeKey);
+    
+    case 'get_payment_methods':
+      return await getPaymentMethods(user, stripeKey);
+    
+    case 'get_billing_history':
+      return await getBillingHistory(user, stripeKey);
       
       case 'update_usage':
         return await updateUsageTracking(supabaseClient, user.id, params);
@@ -592,4 +598,91 @@ function checkUsageLimits(profile: any, updateData: any, limits: any) {
   if (limits.photos_per_month === -1) return false; // Unlimited
   
   return photosUsed > limits.photos_per_month;
+}
+
+// Get payment methods for a user
+async function getPaymentMethods(user: any, stripeKey: string) {
+  try {
+    logStep("Getting payment methods", { userId: user.id, email: user.email });
+    
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    
+    if (customers.data.length === 0) {
+      return new Response(JSON.stringify({ payment_methods: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+    
+    const customerId = customers.data[0].id;
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: customerId,
+      type: 'card',
+    });
+    
+    const formattedMethods = paymentMethods.data.map(pm => ({
+      id: pm.id,
+      brand: pm.card?.brand,
+      last4: pm.card?.last4,
+      exp_month: pm.card?.exp_month,
+      exp_year: pm.card?.exp_year,
+    }));
+    
+    return new Response(JSON.stringify({ payment_methods: formattedMethods }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error: any) {
+    logStep("ERROR getting payment methods", { message: error.message });
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+}
+
+// Get billing history for a user
+async function getBillingHistory(user: any, stripeKey: string) {
+  try {
+    logStep("Getting billing history", { userId: user.id, email: user.email });
+    
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    
+    if (customers.data.length === 0) {
+      return new Response(JSON.stringify({ invoices: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+    
+    const customerId = customers.data[0].id;
+    const invoices = await stripe.invoices.list({
+      customer: customerId,
+      limit: 10,
+    });
+    
+    const formattedInvoices = invoices.data.map(invoice => ({
+      id: invoice.id,
+      number: invoice.number,
+      amount_paid: invoice.amount_paid,
+      currency: invoice.currency,
+      status: invoice.status,
+      created: invoice.created,
+      invoice_pdf: invoice.invoice_pdf,
+      hosted_invoice_url: invoice.hosted_invoice_url,
+    }));
+    
+    return new Response(JSON.stringify({ invoices: formattedInvoices }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error: any) {
+    logStep("ERROR getting billing history", { message: error.message });
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
 }

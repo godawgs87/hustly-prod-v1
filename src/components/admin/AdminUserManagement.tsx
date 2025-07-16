@@ -42,10 +42,21 @@ const AdminUserManagement = () => {
   const getTierBadgeVariant = (tier: string) => {
     switch (tier) {
       case 'founders': return 'destructive';
-      case 'full-time-flipper': return 'default';
-      case 'serious-seller': return 'default';
-      case 'side-hustler': return 'secondary';
+      case 'full_time_flipper': return 'default';
+      case 'serious_seller': return 'default';
+      case 'side_hustler': return 'secondary';
       default: return 'outline';
+    }
+  };
+
+  const getTierDisplayName = (tier: string) => {
+    switch (tier) {
+      case 'side_hustler': return 'Side Hustler';
+      case 'serious_seller': return 'Serious Seller';
+      case 'full_time_flipper': return 'Full-Time Flipper';
+      case 'founders': return 'Founders';
+      case 'trial': return 'Trial';
+      default: return tier;
     }
   };
 
@@ -102,9 +113,9 @@ const AdminUserManagement = () => {
             <SelectContent>
               <SelectItem value="all">All Tiers</SelectItem>
               <SelectItem value="trial">Trial</SelectItem>
-              <SelectItem value="side-hustler">Side Hustler</SelectItem>
-              <SelectItem value="serious-seller">Serious Seller</SelectItem>
-              <SelectItem value="full-time-flipper">Full-time Flipper</SelectItem>
+              <SelectItem value="side_hustler">Side Hustler</SelectItem>
+              <SelectItem value="serious_seller">Serious Seller</SelectItem>
+              <SelectItem value="full_time_flipper">Full-Time Flipper</SelectItem>
               <SelectItem value="founders">Founders</SelectItem>
             </SelectContent>
           </Select>
@@ -141,7 +152,7 @@ const AdminUserManagement = () => {
                       {user.user_role}
                     </Badge>
                     <Badge variant={getTierBadgeVariant(user.subscription_tier)}>
-                      {user.subscription_tier}
+                      {getTierDisplayName(user.subscription_tier)}
                     </Badge>
                   </div>
                 </div>
@@ -179,9 +190,9 @@ const AdminUserManagement = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="trial">Trial</SelectItem>
-                        <SelectItem value="side-hustler">Side Hustler</SelectItem>
-                        <SelectItem value="serious-seller">Serious Seller</SelectItem>
-                        <SelectItem value="full-time-flipper">Full-time Flipper</SelectItem>
+                        <SelectItem value="side_hustler">Side Hustler</SelectItem>
+                        <SelectItem value="serious_seller">Serious Seller</SelectItem>
+                        <SelectItem value="full_time_flipper">Full-Time Flipper</SelectItem>
                         <SelectItem value="founders">Founders</SelectItem>
                       </SelectContent>
                     </Select>
