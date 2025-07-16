@@ -8,6 +8,7 @@ import { CreditCard, Download, Calendar, ExternalLink } from 'lucide-react';
 import { useSubscriptionManagement } from '@/hooks/useSubscriptionManagement';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { TIER_LIMITS, SUBSCRIPTION_TIERS } from '@/utils/constants';
+import { AddonPurchase } from '@/components/addons/AddonPurchase';
 
 const UserBillingTab = () => {
   const { subscriptionStatus, createCheckout, openCustomerPortal, checking, creating } = useSubscriptionManagement();
@@ -215,6 +216,16 @@ const UserBillingTab = () => {
               </div>
             ))}
           </div>
+        </div>
+
+        <Separator />
+
+        <div>
+          <h4 className="text-lg font-medium mb-3">Add-on Purchases</h4>
+          <p className="text-sm text-gray-600 mb-4">
+            Boost your current plan with additional features and capacity
+          </p>
+          <AddonPurchase />
         </div>
 
         <Separator />

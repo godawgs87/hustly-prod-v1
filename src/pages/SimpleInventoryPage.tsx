@@ -2,6 +2,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryManager from '@/components/inventory/InventoryManager';
+import { UsageBanner } from '@/components/usage/UsageBanner';
 
 const SimpleInventoryPage = () => {
   const navigate = useNavigate();
@@ -15,10 +16,13 @@ const SimpleInventoryPage = () => {
   };
 
   return (
-    <InventoryManager
-      onCreateListing={handleCreateListing}
-      onBack={handleBack}
-    />
+    <div>
+      <UsageBanner />
+      <InventoryManager
+        onCreateListing={handleCreateListing}
+        onBack={handleBack}
+      />
+    </div>
   );
 };
 
