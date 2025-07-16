@@ -23,8 +23,52 @@ const UserBillingFinanceTab = () => {
   useEffect(() => {
     if (user) {
       loadBillingData();
+      handlePostPurchaseFlow();
     }
   }, [user]);
+
+  const handlePostPurchaseFlow = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const addonSuccess = urlParams.get('addon_success');
+    const addonCancel = urlParams.get('addon_cancel');
+
+    if (addonSuccess) {
+      toast({
+        title: "Purchase Successful!",
+        description: `Successfully purchased ${addonSuccess.replace('_', ' ')}.`,
+      });
+      
+      // For marketplace purchases, show connection guidance
+      if (addonSuccess === 'extra_marketplace') {
+        setTimeout(() => {
+          toast({
+            title: "Next Step",
+            description: "Visit the Connections tab to set up your new marketplace integration.",
+            duration: 5000,
+          });
+        }, 2000);
+      }
+      
+      // Clean up URL parameters
+      const newUrl = window.location.pathname + '?tab=billing';
+      window.history.replaceState({}, '', newUrl);
+      
+      // Refresh billing data to show new add-on
+      loadBillingData();
+    }
+    
+    if (addonCancel) {
+      toast({
+        title: "Purchase Cancelled",
+        description: "Your add-on purchase was cancelled.",
+        variant: "destructive"
+      });
+      
+      // Clean up URL parameters
+      const newUrl = window.location.pathname + '?tab=billing';
+      window.history.replaceState({}, '', newUrl);
+    }
+  };
 
   const loadBillingData = async () => {
     setLoading(true);
@@ -73,29 +117,28 @@ const UserBillingFinanceTab = () => {
         return;
       }
 
-      const { error } = await supabase.functions.invoke('addon-management', {
+      const { data, error } = await supabase.functions.invoke('addon-management', {
         body: {
-          action: 'purchase_direct',
-          addonType,
-          addonValue,
-          price
+          action: 'create_checkout',
+          addon_type: addonType,
+          addon_value: addonValue,
+          price: price
         }
       });
 
       if (error) throw error;
 
-      toast({
-        title: "Add-on Purchased!",
-        description: `Successfully purchased ${addonType.replace('_', ' ')}.`,
-      });
-
-      // Refresh billing data
-      loadBillingData();
+      if (data?.url) {
+        // Redirect to Stripe checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
     } catch (error: any) {
-      console.error('Add-on purchase failed:', error);
+      console.error('Checkout creation failed:', error);
       toast({
-        title: "Purchase Failed",
-        description: error.message || 'Failed to purchase add-on',
+        title: "Checkout Failed",
+        description: error.message || 'Failed to create checkout session',
         variant: "destructive"
       });
     }

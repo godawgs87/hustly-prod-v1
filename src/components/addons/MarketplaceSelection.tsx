@@ -57,35 +57,34 @@ const MarketplaceSelection: React.FC<MarketplaceSelectionProps> = ({
     try {
       setPurchasing(true);
 
-      // Purchase each marketplace separately
-      for (const marketplace of selectedMarketplaces) {
-        const { error } = await supabase.functions.invoke('addon-management', {
-          body: {
-            action: 'purchase_direct',
-            addonType: `marketplace_${marketplace}`,
-            addonValue: 1,
-            price: 10.00
-          }
-        });
-
-        if (error) throw error;
-      }
-
-      toast({
-        title: "Marketplaces Added!",
-        description: `Successfully added ${selectedMarketplaces.length} marketplace${selectedMarketplaces.length > 1 ? 's' : ''} to your account.`
+      // Calculate total and call backend for Stripe checkout
+      const total = calculateTotal();
+      
+      const { data, error } = await supabase.functions.invoke('addon-management', {
+        body: {
+          action: 'create_checkout',
+          addon_type: 'extra_marketplace',
+          addon_value: selectedMarketplaces.length,
+          price: total * 100, // Convert to cents
+          marketplaces: selectedMarketplaces
+        }
       });
 
-      onSuccess();
-      onClose();
+      if (error) throw error;
+
+      if (data?.url) {
+        // Redirect to Stripe checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
     } catch (error: any) {
-      console.error('Marketplace purchase failed:', error);
+      console.error('Checkout creation failed:', error);
       toast({
-        title: "Purchase Failed",
-        description: error.message || 'Failed to purchase marketplaces',
+        title: "Checkout Failed",
+        description: error.message || 'Failed to create checkout session',
         variant: "destructive"
       });
-    } finally {
       setPurchasing(false);
     }
   };
