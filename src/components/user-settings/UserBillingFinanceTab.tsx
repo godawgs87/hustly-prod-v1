@@ -3,6 +3,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscriptionManagement } from '@/hooks/useSubscriptionManagement';
+import MarketplaceSelection from '@/components/addons/MarketplaceSelection';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,20 +14,15 @@ import { CreditCard, Plus, ShoppingCart, FileText, Download, Calendar, TrendingU
 const UserBillingFinanceTab = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [userAddons, setUserAddons] = useState([]);
-  const [userProfile, setUserProfile] = useState(null);
-
-  const {
-    subscriptionStatus,
-    checkSubscription,
-    openCustomerPortal
-  } = useSubscriptionManagement();
+  const { subscriptionStatus, checking: subscriptionLoading } = useSubscriptionManagement();
+  const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userAddons, setUserAddons] = useState<any[]>([]);
+  const [showMarketplaceSelection, setShowMarketplaceSelection] = useState(false);
 
   useEffect(() => {
     if (user) {
       loadBillingData();
-      checkSubscription();
     }
   }, [user]);
 
@@ -36,7 +32,7 @@ const UserBillingFinanceTab = () => {
       // Load user profile for usage data
       const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
-        .select('listings_used_this_cycle, billing_cycle_start, billing_cycle_end')
+        .select('*')
         .eq('id', user?.id)
         .single();
 
@@ -67,36 +63,40 @@ const UserBillingFinanceTab = () => {
 
   const handlePurchaseAddon = async (addonType: string, addonValue: number, price: number) => {
     try {
-      const billingCycleStart = new Date();
-      const billingCycleEnd = new Date();
-      billingCycleEnd.setMonth(billingCycleEnd.getMonth() + 1);
-
-      const { error } = await supabase
-        .from('user_addons')
-        .insert({
-          user_id: user?.id,
-          addon_type: addonType,
-          addon_value: addonValue,
-          price_paid: price,
-          billing_cycle_start: billingCycleStart.toISOString().split('T')[0],
-          billing_cycle_end: billingCycleEnd.toISOString().split('T')[0],
-          is_active: true
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to purchase add-ons.",
+          variant: "destructive"
         });
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('addon-management', {
+        body: {
+          action: 'purchase_direct',
+          addonType,
+          addonValue,
+          price
+        }
+      });
 
       if (error) throw error;
 
       toast({
-        title: 'Success',
-        description: `${addonType === 'extra_listings' ? 'Extra listings' : 'Marketplace access'} purchased successfully`
+        title: "Add-on Purchased!",
+        description: `Successfully purchased ${addonType.replace('_', ' ')}.`,
       });
-      
+
+      // Refresh billing data
       loadBillingData();
-    } catch (error) {
-      console.error('Error purchasing addon:', error);
+    } catch (error: any) {
+      console.error('Add-on purchase failed:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to purchase addon',
-        variant: 'destructive'
+        title: "Purchase Failed",
+        description: error.message || 'Failed to purchase add-on',
+        variant: "destructive"
       });
     }
   };
@@ -130,10 +130,10 @@ const UserBillingFinanceTab = () => {
   const getUsageLimits = (tier: string) => {
     const limits = {
       'trial': { listings: 10, marketplaces: 1 },
-      'side_hustler': { listings: 50, marketplaces: 2 },
-      'serious_seller': { listings: 200, marketplaces: 3 },
-      'full_time_flipper': { listings: 1000, marketplaces: 5 },
-      'founders': { listings: 999999, marketplaces: 10 }
+      'side_hustler': { listings: 100, marketplaces: 2 },
+      'serious_seller': { listings: 300, marketplaces: 4 },
+      'full_time_flipper': { listings: -1, marketplaces: -1 },
+      'founders': { listings: 300, marketplaces: 4 }
     };
     return limits[tier] || limits['trial'];
   };
@@ -148,7 +148,7 @@ const UserBillingFinanceTab = () => {
 
   const currentLimits = getUsageLimits(subscriptionStatus?.subscription_tier || 'trial');
   const listingsUsed = userProfile?.listings_used_this_cycle || 0;
-  const listingsPercentage = (listingsUsed / currentLimits.listings) * 100;
+  const listingsPercentage = currentLimits.listings === -1 ? 0 : (listingsUsed / currentLimits.listings) * 100;
 
   return (
     <div className="space-y-6">
@@ -180,7 +180,7 @@ const UserBillingFinanceTab = () => {
                     </p>
                   )}
                 </div>
-                <Button onClick={openCustomerPortal} variant="outline">
+                <Button onClick={() => {}} variant="outline">
                   Manage Subscription
                 </Button>
               </div>
@@ -211,14 +211,16 @@ const UserBillingFinanceTab = () => {
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span>Listings Used This Cycle</span>
-                <span>{listingsUsed} / {currentLimits.listings === 999999 ? '∞' : currentLimits.listings}</span>
+                <span>{listingsUsed} / {currentLimits.listings === -1 ? '∞' : currentLimits.listings}</span>
               </div>
-              <Progress value={Math.min(listingsPercentage, 100)} className="h-2" />
+              {currentLimits.listings !== -1 && (
+                <Progress value={Math.min(listingsPercentage, 100)} className="h-2" />
+              )}
             </div>
             
             <div className="flex justify-between text-sm">
               <span>Marketplace Connections</span>
-              <span>0 / {currentLimits.marketplaces}</span>
+              <span>1 / {currentLimits.marketplaces === -1 ? '∞' : currentLimits.marketplaces}</span>
             </div>
           </div>
 
@@ -234,13 +236,13 @@ const UserBillingFinanceTab = () => {
                   <h5 className="font-medium">Extra Listings</h5>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Add 100 additional listings to your current cycle
+                  Add 25 additional listings to your current cycle
                 </p>
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">{formatAmount(19.99)}</span>
+                  <span className="font-medium">{formatAmount(5.00)}</span>
                   <Button 
-                    size="sm" 
-                    onClick={() => handlePurchaseAddon('extra_listings', 100, 19.99)}
+                    size="sm"
+                    onClick={() => handlePurchaseAddon('extra_listings', 25, 5.00)}
                   >
                     Purchase
                   </Button>
@@ -253,13 +255,13 @@ const UserBillingFinanceTab = () => {
                   <h5 className="font-medium">Extra Marketplace</h5>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Connect one additional marketplace for this cycle
+                  Add additional marketplaces - $10.00 each
                 </p>
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">{formatAmount(9.99)}</span>
+                  <span className="font-medium">From {formatAmount(10.00)}</span>
                   <Button 
                     size="sm"
-                    onClick={() => handlePurchaseAddon('extra_marketplace', 1, 9.99)}
+                    onClick={() => setShowMarketplaceSelection(true)}
                   >
                     Purchase
                   </Button>
@@ -386,6 +388,18 @@ const UserBillingFinanceTab = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Marketplace Selection Modal */}
+      {showMarketplaceSelection && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <MarketplaceSelection
+            userTier={subscriptionStatus?.subscription_tier || 'trial'}
+            currentMarketplaces={['ebay']} // TODO: Get from user marketplace connections
+            onClose={() => setShowMarketplaceSelection(false)}
+            onSuccess={() => loadBillingData()}
+          />
+        </div>
+      )}
     </div>
   );
 };
