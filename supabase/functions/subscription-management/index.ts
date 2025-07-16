@@ -457,18 +457,30 @@ async function checkSubscriptionStatus(supabaseClient: any, user: any, stripeKey
     logStep("No active subscription found");
   }
 
-  // Update user profile - preserve existing database tier for admin/tester users
+  // Update user profile - preserve existing database tier for admin/tester users OR any non-trial tier
   let finalTier = subscriptionTier;
+  let finalStatus = hasActiveSub ? 'active' : 'inactive';
+  let isSubscribed = hasActiveSub;
   
-  // Check if user has admin/tester role and existing database tier
-  if (existingProfile?.user_role === 'admin' || existingProfile?.user_role === 'tester') {
-    if (existingProfile?.subscription_tier && existingProfile.subscription_tier !== 'trial') {
-      logStep("Preserving existing admin/tester tier", { 
-        role: existingProfile.user_role,
-        existingTier: existingProfile.subscription_tier,
-        stripeTier: subscriptionTier
-      });
+  // Check if user has existing non-trial tier (admin-set or previous subscription)
+  if (existingProfile?.subscription_tier && existingProfile.subscription_tier !== 'trial') {
+    logStep("Found existing non-trial tier", { 
+      existingTier: existingProfile.subscription_tier,
+      existingStatus: existingProfile.subscription_status,
+      stripeTier: subscriptionTier,
+      hasActiveStripe: hasActiveSub
+    });
+    
+    // If no active Stripe subscription, preserve the existing database tier and status
+    if (!hasActiveSub) {
       finalTier = existingProfile.subscription_tier;
+      finalStatus = existingProfile.subscription_status || 'active';
+      isSubscribed = finalStatus === 'active';
+      logStep("Preserving existing tier due to no active Stripe subscription", { 
+        preservedTier: finalTier,
+        preservedStatus: finalStatus,
+        isSubscribed: isSubscribed
+      });
     }
   }
 
@@ -476,14 +488,14 @@ async function checkSubscriptionStatus(supabaseClient: any, user: any, stripeKey
     id: user.id,
     email: user.email,
     subscription_tier: finalTier,
-    subscription_status: hasActiveSub ? 'active' : 'inactive',
+    subscription_status: finalStatus,
     subscription_ends_at: subscriptionEnd
   }, { onConflict: 'id' });
 
   return new Response(JSON.stringify({
-    subscribed: hasActiveSub,
+    subscribed: isSubscribed,
     subscription_tier: finalTier,
-    subscription_status: hasActiveSub ? 'active' : 'inactive',
+    subscription_status: finalStatus,
     subscription_end: subscriptionEnd
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },

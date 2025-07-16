@@ -189,7 +189,8 @@ const UserBillingFinanceTab = () => {
     );
   }
 
-  const currentLimits = getUsageLimits(subscriptionStatus?.subscription_tier || 'trial');
+  const currentTier = subscriptionStatus?.subscription_tier || userProfile?.subscription_tier || 'trial';
+  const currentLimits = getUsageLimits(currentTier);
   const listingsUsed = userProfile?.listings_used_this_cycle || 0;
   const listingsPercentage = currentLimits.listings === -1 ? 0 : (listingsUsed / currentLimits.listings) * 100;
 
