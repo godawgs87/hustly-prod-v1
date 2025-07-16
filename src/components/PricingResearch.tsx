@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, TrendingUp, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PricingData {
   suggestedPrice: number;
@@ -38,24 +39,37 @@ const PricingResearch = ({ productTitle, condition, onPriceSelect }: PricingRese
     setIsResearching(true);
     
     try {
-      // TODO: Implement real pricing research API
-      // This should call your pricing research service/API
-      // await supabase.functions.invoke('pricing-research', { body: { query, condition } });
-      
-      toast({
-        title: "Feature Coming Soon",
-        description: "Pricing research integration is in development. Please research prices manually for now.",
-        variant: "default"
+      const { data, error } = await supabase.functions.invoke('pricing-research', {
+        body: { query, condition }
       });
-      
-      // Clear any existing data since this is a placeholder
-      setPricingData(null);
+
+      if (error) {
+        throw error;
+      }
+
+      if (data && data.suggestedPrice > 0) {
+        setPricingData(data);
+        toast({
+          title: "Research Complete",
+          description: `Found ${data.competitors.length} comparable listings.`,
+          variant: "default"
+        });
+      } else {
+        setPricingData(null);
+        toast({
+          title: "No Results Found",
+          description: "Try adjusting your search terms or product title.",
+          variant: "default"
+        });
+      }
     } catch (error) {
+      console.error('Pricing research error:', error);
       toast({
         title: "Research Failed",
         description: "Unable to fetch pricing data. Please try again.",
         variant: "destructive"
       });
+      setPricingData(null);
     } finally {
       setIsResearching(false);
     }

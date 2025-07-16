@@ -32,6 +32,9 @@ verify_jwt = false
 [functions.ebay-shipping-services-fetcher]
 verify_jwt = false
 
+[functions.pricing-research]
+verify_jwt = false
+
 # Subscription Management
 [functions.subscription-management]
 verify_jwt = false
