@@ -335,15 +335,50 @@ async function createCheckoutSession(user: any, params: any, stripeKey: string) 
 async function checkSubscriptionStatus(supabaseClient: any, user: any, stripeKey: string) {
   logStep("Checking subscription status", { userId: user.id, email: user.email });
 
+  // First, check existing database subscription data
+  const { data: existingProfile, error: profileError } = await supabaseClient
+    .from('user_profiles')
+    .select('subscription_tier, subscription_status, subscription_ends_at, user_role')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError && profileError.code !== 'PGRST116') {
+    logStep("Error fetching profile", { error: profileError });
+  }
+
+  logStep("Existing profile data", { 
+    tier: existingProfile?.subscription_tier, 
+    status: existingProfile?.subscription_status,
+    role: existingProfile?.user_role 
+  });
+
   const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
   
   // Find Stripe customer
   const customers = await stripe.customers.list({ email: user.email, limit: 1 });
   
   if (customers.data.length === 0) {
-    logStep("No customer found, updating unsubscribed state");
+    logStep("No Stripe customer found - using database subscription data");
     
-    // Update user profile
+    // If we have existing subscription data in database, preserve it
+    if (existingProfile?.subscription_tier && existingProfile.subscription_tier !== 'trial') {
+      logStep("Using existing database subscription", { 
+        tier: existingProfile.subscription_tier,
+        status: existingProfile.subscription_status 
+      });
+      
+      return new Response(JSON.stringify({ 
+        subscribed: existingProfile.subscription_status === 'active',
+        subscription_tier: existingProfile.subscription_tier,
+        subscription_status: existingProfile.subscription_status || 'active',
+        subscription_end: existingProfile.subscription_ends_at
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+    
+    // No existing subscription - set to trial
     await supabaseClient.from("user_profiles").upsert({
       id: user.id,
       email: user.email,
@@ -529,7 +564,9 @@ function getUsageLimits(tier: string) {
     trial: { photos_per_month: 10 },
     starter: { photos_per_month: 50 },
     professional: { photos_per_month: 200 },
-    enterprise: { photos_per_month: -1 } // Unlimited
+    enterprise: { photos_per_month: -1 }, // Unlimited
+    'full-time-flipper': { photos_per_month: -1 }, // Unlimited (legacy tier)
+    founders: { photos_per_month: -1 } // Unlimited
   };
   
   return limits[tier as keyof typeof limits] || limits.trial;
