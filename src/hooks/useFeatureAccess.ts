@@ -58,12 +58,26 @@ export const useFeatureAccess = () => {
     return userProfile?.user_role === 'admin' || userProfile?.user_role === 'tester';
   };
   
+  // Normalize tier names from database format to constants format
+  const normalizeTierName = (tier: string): keyof typeof TIER_LIMITS => {
+    // Convert database format (with hyphens) to constants format (with underscores)
+    const normalizedTier = tier.replace(/-/g, '_');
+    
+    // Check if normalized tier exists in TIER_LIMITS
+    if (normalizedTier in TIER_LIMITS) {
+      return normalizedTier as keyof typeof TIER_LIMITS;
+    }
+    
+    // Fallback for any unrecognized tiers
+    return SUBSCRIPTION_TIERS.FREE;
+  };
+
   const currentTier = useMemo(() => {
     // Use actual subscription tier for everyone, including admins/testers
     if (!subscriptionStatus?.subscription_tier) {
       return SUBSCRIPTION_TIERS.FREE;
     }
-    return subscriptionStatus.subscription_tier as keyof typeof TIER_LIMITS;
+    return normalizeTierName(subscriptionStatus.subscription_tier);
   }, [subscriptionStatus]);
 
   const tierLimits = useMemo(() => {

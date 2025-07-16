@@ -102,12 +102,12 @@ export const UsageTracker: React.FC<UsageTrackerProps> = ({
             </p>
             {!compact && (
               <div className="flex items-center space-x-4 text-xs text-muted-foreground mt-1">
-                <span>
-                  {isUnlimited 
-                    ? `${billingInfo.listingsUsed} listings (unlimited)`
-                    : `${billingInfo.listingsUsed}/${listingAccess.limit} listings`
-                  }
-                </span>
+                 <span>
+                   {isUnlimited 
+                     ? `${billingInfo.listingsUsed} listings (♾️)`
+                     : `${billingInfo.listingsUsed}/${listingAccess.limit} listings`
+                   }
+                 </span>
                 <span>•</span>
                 <span>{billingInfo.daysLeft} days left</span>
                 <span>•</span>

@@ -72,7 +72,7 @@ const UserBillingTab = () => {
                 </div>
                 <div className="p-4 border rounded-lg">
                   <p className="text-lg font-semibold">
-                    {tierLimits.listings_per_month === -1 ? 'Unlimited' : tierLimits.listings_per_month}
+                    {tierLimits.listings_per_month === -1 ? '♾️' : tierLimits.listings_per_month}
                   </p>
                   <p className="text-sm text-gray-600">Monthly listings with AI analysis</p>
                 </div>
@@ -97,18 +97,18 @@ const UserBillingTab = () => {
                   <p className="text-2xl font-bold">${tierLimits.price}</p>
                   <p className="text-sm text-gray-600">per month</p>
                 </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold">
-                    {tierLimits.listings_per_month === -1 ? '∞' : tierLimits.listings_per_month}
-                  </p>
-                  <p className="text-sm text-gray-600">listings with AI analysis</p>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold">
-                    {tierLimits.marketplace_connections === -1 ? '∞' : tierLimits.marketplace_connections}
-                  </p>
-                  <p className="text-sm text-gray-600">marketplace connections</p>
-                </div>
+                 <div className="p-4 border rounded-lg">
+                   <p className="text-2xl font-bold">
+                     {tierLimits.listings_per_month === -1 ? '♾️' : tierLimits.listings_per_month}
+                   </p>
+                   <p className="text-sm text-gray-600">listings with AI analysis</p>
+                 </div>
+                 <div className="p-4 border rounded-lg">
+                   <p className="text-2xl font-bold">
+                     {tierLimits.marketplace_connections === -1 ? '♾️' : tierLimits.marketplace_connections}
+                   </p>
+                   <p className="text-sm text-gray-600">marketplace connections</p>
+                 </div>
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg mb-4">
