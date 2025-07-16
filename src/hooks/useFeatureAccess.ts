@@ -198,7 +198,7 @@ export const useFeatureAccess = () => {
   };
 
   const getNextTierForListings = (neededListings: number): string => {
-    if (neededListings <= 150) return SUBSCRIPTION_TIERS.SIDE_HUSTLER;
+    if (neededListings <= 100) return SUBSCRIPTION_TIERS.SIDE_HUSTLER;
     if (neededListings <= 300) return SUBSCRIPTION_TIERS.SERIOUS_SELLER;
     return SUBSCRIPTION_TIERS.FULL_TIME_FLIPPER;
   };

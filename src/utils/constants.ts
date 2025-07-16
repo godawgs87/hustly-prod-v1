@@ -69,19 +69,19 @@ export const SUBSCRIPTION_FEATURES = {
 // Feature limits by subscription tier
 export const TIER_LIMITS = {
   [SUBSCRIPTION_TIERS.FREE]: {
-    listings_per_month: 25,
+    listings_per_month: 10,
     marketplace_connections: 1,
     allowed_platforms: [PLATFORMS.EBAY],
-    photo_analyses_per_month: 25, // Same as listings since AI analysis is automatic
+    photo_analyses_per_month: 10, // Same as listings since AI analysis is automatic
     features: [] as const,
     price: 0,
     name: 'Free'
   },
   [SUBSCRIPTION_TIERS.SIDE_HUSTLER]: {
-    listings_per_month: 150,
+    listings_per_month: 100,
     marketplace_connections: 2,
     allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
-    photo_analyses_per_month: 150, // Same as listings since AI analysis is automatic
+    photo_analyses_per_month: 100, // Same as listings since AI analysis is automatic
     features: [] as const, // NO bulk upload - this is intentional
     price: 19,
     name: 'Side Hustler'
@@ -141,9 +141,9 @@ export const ADDON_TYPES = {
 export const ADDON_PRICING = {
   [ADDON_TYPES.EXTRA_LISTINGS]: {
     name: 'Extra Listings Pack',
-    description: '10 additional listings for this billing cycle',
-    price: 1.00,
-    value: 10
+    description: '25 additional listings for this billing cycle',
+    price: 5.00,
+    value: 25
   },
   [ADDON_TYPES.EXTRA_MARKETPLACE]: {
     name: 'Extra Marketplace Access',

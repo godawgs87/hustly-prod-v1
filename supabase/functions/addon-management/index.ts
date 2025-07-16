@@ -15,9 +15,9 @@ const logStep = (step: string, details?: any) => {
 const ADDON_PRICING = {
   extra_listings: {
     name: 'Extra Listings Pack',
-    description: '10 additional listings for this billing cycle',
-    price: 100, // $1.00 in cents
-    value: 10
+    description: '25 additional listings for this billing cycle',
+    price: 500, // $5.00 in cents
+    value: 25
   },
   extra_marketplace: {
     name: 'Extra Marketplace Access',
