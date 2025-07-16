@@ -31,10 +31,56 @@ export const useSubscriptionManagement = () => {
 
       if (error) throw error;
 
-      setSubscriptionStatus(data);
-      return data;
+      // Handle the response properly - check if it's nested or direct
+      const subscriptionData = data?.data || data;
+      
+      if (subscriptionData) {
+        setSubscriptionStatus(subscriptionData);
+        return subscriptionData;
+      }
+
+      // Fallback to reading from user_profiles table
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('subscription_tier, subscription_status, subscription_ends_at')
+        .single();
+
+      if (!profileError && profileData) {
+        const fallbackData = {
+          subscribed: profileData.subscription_status === 'active',
+          subscription_tier: profileData.subscription_tier || 'trial',
+          subscription_status: profileData.subscription_status || 'active',
+          subscription_end: profileData.subscription_ends_at
+        };
+        setSubscriptionStatus(fallbackData);
+        return fallbackData;
+      }
+
+      return null;
     } catch (error: any) {
       console.error('Subscription check failed:', error);
+      
+      // Try fallback to user_profiles table
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('subscription_tier, subscription_status, subscription_ends_at')
+          .single();
+
+        if (!profileError && profileData) {
+          const fallbackData = {
+            subscribed: profileData.subscription_status === 'active',
+            subscription_tier: profileData.subscription_tier || 'trial',
+            subscription_status: profileData.subscription_status || 'active',
+            subscription_end: profileData.subscription_ends_at
+          };
+          setSubscriptionStatus(fallbackData);
+          return fallbackData;
+        }
+      } catch (fallbackError) {
+        console.error('Fallback subscription check failed:', fallbackError);
+      }
+
       toast({
         title: "Subscription Check Failed",
         description: error.message || 'Failed to check subscription status',

@@ -24,7 +24,7 @@ const ADDON_PRICING = {
     name: "Extra Marketplace",
     description: "Connect to an additional marketplace",
     value: 1,
-    price: 1000, // $10.00 in cents
+    price: 1000, // $10.00 in cents per marketplace
   },
 };
 
@@ -95,7 +95,7 @@ serve(async (req) => {
 });
 
 async function createAddonCheckout(user: any, params: any, stripeKey: string, supabaseClient: any, req: Request) {
-  logStep("Creating add-on checkout", { userId: user.id, addonType: params.addon_type });
+  logStep("Creating add-on checkout", { userId: user.id, addonType: params.addon_type, params });
 
   const addon = ADDON_PRICING[params.addon_type as keyof typeof ADDON_PRICING];
   if (!addon) {
@@ -125,6 +125,22 @@ async function createAddonCheckout(user: any, params: any, stripeKey: string, su
 
   const origin = req.headers.get("origin") || "http://localhost:3000";
   
+  // Handle marketplace-specific pricing
+  let unitAmount = addon.price;
+  let quantity = 1;
+  let description = addon.description;
+  
+  if (params.addon_type === 'extra_marketplace' && params.addon_value > 1) {
+    quantity = params.addon_value;
+    description = `Connect to ${params.addon_value} additional marketplaces`;
+  }
+
+  // If custom price is provided (for marketplace bundles), use it
+  if (params.price) {
+    unitAmount = params.price;
+    quantity = 1; // Custom price is already total
+  }
+  
   // Create checkout session
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
@@ -134,20 +150,21 @@ async function createAddonCheckout(user: any, params: any, stripeKey: string, su
           currency: "usd",
           product_data: {
             name: addon.name,
-            description: addon.description,
+            description: description,
           },
-          unit_amount: addon.price,
+          unit_amount: unitAmount,
         },
-        quantity: 1,
+        quantity: quantity,
       },
     ],
     mode: "payment",
-    success_url: `${origin}/settings?tab=billing&addon_success=${params.addon_type}`,
+    success_url: `${origin}/settings?tab=billing&addon_success=${params.addon_type}&value=${params.addon_value}${params.marketplaces ? `&marketplaces=${params.marketplaces.join(',')}` : ''}`,
     cancel_url: `${origin}/settings?tab=billing&addon_cancel=true`,
     metadata: {
       user_id: user.id,
       addon_type: params.addon_type,
       addon_value: params.addon_value.toString(),
+      marketplaces: params.marketplaces ? params.marketplaces.join(',') : '',
     },
   });
 
