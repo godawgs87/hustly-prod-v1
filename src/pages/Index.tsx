@@ -11,7 +11,7 @@ import UnifiedMobileNavigation from "@/components/UnifiedMobileNavigation";
 import LoadingState from "@/components/LoadingState";
 import { useAuth } from "@/components/AuthProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { UsageBanner } from "@/components/usage/UsageBanner";
+import { UsageTracker } from "@/components/layout/UsageTracker";
 
 type ViewType = 'dashboard' | 'create' | 'inventory' | 'active-listings' | 'data-management';
 
@@ -117,7 +117,7 @@ const Index = () => {
       />
 
       <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6 md:space-y-8">
-        <UsageBanner />
+        <UsageTracker sticky={true} />
         
         <div className="text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">

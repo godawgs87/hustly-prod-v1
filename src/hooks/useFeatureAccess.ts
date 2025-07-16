@@ -59,23 +59,19 @@ export const useFeatureAccess = () => {
   };
   
   const currentTier = useMemo(() => {
-    // Admin and testers get founders plan access
-    if (isAdminOrTester()) {
-      return SUBSCRIPTION_TIERS.FOUNDERS;
-    }
-    
+    // Use actual subscription tier for everyone, including admins/testers
     if (!subscriptionStatus?.subscription_tier) {
       return SUBSCRIPTION_TIERS.FREE;
     }
     return subscriptionStatus.subscription_tier as keyof typeof TIER_LIMITS;
-  }, [subscriptionStatus, userProfile]);
+  }, [subscriptionStatus]);
 
   const tierLimits = useMemo(() => {
     return TIER_LIMITS[currentTier] || TIER_LIMITS[SUBSCRIPTION_TIERS.FREE];
   }, [currentTier]);
 
   const checkFeatureAccess = (feature: FeatureGateProps['feature'], currentUsage: number = 0): FeatureAccess => {
-    // Admin and testers have unlimited access
+    // Admin and testers have unlimited access but show actual tier name
     if (isAdminOrTester()) {
       return {
         hasAccess: true,
@@ -83,7 +79,7 @@ export const useFeatureAccess = () => {
         currentUsage,
         limit: -1,
         upgradeRequired: '',
-        tierName: 'Admin/Tester Access'
+        tierName: `${tierLimits.name} (Admin Access)`
       };
     }
     
