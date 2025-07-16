@@ -968,6 +968,45 @@ export type Database = {
           },
         ]
       }
+      user_addons: {
+        Row: {
+          addon_type: string
+          addon_value: number
+          billing_cycle_end: string
+          billing_cycle_start: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          price_paid: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          addon_type: string
+          addon_value: number
+          billing_cycle_end: string
+          billing_cycle_start: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          price_paid: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          addon_type?: string
+          addon_value?: number
+          billing_cycle_end?: string
+          billing_cycle_start?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          price_paid?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_analytics_summary: {
         Row: {
           active_listings: number
@@ -1027,6 +1066,8 @@ export type Database = {
           accepts_returns: boolean | null
           account_type: string | null
           ai_training_completed: boolean | null
+          billing_cycle_end: string | null
+          billing_cycle_start: string | null
           business_name: string | null
           business_phone: string | null
           business_type: string | null
@@ -1054,6 +1095,7 @@ export type Database = {
           inventory_state: string | null
           last_photo_reset_date: string | null
           listing_duration: string | null
+          listings_used_this_cycle: number | null
           monthly_photo_limit: number | null
           onboarding_completed: boolean | null
           payment_policy_id: string | null
@@ -1093,6 +1135,8 @@ export type Database = {
           accepts_returns?: boolean | null
           account_type?: string | null
           ai_training_completed?: boolean | null
+          billing_cycle_end?: string | null
+          billing_cycle_start?: string | null
           business_name?: string | null
           business_phone?: string | null
           business_type?: string | null
@@ -1120,6 +1164,7 @@ export type Database = {
           inventory_state?: string | null
           last_photo_reset_date?: string | null
           listing_duration?: string | null
+          listings_used_this_cycle?: number | null
           monthly_photo_limit?: number | null
           onboarding_completed?: boolean | null
           payment_policy_id?: string | null
@@ -1159,6 +1204,8 @@ export type Database = {
           accepts_returns?: boolean | null
           account_type?: string | null
           ai_training_completed?: boolean | null
+          billing_cycle_end?: string | null
+          billing_cycle_start?: string | null
           business_name?: string | null
           business_phone?: string | null
           business_type?: string | null
@@ -1186,6 +1233,7 @@ export type Database = {
           inventory_state?: string | null
           last_photo_reset_date?: string | null
           listing_duration?: string | null
+          listings_used_this_cycle?: number | null
           monthly_photo_limit?: number | null
           onboarding_completed?: boolean | null
           payment_policy_id?: string | null
@@ -1274,6 +1322,10 @@ export type Database = {
           category_name: string
           leaf_category: boolean
         }[]
+      }
+      reset_billing_cycle: {
+        Args: { user_id_param: string }
+        Returns: undefined
       }
       search_categories: {
         Args: { search_term: string; limit_count?: number }

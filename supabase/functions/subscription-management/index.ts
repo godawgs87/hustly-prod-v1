@@ -67,6 +67,9 @@ const ensureUserProfile = async (supabaseClient: any, userId: string, email: str
           monthly_photo_limit: 50,
           photos_used_this_month: 0,
           last_photo_reset_date: currentDate,
+          billing_cycle_start: currentDate,
+          billing_cycle_end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          listings_used_this_cycle: 0,
           created_at: now.toISOString(),
           updated_at: now.toISOString()
         })

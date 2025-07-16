@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSubscriptionManagement } from './useSubscriptionManagement';
-import { SUBSCRIPTION_TIERS, SUBSCRIPTION_FEATURES, TIER_LIMITS } from '@/utils/constants';
+import { SUBSCRIPTION_TIERS, SUBSCRIPTION_FEATURES, TIER_LIMITS, ADDON_TYPES } from '@/utils/constants';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface FeatureAccess {
@@ -29,11 +29,28 @@ export const useFeatureAccess = () => {
 
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('user_role, subscription_tier, subscription_status')
+        .select('user_role, subscription_tier, subscription_status, billing_cycle_start, billing_cycle_end, listings_used_this_cycle')
         .eq('id', session.user.id)
         .maybeSingle();
 
       return profile;
+    },
+  });
+
+  const { data: userAddons } = useQuery({
+    queryKey: ['userAddons'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return [];
+
+      const { data: addons } = await supabase
+        .from('user_addons')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .gte('billing_cycle_end', new Date().toISOString().split('T')[0]);
+
+      return addons || [];
     },
   });
 
@@ -71,15 +88,17 @@ export const useFeatureAccess = () => {
     }
     
     const limits = tierLimits;
+    const hasBulkUploadAddon = userAddons?.some(addon => addon.addon_type === ADDON_TYPES.BULK_UPLOAD_BOOST) || false;
     
     switch (feature) {
       case SUBSCRIPTION_FEATURES.BULK_UPLOAD:
+        const hasBulkAccess = (limits.features as readonly string[]).includes('bulk_upload') || hasBulkUploadAddon;
         return {
-          hasAccess: (limits.features as readonly string[]).includes('bulk_upload'),
+          hasAccess: hasBulkAccess,
           isAtLimit: false,
           currentUsage: 0,
           limit: -1,
-          upgradeRequired: (limits.features as readonly string[]).includes('bulk_upload') 
+          upgradeRequired: hasBulkAccess 
             ? null 
             : SUBSCRIPTION_TIERS.SERIOUS_SELLER,
           tierName: limits.name
@@ -135,12 +154,15 @@ export const useFeatureAccess = () => {
 
       case 'listing_creation':
         const maxListings = limits.listings_per_month;
-        const isAtListingLimit = maxListings !== -1 && currentUsage >= maxListings;
+        const extraListings = userAddons?.filter(addon => addon.addon_type === ADDON_TYPES.EXTRA_LISTINGS)
+          .reduce((total, addon) => total + addon.addon_value, 0) || 0;
+        const totalListingsLimit = maxListings === -1 ? -1 : maxListings + extraListings;
+        const isAtListingLimit = totalListingsLimit !== -1 && currentUsage >= totalListingsLimit;
         return {
           hasAccess: !isAtListingLimit,
           isAtLimit: isAtListingLimit,
           currentUsage,
-          limit: maxListings,
+          limit: totalListingsLimit,
           upgradeRequired: isAtListingLimit ? getNextTierForListings(currentUsage + 1) : null,
           tierName: limits.name
         };
@@ -176,8 +198,9 @@ export const useFeatureAccess = () => {
   };
 
   const getNextTierForListings = (neededListings: number): string => {
-    if (neededListings <= 100) return SUBSCRIPTION_TIERS.SIDE_HUSTLER;
-    return SUBSCRIPTION_TIERS.SERIOUS_SELLER;
+    if (neededListings <= 150) return SUBSCRIPTION_TIERS.SIDE_HUSTLER;
+    if (neededListings <= 300) return SUBSCRIPTION_TIERS.SERIOUS_SELLER;
+    return SUBSCRIPTION_TIERS.FULL_TIME_FLIPPER;
   };
 
   const getNextTierForPhotoAnalysis = (neededAnalyses: number): string => {
@@ -194,6 +217,29 @@ export const useFeatureAccess = () => {
     return currentTier === SUBSCRIPTION_TIERS.FOUNDERS;
   };
 
+  const getBillingCycleInfo = () => {
+    if (!userProfile?.billing_cycle_start || !userProfile?.billing_cycle_end) {
+      return {
+        daysLeft: 30,
+        cycleStart: new Date(),
+        cycleEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        listingsUsed: userProfile?.listings_used_this_cycle || 0
+      };
+    }
+
+    const cycleStart = new Date(userProfile.billing_cycle_start);
+    const cycleEnd = new Date(userProfile.billing_cycle_end);
+    const today = new Date();
+    const daysLeft = Math.max(0, Math.ceil((cycleEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+
+    return {
+      daysLeft,
+      cycleStart,
+      cycleEnd,
+      listingsUsed: userProfile.listings_used_this_cycle || 0
+    };
+  };
+
   return {
     currentTier,
     tierLimits,
@@ -201,6 +247,8 @@ export const useFeatureAccess = () => {
     canAccessPlatform,
     isFoundersPlan,
     isAdminOrTester,
-    subscriptionStatus
+    subscriptionStatus,
+    userAddons: userAddons || [],
+    getBillingCycleInfo
   };
 };

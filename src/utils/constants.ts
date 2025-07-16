@@ -69,28 +69,28 @@ export const SUBSCRIPTION_FEATURES = {
 // Feature limits by subscription tier
 export const TIER_LIMITS = {
   [SUBSCRIPTION_TIERS.FREE]: {
-    listings_per_month: 15,
+    listings_per_month: 25,
     marketplace_connections: 1,
     allowed_platforms: [PLATFORMS.EBAY],
-    photo_analyses_per_month: 15, // Same as listings since AI analysis is automatic
+    photo_analyses_per_month: 25, // Same as listings since AI analysis is automatic
     features: [] as const,
     price: 0,
     name: 'Free'
   },
   [SUBSCRIPTION_TIERS.SIDE_HUSTLER]: {
-    listings_per_month: 100,
+    listings_per_month: 150,
     marketplace_connections: 2,
     allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
-    photo_analyses_per_month: 100, // Same as listings since AI analysis is automatic
-    features: [] as const,
+    photo_analyses_per_month: 150, // Same as listings since AI analysis is automatic
+    features: [] as const, // NO bulk upload - this is intentional
     price: 19,
     name: 'Side Hustler'
   },
   [SUBSCRIPTION_TIERS.SERIOUS_SELLER]: {
-    listings_per_month: -1, // unlimited
+    listings_per_month: 300, // Changed from unlimited to 300
     marketplace_connections: 4,
     allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
-    photo_analyses_per_month: -1, // unlimited - same as listings
+    photo_analyses_per_month: 300, // Same as listings
     features: ['bulk_upload', 'advanced_analytics', 'priority_support'] as const,
     price: 49,
     name: 'Serious Seller'
@@ -105,10 +105,10 @@ export const TIER_LIMITS = {
     name: 'Full-Time Flipper'
   },
   [SUBSCRIPTION_TIERS.FOUNDERS]: {
-    listings_per_month: -1, // unlimited
+    listings_per_month: 300, // Same as Serious Seller
     marketplace_connections: 4,
     allowed_platforms: [PLATFORMS.EBAY, PLATFORMS.POSHMARK, PLATFORMS.MERCARI, PLATFORMS.DEPOP],
-    photo_analyses_per_month: -1, // unlimited - same as listings
+    photo_analyses_per_month: 300, // Same as listings
     features: ['bulk_upload', 'advanced_analytics', 'priority_support'] as const,
     price: 39.99,
     name: 'Founders',
@@ -130,6 +130,33 @@ export const ROUTES = {
   INVENTORY: '/inventory',
   SETTINGS: '/settings',
   EBAY_CALLBACK: '/ebay/callback'
+} as const;
+
+export const ADDON_TYPES = {
+  EXTRA_LISTINGS: 'extra_listings',
+  EXTRA_MARKETPLACE: 'extra_marketplace', 
+  BULK_UPLOAD_BOOST: 'bulk_upload_boost'
+} as const;
+
+export const ADDON_PRICING = {
+  [ADDON_TYPES.EXTRA_LISTINGS]: {
+    name: 'Extra Listings Pack',
+    description: '10 additional listings for this billing cycle',
+    price: 1.00,
+    value: 10
+  },
+  [ADDON_TYPES.EXTRA_MARKETPLACE]: {
+    name: 'Extra Marketplace Access',
+    description: 'Add one additional marketplace for this billing cycle',
+    price: 10.00,
+    value: 1
+  },
+  [ADDON_TYPES.BULK_UPLOAD_BOOST]: {
+    name: 'Bulk Upload Booster',
+    description: 'Enable bulk upload for Side Hustler plan',
+    price: 15.00,
+    value: 1
+  }
 } as const;
 
 export const VALIDATION_LIMITS = {

@@ -35,3 +35,6 @@ verify_jwt = false
 # Subscription Management
 [functions.subscription-management]
 verify_jwt = false
+
+[functions.addon-management]
+verify_jwt = false
