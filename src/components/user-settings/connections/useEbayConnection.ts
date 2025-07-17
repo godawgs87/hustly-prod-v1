@@ -51,7 +51,7 @@ export const useEbayConnection = () => {
         
       if (session) {
         // Use supabase.functions.invoke for consistency
-        const { data, error } = await supabase.functions.invoke('ebay-oauth', {
+        const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
           body: {
             action: 'exchange_code',
             code: code,
@@ -99,7 +99,7 @@ export const useEbayConnection = () => {
       console.log('✅ User session verified, calling edge function...');
       
       // Use supabase.functions.invoke for consistency
-      const { data, error } = await supabase.functions.invoke('ebay-oauth', {
+      const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
         body: {
           action: 'get_auth_url',
           state: crypto.randomUUID()

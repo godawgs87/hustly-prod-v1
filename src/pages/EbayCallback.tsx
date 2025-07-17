@@ -85,7 +85,7 @@ const EbayCallback = () => {
         console.log('Sending request to ebay-oauth with body:', requestBody);
 
         // Use Supabase function invoke for proper authentication
-        const { data: responseData, error: functionError } = await supabase.functions.invoke('ebay-oauth', {
+        const { data: responseData, error: functionError } = await supabase.functions.invoke('ebay-oauth-modern', {
           body: {
             action: 'exchange_code',
             code: code,
