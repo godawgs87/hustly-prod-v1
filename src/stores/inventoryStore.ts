@@ -17,6 +17,7 @@ interface InventoryState {
   error: string | null;
   stats: InventoryStats;
   usingFallback: boolean;
+  syncInProgress: Set<string>;
   filters: {
     search: string;
     category: string;
@@ -39,6 +40,8 @@ interface InventoryState {
   clearFilters: () => void;
   fetchListings: () => Promise<void>;
   refetch: () => Promise<void>;
+  syncListing: (id: string) => Promise<void>;
+  setSyncInProgress: (id: string, inProgress: boolean) => void;
 }
 
 export const useInventoryStore = create<InventoryState>()(
@@ -49,6 +52,7 @@ export const useInventoryStore = create<InventoryState>()(
       isLoading: false,
       error: null,
       usingFallback: false,
+      syncInProgress: new Set(),
       stats: {
         totalItems: 0,
         totalValue: 0,
@@ -283,6 +287,39 @@ export const useInventoryStore = create<InventoryState>()(
 
       refetch: async () => {
         await get().fetchListings();
+      },
+
+      syncListing: async (id: string) => {
+        const { InventorySyncService } = await import('@/services/InventorySyncService');
+        
+        set(state => ({
+          syncInProgress: new Set([...state.syncInProgress, id])
+        }));
+
+        try {
+          await InventorySyncService.syncListingAcrossPlatforms(id);
+        } catch (error) {
+          console.error('Failed to sync listing:', error);
+          throw error;
+        } finally {
+          set(state => {
+            const newSet = new Set(state.syncInProgress);
+            newSet.delete(id);
+            return { syncInProgress: newSet };
+          });
+        }
+      },
+
+      setSyncInProgress: (id: string, inProgress: boolean) => {
+        set(state => {
+          const newSet = new Set(state.syncInProgress);
+          if (inProgress) {
+            newSet.add(id);
+          } else {
+            newSet.delete(id);
+          }
+          return { syncInProgress: newSet };
+        });
       }
     }),
     { name: 'inventory-store' }
