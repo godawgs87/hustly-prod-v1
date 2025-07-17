@@ -37,65 +37,50 @@ export interface FulfillmentDetails {
 }
 
 // eBay Inventory API Compatible Shipping Service Codes
-// These are specifically for the Inventory API (different from Trading API)
+// Use the most basic, widely accepted codes that work across all account types
 const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
-  // ✅ UPDATED: Most widely accepted Inventory API service codes based on eBay API docs
-  'Other': {
-    serviceCode: 'Other',
+  // ✅ These are the most basic shipping service codes that work for individual accounts
+  'ShippingMethodStandard': {
+    serviceCode: 'ShippingMethodStandard',
     displayName: 'Standard Shipping',
     estimatedDays: { min: 3, max: 7 },
     isValid: true
   },
-  'US_Postal': {
-    serviceCode: 'US_Postal',
-    displayName: 'USPS Standard',
-    estimatedDays: { min: 3, max: 7 },
-    isValid: true
-  },
-  // ❌ REMOVE INVALID CODES - These are causing eBay Error 25007
-  // These hardcoded service codes are not working, will be replaced by eBay API fetched codes
-  'USPSPriorityMail': {
-    serviceCode: 'USPSPriorityMail',
-    displayName: 'USPS Priority Mail',
+  'ShippingMethodExpress': {
+    serviceCode: 'ShippingMethodExpress', 
+    displayName: 'Express Shipping',
     estimatedDays: { min: 1, max: 3 },
     isValid: true
   },
-  'USPSGround': {
-    serviceCode: 'USPSGround',
-    displayName: 'USPS Ground Advantage',
-    estimatedDays: { min: 3, max: 5 },
-    isValid: true
-  },
-  'USPSMedia': {
-    serviceCode: 'USPSMedia',
-    displayName: 'USPS Media Mail',
-    estimatedDays: { min: 2, max: 8 },
+  'ShippingMethodOvernight': {
+    serviceCode: 'ShippingMethodOvernight',
+    displayName: 'Overnight Shipping',
+    estimatedDays: { min: 1, max: 1 },
     isValid: true
   }
 };
 
-// User preference to Inventory API compatible eBay service mapping
+// User preference to most basic eBay service mapping
 const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
-  // ✅ UPDATED: Updated mappings to use new service codes that should work
-  'other': 'Other',                    // ✅ Most compatible fallback
-  'usps_media': 'USPSMedia',           // ✅ Media mail - updated
-  'usps_priority_flat': 'USPSPriorityMail', // ✅ Priority - updated
-  'usps_express_flat': 'USPSPriorityMail',  // ✅ Map to Priority - updated
-  'usps_ground': 'USPSGround',         // ✅ USPS Ground Advantage - updated
-  // Legacy mappings - all map to updated service codes
-  'usps_priority': 'USPSPriorityMail', // ✅ Updated to new code
-  'usps_first_class': 'USPSGround',    // ✅ Map to Ground (First Class discontinued)
-  'standard': 'Other',                 // ✅ Map to Other (most compatible)
-  'expedited': 'USPSPriorityMail',     // ✅ Map to Priority - updated
-  'overnight': 'USPSPriorityMail',     // ✅ Map to Priority - updated
-  'express': 'USPSPriorityMail',       // ✅ Map to Priority - updated
-  'flat_rate': 'USPSPriorityMail',     // ✅ Map to Priority - updated
-  'ups_ground': 'Other',               // ✅ Map unsupported to Other
-  'fedex_ground': 'Other'              // ✅ Map unsupported to Other
+  // ✅ Map all preferences to basic shipping methods that work for individual accounts
+  'other': 'ShippingMethodStandard',
+  'usps_media': 'ShippingMethodStandard',
+  'usps_priority_flat': 'ShippingMethodExpress', 
+  'usps_express_flat': 'ShippingMethodExpress',
+  'usps_ground': 'ShippingMethodStandard',
+  'usps_priority': 'ShippingMethodExpress',
+  'usps_first_class': 'ShippingMethodStandard',
+  'standard': 'ShippingMethodStandard',
+  'expedited': 'ShippingMethodExpress',
+  'overnight': 'ShippingMethodOvernight',
+  'express': 'ShippingMethodExpress',
+  'flat_rate': 'ShippingMethodStandard',
+  'ups_ground': 'ShippingMethodStandard',
+  'fedex_ground': 'ShippingMethodStandard'
 };
 
-const DEFAULT_SERVICE = 'Other';       // Most basic and compatible service
-const FALLBACK_SERVICE = 'US_Postal'; // USPS fallback
+const DEFAULT_SERVICE = 'ShippingMethodStandard';  // Most basic and compatible service
+const FALLBACK_SERVICE = 'ShippingMethodStandard';  // Same fallback for consistency
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
@@ -401,10 +386,9 @@ export class EbayShippingServices {
     
     // Define fallback service priority order
     const fallbackOrder = [
-      'US_Postal',     // Most basic and widely accepted
-      'USPSGround',    // USPS Ground Advantage
-      'Other',         // Generic fallback
-      'USPSMedia'      // Last resort for media items
+      'ShippingMethodStandard',    // Most basic and widely accepted
+      'ShippingMethodExpress',     // Express shipping
+      'ShippingMethodOvernight'    // Last resort
     ];
     
     let serviceCode: string;
@@ -427,7 +411,7 @@ export class EbayShippingServices {
           totalOptions: fallbackOrder.length
         });
       } else {
-        serviceCode = 'Other'; // Ultimate fallback
+        serviceCode = 'ShippingMethodStandard'; // Ultimate fallback
         this.logStep('Using ultimate fallback service', { selectedService: serviceCode });
       }
     } else {
