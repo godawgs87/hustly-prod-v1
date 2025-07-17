@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -249,81 +249,9 @@ serve(async (req) => {
         const expiresIn = tokenData.expires_in || 7200;
         const expirationTime = new Date(Date.now() + expiresIn * 1000);
 
-        // Get user info from eBay to store real username
-        let realUsername = 'ebay_seller';
-        let usernameSource = 'default';
-        
-        try {
-          console.log('Attempting to get real eBay username...');
-          
-          // Try the User Identity API first
-          console.log('Trying Identity API...');
-          const userResponse = await fetch(`${EBAY_CONFIG.baseUrl}/commerce/identity/v1/user/`, {
-            headers: {
-              'Authorization': `Bearer ${tokenData.access_token}`,
-              'Accept': 'application/json'
-            }
-          });
-          
-          console.log('Identity API response status:', userResponse.status);
-          
-          if (userResponse.ok) {
-            const userInfo = await userResponse.json();
-            console.log('Identity API response:', userInfo);
-            
-            if (userInfo.username) {
-              realUsername = userInfo.username;
-              usernameSource = 'identity_api';
-              console.log('✅ Retrieved eBay username from Identity API:', realUsername);
-            } else if (userInfo.userId) {
-              realUsername = userInfo.userId;
-              usernameSource = 'identity_api_userid';
-              console.log('✅ Retrieved eBay userId from Identity API:', realUsername);
-            }
-          } else {
-            const errorText = await userResponse.text();
-            console.log('Identity API failed with error:', errorText);
-            console.log('Trying Account API...');
-            
-            // Fallback to Account API
-            const accountResponse = await fetch(`${EBAY_CONFIG.baseUrl}/sell/account/v1/privilege`, {
-              headers: {
-                'Authorization': `Bearer ${tokenData.access_token}`,
-                'Accept': 'application/json'
-              }
-            });
-            
-            console.log('Account API response status:', accountResponse.status);
-            
-            if (accountResponse.ok) {
-              const accountInfo = await accountResponse.json();
-              console.log('Account API response:', accountInfo);
-              
-              if (accountInfo.username) {
-                realUsername = accountInfo.username;
-                usernameSource = 'account_api';
-                console.log('✅ Retrieved eBay username from Account API:', realUsername);
-              } else {
-                // Create a unique username with timestamp
-                realUsername = `ebay_user_${Date.now()}`;
-                usernameSource = 'generated_timestamp';
-                console.log('⚠️ No username in Account API, generated:', realUsername);
-              }
-            } else {
-              const accountErrorText = await accountResponse.text();
-              console.log('Account API also failed:', accountErrorText);
-              realUsername = `ebay_user_${Date.now()}`;
-              usernameSource = 'generated_fallback';
-              console.log('⚠️ Both APIs failed, generated username:', realUsername);
-            }
-          }
-        } catch (err) {
-          console.log('❌ Exception while getting eBay user info:', err.message);
-          realUsername = `ebay_user_${Date.now()}`;
-          usernameSource = 'error_fallback';
-        }
-        
-        console.log(`Final username: "${realUsername}" (source: ${usernameSource})`);
+        // Use a simple username for now to avoid timeouts
+        const realUsername = `ebay_user_${Date.now()}`;
+        console.log('Using generated username:', realUsername);
 
         // ✅ CORRECT database fields with real user data
         const marketplaceAccountData = {
@@ -367,36 +295,6 @@ serve(async (req) => {
         }
 
         console.log('eBay connection stored successfully');
-        
-        // Trigger category sync and policy setup after successful connection
-        try {
-          logStep('Triggering category sync after OAuth connection');
-          const { error: syncError } = await supabase.functions.invoke('ebay-category-sync', {
-            body: { fullSync: false }
-          });
-          if (syncError) {
-            logStep('Category sync after OAuth failed', { error: syncError });
-          } else {
-            logStep('Category sync triggered successfully after OAuth');
-          }
-        } catch (syncErr) {
-          logStep('Failed to trigger category sync', { error: syncErr });
-        }
-
-        // Trigger policy setup after successful connection
-        try {
-          logStep('Triggering policy setup after OAuth connection');
-          const { error: policyError } = await supabase.functions.invoke('ebay-policy-manager', {
-            body: {}
-          });
-          if (policyError) {
-            logStep('Policy setup after OAuth failed', { error: policyError });
-          } else {
-            logStep('Policy setup triggered successfully after OAuth');
-          }
-        } catch (policyErr) {
-          logStep('Failed to trigger policy setup', { error: policyErr });
-        }
         
         return new Response(JSON.stringify({
           success: true,
