@@ -40,14 +40,8 @@ export interface FulfillmentDetails {
 let VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {};
 let PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {};
 
-// Fallback hardcoded services only used if eBay API fails
+// Fallback hardcoded services only used if eBay API fails - using validated service codes
 const HARDCODED_FALLBACK_SERVICES: Record<string, ShippingServiceConfig> = {
-  'USPSPriority': {
-    serviceCode: 'USPSPriority',
-    displayName: 'USPS Priority Mail',
-    estimatedDays: { min: 1, max: 3 },
-    isValid: true
-  },
   'USPSGround': {
     serviceCode: 'USPSGround',
     displayName: 'USPS Ground',
@@ -59,11 +53,23 @@ const HARDCODED_FALLBACK_SERVICES: Record<string, ShippingServiceConfig> = {
     displayName: 'USPS First Class',
     estimatedDays: { min: 1, max: 5 },
     isValid: true
+  },
+  'USPSMedia': {
+    serviceCode: 'USPSMedia',
+    displayName: 'USPS Media Mail',
+    estimatedDays: { min: 3, max: 8 },
+    isValid: true
+  },
+  'USPSPriorityMailFlatRateBox': {
+    serviceCode: 'USPSPriorityMailFlatRateBox',
+    displayName: 'USPS Priority Mail Flat Rate Box',
+    estimatedDays: { min: 1, max: 3 },
+    isValid: true
   }
 };
 
-const DEFAULT_SERVICE = 'USPSPriority';  // Most reliable USPS service
-const FALLBACK_SERVICE = 'USPSGround';  // Fallback option
+const DEFAULT_SERVICE = 'USPSGround';  // Most reliable validated service
+const FALLBACK_SERVICE = 'USPSFirstClass';  // Secondary fallback option
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
@@ -161,20 +167,20 @@ export class EbayShippingServices {
       const firstClassService = this.findBestService(realServiceCodes, ['first', 'class', 'economy']);
       const mediaService = this.findBestService(realServiceCodes, ['media', 'book']);
 
-      // Create preference mapping
+      // Create preference mapping with validated services as fallback
       PREFERENCE_TO_EBAY_SERVICE = {
-        'usps_priority': priorityService || realServiceCodes[0],
-        'usps_priority_flat': priorityService || realServiceCodes[0],
-        'usps_express_flat': priorityService || realServiceCodes[0],
-        'usps_ground': groundService || realServiceCodes[0],
-        'usps_first_class': firstClassService || realServiceCodes[0],
-        'usps_media': mediaService || realServiceCodes[0],
-        'standard': groundService || realServiceCodes[0],
-        'expedited': priorityService || realServiceCodes[0],
-        'overnight': priorityService || realServiceCodes[0],
-        'express': priorityService || realServiceCodes[0],
-        'flat_rate': priorityService || realServiceCodes[0],
-        'other': groundService || realServiceCodes[0]
+        'usps_priority': priorityService || 'USPSPriorityMailFlatRateBox',
+        'usps_priority_flat': priorityService || 'USPSPriorityMailFlatRateBox',
+        'usps_express_flat': priorityService || 'USPSPriorityMailFlatRateBox',
+        'usps_ground': groundService || 'USPSGround',
+        'usps_first_class': firstClassService || 'USPSFirstClass',
+        'usps_media': mediaService || 'USPSMedia',
+        'standard': groundService || 'USPSGround',
+        'expedited': priorityService || 'USPSPriorityMailFlatRateBox',
+        'overnight': priorityService || 'USPSPriorityMailFlatRateBox',
+        'express': priorityService || 'USPSPriorityMailFlatRateBox',
+        'flat_rate': priorityService || 'USPSPriorityMailFlatRateBox',
+        'other': groundService || 'USPSGround'
       };
     }
 
