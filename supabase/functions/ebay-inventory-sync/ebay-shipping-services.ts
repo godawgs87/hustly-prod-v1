@@ -36,12 +36,20 @@ export interface FulfillmentDetails {
   };
 }
 
-// eBay Inventory API Compatible Shipping Service Codes - OFFICIAL VALID CODES
-// Using real eBay shipping service codes from official documentation
-const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
-  // ✅ Official eBay shipping service codes that work for individual accounts
+// Dynamic service mapping - populated from eBay API
+let VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {};
+let PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {};
+
+// Fallback hardcoded services only used if eBay API fails
+const HARDCODED_FALLBACK_SERVICES: Record<string, ShippingServiceConfig> = {
+  'USPSPriority': {
+    serviceCode: 'USPSPriority',
+    displayName: 'USPS Priority Mail',
+    estimatedDays: { min: 1, max: 3 },
+    isValid: true
+  },
   'USPSGround': {
-    serviceCode: 'USPSGround', 
+    serviceCode: 'USPSGround',
     displayName: 'USPS Ground',
     estimatedDays: { min: 2, max: 8 },
     isValid: true
@@ -51,42 +59,11 @@ const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
     displayName: 'USPS First Class',
     estimatedDays: { min: 1, max: 5 },
     isValid: true
-  },
-  'USPSMedia': {
-    serviceCode: 'USPSMedia',
-    displayName: 'USPS Media Mail',
-    estimatedDays: { min: 2, max: 8 },
-    isValid: true
-  },
-  'USPSPriorityMailFlatRateBox': {
-    serviceCode: 'USPSPriorityMailFlatRateBox',
-    displayName: 'USPS Priority Mail Flat Rate Box',
-    estimatedDays: { min: 1, max: 3 },
-    isValid: true
   }
 };
 
-// User preference to VALID eBay service mapping
-const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
-  // ✅ Map all preferences to official eBay shipping service codes
-  'other': 'USPSGround',
-  'usps_media': 'USPSMedia',
-  'usps_priority_flat': 'USPSPriorityMailFlatRateBox', 
-  'usps_express_flat': 'USPSPriorityMailFlatRateBox',
-  'usps_ground': 'USPSGround',
-  'usps_priority': 'USPSPriorityMailFlatRateBox',
-  'usps_first_class': 'USPSFirstClass',
-  'standard': 'USPSGround',
-  'expedited': 'USPSPriorityMailFlatRateBox',
-  'overnight': 'USPSPriorityMailFlatRateBox',
-  'express': 'USPSPriorityMailFlatRateBox',
-  'flat_rate': 'USPSPriorityMailFlatRateBox',
-  'ups_ground': 'USPSGround',
-  'fedex_ground': 'USPSGround'
-};
-
-const DEFAULT_SERVICE = 'USPSGround';  // Most reliable USPS service for individual accounts
-const FALLBACK_SERVICE = 'USPSFirstClass';  // Fallback option
+const DEFAULT_SERVICE = 'USPSPriority';  // Most reliable USPS service
+const FALLBACK_SERVICE = 'USPSGround';  // Fallback option
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
@@ -95,7 +72,7 @@ export class EbayShippingServices {
   }
 
   /**
-   * Fetches valid shipping services from eBay API
+   * Fetches valid shipping services from eBay API and populates internal cache
    */
   static async fetchValidServices(userId: string, forceRefresh = false): Promise<any[]> {
     try {
@@ -130,13 +107,21 @@ export class EbayShippingServices {
         throw new Error(`Failed to fetch services: ${response.error.message}`);
       }
 
-      this.logStep('✅ Successfully fetched valid services', {
-        serviceCount: response.data?.services?.length || 0,
+      const services = response.data?.services || [];
+      
+      // Update internal cache with real eBay services
+      if (services.length > 0) {
+        this.logStep('🔄 Updating internal service cache with eBay data', { serviceCount: services.length });
+        this.updateServiceCache(services);
+      }
+
+      this.logStep('✅ Successfully fetched and cached valid services', {
+        serviceCount: services.length,
         cached: response.data?.cached,
-        services: response.data?.services
+        validatedServicesCount: Object.keys(VALIDATED_EBAY_SERVICES).length
       });
 
-      return response.data?.services || [];
+      return services;
     } catch (error) {
       this.logStep('❌ CRITICAL DEBUG - Exception in fetchValidServices', { 
         error: error.message,
@@ -145,6 +130,72 @@ export class EbayShippingServices {
       });
       return [];
     }
+  }
+
+  /**
+   * Updates internal service cache with real eBay service data
+   */
+  private static updateServiceCache(services: any[]) {
+    // Clear existing cache
+    VALIDATED_EBAY_SERVICES = {};
+    PREFERENCE_TO_EBAY_SERVICE = {};
+
+    // Populate with real eBay services
+    services.forEach(service => {
+      if (service.service_code && service.service_name) {
+        VALIDATED_EBAY_SERVICES[service.service_code] = {
+          serviceCode: service.service_code,
+          displayName: service.service_name,
+          estimatedDays: { min: 1, max: 5 }, // Default estimate
+          isValid: true
+        };
+      }
+    });
+
+    // Update preference mapping with real service codes
+    const realServiceCodes = Object.keys(VALIDATED_EBAY_SERVICES);
+    if (realServiceCodes.length > 0) {
+      // Find best matches for common preferences
+      const priorityService = this.findBestService(realServiceCodes, ['priority', 'express', 'expedited']);
+      const groundService = this.findBestService(realServiceCodes, ['ground', 'standard', 'regular']);
+      const firstClassService = this.findBestService(realServiceCodes, ['first', 'class', 'economy']);
+      const mediaService = this.findBestService(realServiceCodes, ['media', 'book']);
+
+      // Create preference mapping
+      PREFERENCE_TO_EBAY_SERVICE = {
+        'usps_priority': priorityService || realServiceCodes[0],
+        'usps_priority_flat': priorityService || realServiceCodes[0],
+        'usps_express_flat': priorityService || realServiceCodes[0],
+        'usps_ground': groundService || realServiceCodes[0],
+        'usps_first_class': firstClassService || realServiceCodes[0],
+        'usps_media': mediaService || realServiceCodes[0],
+        'standard': groundService || realServiceCodes[0],
+        'expedited': priorityService || realServiceCodes[0],
+        'overnight': priorityService || realServiceCodes[0],
+        'express': priorityService || realServiceCodes[0],
+        'flat_rate': priorityService || realServiceCodes[0],
+        'other': groundService || realServiceCodes[0]
+      };
+    }
+
+    this.logStep('✅ Service cache updated', {
+      validatedServicesCount: Object.keys(VALIDATED_EBAY_SERVICES).length,
+      preferenceMappingCount: Object.keys(PREFERENCE_TO_EBAY_SERVICE).length,
+      services: Object.keys(VALIDATED_EBAY_SERVICES)
+    });
+  }
+
+  /**
+   * Finds the best matching service code from available options
+   */
+  private static findBestService(availableServices: string[], keywords: string[]): string | null {
+    for (const keyword of keywords) {
+      const match = availableServices.find(service => 
+        service.toLowerCase().includes(keyword.toLowerCase())
+      );
+      if (match) return match;
+    }
+    return null;
   }
 
   /**
@@ -157,12 +208,11 @@ export class EbayShippingServices {
     this.logStep('🔍 CRITICAL DEBUG - Starting service mapping', {
       userPreference,
       userId,
-      hasUserId: !!userId
+      hasUserId: !!userId,
+      cachedServicesCount: Object.keys(VALIDATED_EBAY_SERVICES).length
     });
 
-    let serviceCode = PREFERENCE_TO_EBAY_SERVICE[userPreference || 'standard'] || DEFAULT_SERVICE;
-    
-    // Try to get valid services from eBay if userId provided
+    // First ensure we have the latest service data
     if (userId) {
       this.logStep('🚀 CRITICAL DEBUG - About to fetch valid services from eBay', { userId });
       try {
@@ -170,56 +220,47 @@ export class EbayShippingServices {
         
         this.logStep('📡 CRITICAL DEBUG - Received response from fetchValidServices', {
           serviceCount: validServices?.length || 0,
-          services: validServices,
+          cachedServicesAfterFetch: Object.keys(VALIDATED_EBAY_SERVICES).length,
           isArray: Array.isArray(validServices)
         });
-        
-        if (validServices && validServices.length > 0) {
-          // Find best matching service from eBay's valid list
-          const preferredService = validServices.find(s => 
-            s.service_code === serviceCode || 
-            s.service_name.toLowerCase().includes(userPreference?.toLowerCase() || 'priority')
-          );
-          
-          if (preferredService) {
-            serviceCode = preferredService.service_code;
-            this.logStep('✅ Using eBay-validated service', {
-              userPreference,
-              validatedService: serviceCode,
-              serviceName: preferredService.service_name
-            });
-          } else {
-            // Use first available domestic service
-            const fallbackService = validServices.find(s => s.is_domestic);
-            if (fallbackService) {
-              serviceCode = fallbackService.service_code;
-              this.logStep('🔄 Using eBay fallback service', {
-                userPreference,
-                fallbackService: serviceCode,
-                serviceName: fallbackService.service_name
-              });
-            } else {
-              this.logStep('⚠️ No domestic services found in eBay response', { validServices });
-            }
-          }
-        } else {
-          this.logStep('⚠️ No valid services returned from eBay API', { validServices });
-        }
       } catch (error) {
-        this.logStep('❌ CRITICAL ERROR - Failed to fetch eBay services', { 
+        this.logStep('❌ CRITICAL ERROR - Failed to fetch eBay services, using fallback', { 
           error: error.message,
           stack: error.stack,
           errorType: error.constructor.name 
         });
+        // Use hardcoded fallback
+        VALIDATED_EBAY_SERVICES = { ...HARDCODED_FALLBACK_SERVICES };
       }
-    } else {
-      this.logStep('⚠️ No userId provided, skipping eBay service fetch');
+    }
+
+    // Now map using the updated cache
+    let serviceCode = PREFERENCE_TO_EBAY_SERVICE[userPreference || 'standard'] || DEFAULT_SERVICE;
+    
+    // Validate the service code exists in our cache
+    if (!VALIDATED_EBAY_SERVICES[serviceCode]) {
+      this.logStep('⚠️ Selected service not in cache, using fallback', { 
+        selectedService: serviceCode,
+        availableServices: Object.keys(VALIDATED_EBAY_SERVICES)
+      });
+      
+      // Find first available service
+      const availableServices = Object.keys(VALIDATED_EBAY_SERVICES);
+      if (availableServices.length > 0) {
+        serviceCode = availableServices[0];
+        this.logStep('✅ Using first available service', { serviceCode });
+      } else {
+        // Ultimate fallback to hardcoded
+        serviceCode = DEFAULT_SERVICE;
+        this.logStep('⚠️ No services available, using hardcoded default', { serviceCode });
+      }
     }
     
-    this.logStep('Mapping user preference to eBay service', {
+    this.logStep('✅ Final service mapping result', {
       userPreference: userPreference || 'none',
       mappedService: serviceCode,
-      isValidService: this.isValidService(serviceCode)
+      isValidService: this.isValidService(serviceCode),
+      serviceName: VALIDATED_EBAY_SERVICES[serviceCode]?.displayName || 'Unknown'
     });
 
     return serviceCode;
@@ -229,14 +270,14 @@ export class EbayShippingServices {
    * Validates if a service code is in our list of confirmed working services
    */
   static isValidService(serviceCode: string): boolean {
-    return serviceCode in VALIDATED_EBAY_SERVICES;
+    return serviceCode in VALIDATED_EBAY_SERVICES || serviceCode in HARDCODED_FALLBACK_SERVICES;
   }
 
   /**
    * Gets service configuration details
    */
   static getServiceConfig(serviceCode: string): ShippingServiceConfig | null {
-    return VALIDATED_EBAY_SERVICES[serviceCode] || null;
+    return VALIDATED_EBAY_SERVICES[serviceCode] || HARDCODED_FALLBACK_SERVICES[serviceCode] || null;
   }
 
   /**
@@ -378,51 +419,59 @@ export class EbayShippingServices {
   /**
    * Creates fulfillment details with fallback logic for failed service codes
    */
-  static createFulfillmentDetailsWithFallback(
+  static async createFulfillmentDetailsWithFallback(
     userProfile: any,
     options: {
       domesticCost?: number;
       handlingTimeDays?: number;
       attemptedService?: string;
+      userId?: string;
     } = {}
-  ): FulfillmentDetails {
+  ): Promise<FulfillmentDetails> {
     const domesticCost = options.domesticCost || userProfile.shipping_cost_domestic || 9.95;
     const handlingTime = options.handlingTimeDays || userProfile.handling_time_days || 1;
     const preferredService = userProfile.preferred_shipping_service;
     
-    // Define fallback service priority order using VALID eBay codes
-    const fallbackOrder = [
-      'USPSPriority',    // Most reliable USPS service
-      'USPSGround',      // Backup ground service
-      'USPSFirstClass'   // Last resort
-    ];
-    
     let serviceCode: string;
     
-    // If we've already attempted a service and it failed, try the next in fallback order
+    // If we've already attempted a service and it failed, try multiple fallback approaches
     if (options.attemptedService) {
       this.logStep('Attempting fallback service selection', { 
         failedService: options.attemptedService,
-        fallbackOrder 
+        userId: options.userId
       });
       
-      const failedIndex = fallbackOrder.indexOf(options.attemptedService);
-      const nextServiceIndex = failedIndex + 1;
-      
-      if (nextServiceIndex < fallbackOrder.length) {
-        serviceCode = fallbackOrder[nextServiceIndex];
-        this.logStep('Using next fallback service', { 
-          selectedService: serviceCode,
-          position: nextServiceIndex + 1,
-          totalOptions: fallbackOrder.length
-        });
+      // Try to get different service from eBay API
+      if (options.userId) {
+        try {
+          const validServices = await this.fetchValidServices(options.userId);
+          const alternativeService = validServices.find(s => 
+            s.service_code !== options.attemptedService && s.is_domestic
+          );
+          
+          if (alternativeService) {
+            serviceCode = alternativeService.service_code;
+            this.logStep('✅ Using alternative eBay service', { 
+              selectedService: serviceCode,
+              serviceName: alternativeService.service_name
+            });
+          } else {
+            // Use hardcoded fallback
+            serviceCode = Object.keys(HARDCODED_FALLBACK_SERVICES)[0];
+            this.logStep('🔄 Using hardcoded fallback service', { selectedService: serviceCode });
+          }
+        } catch (error) {
+          this.logStep('❌ Failed to fetch alternative service, using hardcoded fallback', { error: error.message });
+          serviceCode = Object.keys(HARDCODED_FALLBACK_SERVICES)[0];
+        }
       } else {
-        serviceCode = 'USPSPriority'; // Ultimate fallback to reliable USPS service
-        this.logStep('Using ultimate fallback service', { selectedService: serviceCode });
+        // Use hardcoded fallback
+        serviceCode = Object.keys(HARDCODED_FALLBACK_SERVICES)[0];
+        this.logStep('🔄 Using hardcoded fallback service (no userId)', { selectedService: serviceCode });
       }
     } else {
-      // Normal service selection - for this fallback function, use sync mapping
-      serviceCode = PREFERENCE_TO_EBAY_SERVICE[preferredService || 'usps_ground'] || DEFAULT_SERVICE;
+      // Normal service selection with real-time eBay validation
+      serviceCode = await this.mapUserPreferenceToEbayService(preferredService, options.userId);
     }
     
     const serviceConfig = this.getServiceConfig(serviceCode);
@@ -479,6 +528,23 @@ export class EbayShippingServices {
    * Lists all available validated eBay services
    */
   static getAvailableServices(): ShippingServiceConfig[] {
-    return Object.values(VALIDATED_EBAY_SERVICES);
+    const services = Object.values(VALIDATED_EBAY_SERVICES);
+    return services.length > 0 ? services : Object.values(HARDCODED_FALLBACK_SERVICES);
+  }
+
+  /**
+   * Initializes the service system by fetching services from eBay
+   */
+  static async initialize(userId: string): Promise<void> {
+    this.logStep('🚀 Initializing eBay shipping services', { userId });
+    try {
+      await this.fetchValidServices(userId, true); // Force refresh on init
+      this.logStep('✅ eBay shipping services initialized', { 
+        servicesCount: Object.keys(VALIDATED_EBAY_SERVICES).length 
+      });
+    } catch (error) {
+      this.logStep('❌ Failed to initialize eBay services, using fallback', { error: error.message });
+      VALIDATED_EBAY_SERVICES = { ...HARDCODED_FALLBACK_SERVICES };
+    }
   }
 }

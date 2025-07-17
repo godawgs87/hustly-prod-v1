@@ -171,6 +171,11 @@ class EbayInventoryAPI {
     return await this.offerManager.publishOffer(token, offerId);
   }
 
+  async deleteOffer(offerId: string): Promise<void> {
+    const token = await this.getAccessToken();
+    return await this.offerManager.deleteOffer(token, offerId);
+  }
+
   async handleExistingOffers(sku: string): Promise<{ offerId?: string; shouldCreateNew: boolean; alreadyPublished?: { listingId: string; offerId: string } }> {
     const token = await this.getAccessToken();
     return await this.offerManager.handleExistingOffers(token, sku);
@@ -346,17 +351,22 @@ async function syncListingToEbay(supabaseClient: any, userId: string, listingId:
       }
     });
 
-    // 5. Initialize eBay API
+    // 5. Initialize eBay shipping services with real data
+    logStep('🚀 Initializing eBay shipping services');
+    await EbayShippingServices.initialize(userId);
+    logStep('✅ eBay shipping services initialized');
+
+    // 6. Initialize eBay API
     const ebayApi = new EbayInventoryAPI(false, supabaseClient, userId);
     const ebayLocationKey = await ebayApi.getUserInventoryLocationKey();
 
-    // 6. Create inventory item
+    // 7. Create inventory item
     const inventoryData = EbayInventoryItemManager.mapListingToEbayInventory(listing, listing.listing_photos);
     await ebayApi.createInventoryItem(listingId, inventoryData);
 
     logStep('✅ Inventory item created');
 
-    // 7. Handle offers with automatic cleanup
+    // 8. Handle offers with automatic cleanup
     const offerResult = await ebayApi.handleExistingOffers(listingId);
     
     let offerId: string;
@@ -389,14 +399,51 @@ async function syncListingToEbay(supabaseClient: any, userId: string, listingId:
       offerId = await ebayApi.createOffer(offerData);
       logStep('✅ Offer created');
 
-      // Publish offer
-      ebayListingId = await ebayApi.publishOffer(offerId);
-      logStep('✅ Offer published', { ebayListingId });
+      // Publish offer with fallback retry logic
+      try {
+        ebayListingId = await ebayApi.publishOffer(offerId);
+        logStep('✅ Offer published', { ebayListingId });
+      } catch (publishError: any) {
+        logStep('❌ Offer publish failed, attempting fallback', { error: publishError.message });
+        
+        // Check if it's a shipping service error (Error 25007)
+        if (publishError.message.includes('25007') || publishError.message.includes('shipping service')) {
+          logStep('🔄 Attempting with fallback shipping service');
+          
+          // Get fallback fulfillment details
+          const fallbackFulfillmentDetails = await EbayShippingServices.createFulfillmentDetailsWithFallback(
+            userProfile, 
+            { 
+              attemptedService: offerData.fulfillmentDetails?.shippingOptions[0]?.shippingServices[0]?.serviceCode,
+              userId: userId
+            }
+          );
+          
+          // Update offer with fallback shipping
+          const fallbackOfferData = {
+            ...offerData,
+            fulfillmentDetails: fallbackFulfillmentDetails
+          };
+          
+          // Delete failed offer and create new one
+          await ebayApi.deleteOffer(offerId);
+          const fallbackOfferId = await ebayApi.createOffer(fallbackOfferData);
+          ebayListingId = await ebayApi.publishOffer(fallbackOfferId);
+          offerId = fallbackOfferId;
+          
+          logStep('✅ Fallback offer published successfully', { 
+            ebayListingId, 
+            fallbackService: fallbackFulfillmentDetails.shippingOptions[0]?.shippingServices[0]?.serviceCode 
+          });
+        } else {
+          throw publishError;
+        }
+      }
     } else {
       throw new Error('Unexpected offer handling result');
     }
 
-    // 8. Update platform_listings table
+    // 9. Update platform_listings table
     await supabaseClient.from('platform_listings').upsert({
       listing_id: listingId,
       user_id: userId,
