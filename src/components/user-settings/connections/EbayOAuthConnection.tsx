@@ -89,6 +89,25 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
     const state = urlParams.get('state');
     const error = urlParams.get('error');
 
+    // Handle pending OAuth from localStorage (after login)
+    const pendingOAuth = localStorage.getItem('ebay_oauth_pending');
+    if (pendingOAuth && !code) {
+      try {
+        const { code: pendingCode, state: pendingState } = JSON.parse(pendingOAuth);
+        if (pendingCode) {
+          console.log('🔄 Processing pending eBay OAuth from localStorage...');
+          localStorage.removeItem('ebay_oauth_pending');
+          
+          // Process the pending OAuth
+          await processOAuthToken(pendingCode, pendingState);
+          return;
+        }
+      } catch (err) {
+        console.error('❌ Error processing pending OAuth:', err);
+        localStorage.removeItem('ebay_oauth_pending');
+      }
+    }
+
     if (error) {
       console.error('❌ eBay OAuth error:', error);
       toast({
@@ -102,71 +121,72 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
     }
 
     if (code && state === 'ebay_oauth') {
-      setLoading(true);
-      console.log('🔄 Processing eBay OAuth callback...');
+      // Clean URL immediately to prevent refresh issues
+      window.history.replaceState({}, document.title, window.location.pathname);
       
-      try {
-        // Ensure user is still authenticated for the callback
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-          throw new Error('Authentication session expired. Please log in again.');
-        }
+      await processOAuthToken(code, state);
+    }
+  };
 
-        console.log('✅ Session verified, exchanging code for token...');
-
-        // Exchange code for access token via our edge function
-        const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
-          body: { action: 'exchange_code', code }
-        });
-
-        console.log('📡 Token exchange response:', { data, error });
-
-        if (error) {
-          console.error('❌ Token exchange error:', error);
-          throw new Error(`Token exchange failed: ${error.message || 'Unknown error'}`);
-        }
-
-        if (!data?.success) {
-          console.error('❌ Unexpected response format:', data);
-          throw new Error('Unexpected response from eBay connection service');
-        }
-
-        console.log('✅ eBay OAuth successful!');
-
-        toast({
-          title: "eBay Connected Successfully! 🎉",
-          description: "Your eBay account is now linked to Hustly"
-        });
-
-        // Clean URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
-        // Refresh connection status and notify parent
-        await checkExistingConnection();
-        if (onConnectionSuccess) {
-          onConnectionSuccess();
-        }
-      } catch (error: any) {
-        console.error('❌ OAuth callback failed:', error);
-        
-        let errorMessage = error.message;
-        if (error.message?.includes('Authentication session')) {
-          errorMessage = 'Your session expired during the connection process. Please try connecting again.';
-        } else if (error.message?.includes('Token exchange failed')) {
-          errorMessage = 'Failed to complete eBay connection. Please try again or contact support.';
-        }
-        
-        toast({
-          title: "eBay Connection Failed",
-          description: errorMessage,
-          variant: "destructive"
-        });
-
-        // Clean URL even on error
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } finally {
-        setLoading(false);
+  const processOAuthToken = async (code: string, state?: string) => {
+    setLoading(true);
+    console.log('🔄 Processing eBay OAuth token...');
+    
+    try {
+      // Ensure user is still authenticated for the callback
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Authentication session expired. Please log in again.');
       }
+
+      console.log('✅ Session verified, exchanging code for token...');
+
+      // Exchange code for access token via our edge function
+      const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
+        body: { action: 'exchange_code', code, state }
+      });
+
+      console.log('📡 Token exchange response:', { data, error });
+
+      if (error) {
+        console.error('❌ Token exchange error:', error);
+        throw new Error(`Token exchange failed: ${error.message || 'Unknown error'}`);
+      }
+
+      if (!data?.success) {
+        console.error('❌ Unexpected response format:', data);
+        throw new Error('Unexpected response from eBay connection service');
+      }
+
+      console.log('✅ eBay OAuth successful!');
+
+      toast({
+        title: "eBay Connected Successfully! 🎉",
+        description: "Your eBay account is now linked to Hustly"
+      });
+      
+      // Refresh connection status and notify parent
+      await checkExistingConnection();
+      if (onConnectionSuccess) {
+        onConnectionSuccess();
+      }
+    } catch (error: any) {
+      console.error('❌ OAuth token processing failed:', error);
+      
+      let errorMessage = error.message;
+      if (error.message?.includes('Authentication session')) {
+        errorMessage = 'Your session expired during the connection process. Please try connecting again.';
+      } else if (error.message?.includes('Token exchange failed')) {
+        errorMessage = 'Failed to complete eBay connection. Please try again or contact support.';
+      }
+      
+      toast({
+        title: "eBay Connection Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -182,6 +202,9 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
       }
 
       console.log('✅ User session verified, calling edge function...');
+
+      // Clean up any pending OAuth data before starting new flow
+      localStorage.removeItem('ebay_oauth_pending');
 
       // Get OAuth URL from our edge function with proper auth headers
       const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {

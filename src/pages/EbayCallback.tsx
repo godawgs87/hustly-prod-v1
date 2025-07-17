@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/components/AuthProvider';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
@@ -10,9 +11,16 @@ const EbayCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, session, loading: authLoading } = useAuth();
   const [processing, setProcessing] = useState(true);
 
+  // Wait for auth to initialize before processing
   useEffect(() => {
+    if (authLoading) {
+      console.log('⏳ Waiting for auth to initialize...');
+      return;
+    }
+
     const handleOAuthCallback = async () => {
       try {
         const code = searchParams.get('code');
@@ -22,7 +30,9 @@ const EbayCallback = () => {
         console.log('🔄 eBay OAuth callback received:', { 
           code: code ? 'present' : 'missing', 
           state: state ? 'present' : 'missing', 
-          error 
+          error,
+          hasUser: !!user,
+          hasSession: !!session
         });
 
         if (error) {
@@ -33,53 +43,25 @@ const EbayCallback = () => {
           throw new Error('No authorization code received from eBay');
         }
 
-        console.log('🔍 Processing eBay OAuth callback with code');
-
-        // Get current session with extended retry logic
-        let session = null;
-        let attempts = 0;
-        const maxAttempts = 5;
-        
-        while (!session && attempts < maxAttempts) {
-          attempts++;
-          console.log(`🔍 Attempting to get session (attempt ${attempts}/${maxAttempts})`);
-          
-          const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-          
-          if (sessionError) {
-            console.error('❌ Session error:', sessionError);
-            if (attempts === maxAttempts) {
-              throw new Error(`Session error: ${sessionError.message}`);
-            }
-          }
-          
-          session = currentSession;
-          
-          if (!session && attempts < maxAttempts) {
-            console.log('⏳ No session found, waiting 2 seconds before retry...');
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-        }
-        
-        if (!session) {
-          // Instead of redirecting to auth, store OAuth data and show a message
-          console.log('⚠️ No session found after retries, storing OAuth data');
+        // Check if we have a user/session from auth provider
+        if (!user || !session) {
+          console.log('⚠️ No authenticated user, storing OAuth data for later');
           localStorage.setItem('ebay_oauth_pending', JSON.stringify({ code, state }));
           
           toast({
-            title: "Session Required",
-            description: "Please log in to complete the eBay connection. Your connection will be completed automatically after login.",
+            title: "Authentication Required",
+            description: "Please log in to complete your eBay connection. Your connection will be completed automatically after login.",
             variant: "destructive"
           });
           
-          // Wait a moment then redirect to auth
+          // Wait then redirect to auth
           setTimeout(() => {
             navigate('/auth', { replace: true });
           }, 3000);
           return;
         }
 
-        console.log('✅ Session found, proceeding with token exchange');
+        console.log('✅ User authenticated, proceeding with token exchange');
 
         // Exchange code for token
         const { data: responseData, error: functionError } = await supabase.functions.invoke('ebay-oauth-modern', {
@@ -135,7 +117,7 @@ const EbayCallback = () => {
     };
 
     handleOAuthCallback();
-  }, [searchParams, navigate, toast]);
+  }, [searchParams, navigate, toast, user, session, authLoading]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
