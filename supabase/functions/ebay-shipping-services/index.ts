@@ -11,29 +11,35 @@ const logStep = (step: string, details?: any) => {
   console.log(`[EBAY-SHIPPING-SERVICES] ${step}${detailsStr}`);
 };
 
-// Hardcoded shipping services for individual accounts
+// Hardcoded shipping services for individual accounts using VALID eBay service codes
 const INDIVIDUAL_SHIPPING_SERVICES = {
   'usps_priority': {
-    serviceCode: 'ShippingMethodStandard',
-    serviceName: 'Standard Shipping',
+    serviceCode: 'USPSPriority',
+    serviceName: 'USPS Priority Mail',
     isDomestic: true,
     isInternational: false
   },
   'usps_ground': {
-    serviceCode: 'ShippingMethodStandard', 
-    serviceName: 'Ground Shipping',
+    serviceCode: 'USPSGround', 
+    serviceName: 'USPS Ground',
     isDomestic: true,
     isInternational: false
   },
   'usps_media': {
-    serviceCode: 'ShippingMethodStandard',
-    serviceName: 'Media Mail',
+    serviceCode: 'USPSMedia',
+    serviceName: 'USPS Media Mail',
+    isDomestic: true,
+    isInternational: false
+  },
+  'usps_first_class': {
+    serviceCode: 'USPSFirstClass',
+    serviceName: 'USPS First Class',
     isDomestic: true,
     isInternational: false
   },
   'other': {
-    serviceCode: 'ShippingMethodStandard',
-    serviceName: 'Standard Shipping',
+    serviceCode: 'USPSPriority',
+    serviceName: 'USPS Priority Mail',
     isDomestic: true,
     isInternational: false
   }

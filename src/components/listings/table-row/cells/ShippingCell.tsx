@@ -22,14 +22,17 @@ const ShippingCell = ({ shippingCost }: ShippingCellProps) => {
           .eq('id', user.id)
           .single();
 
-        // Set shipping cost based on user's preferred service
+        // Set shipping cost based on user's preferred service (aligned with valid eBay service codes)
         if (profile?.preferred_shipping_service) {
           const serviceCosts = {
             'usps_priority': 9.95,
             'usps_ground': 7.95,
+            'usps_first_class': 5.95,
+            'usps_media': 4.95,
             'usps_express': 24.95,
             'ups_ground': 12.95,
-            'fedex_ground': 11.95
+            'fedex_ground': 11.95,
+            'other': 9.95
           };
           setDefaultShippingCost(serviceCosts[profile.preferred_shipping_service as keyof typeof serviceCosts] || 9.95);
         }

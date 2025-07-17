@@ -36,51 +36,57 @@ export interface FulfillmentDetails {
   };
 }
 
-// eBay Inventory API Compatible Shipping Service Codes
-// Use the most basic, widely accepted codes that work across all account types
+// eBay Inventory API Compatible Shipping Service Codes - OFFICIAL VALID CODES
+// Using real eBay shipping service codes from official documentation
 const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
-  // ✅ These are the most basic shipping service codes that work for individual accounts
-  'ShippingMethodStandard': {
-    serviceCode: 'ShippingMethodStandard',
-    displayName: 'Standard Shipping',
-    estimatedDays: { min: 3, max: 7 },
-    isValid: true
-  },
-  'ShippingMethodExpress': {
-    serviceCode: 'ShippingMethodExpress', 
-    displayName: 'Express Shipping',
+  // ✅ Official eBay shipping service codes that work for individual accounts
+  'USPSPriority': {
+    serviceCode: 'USPSPriority',
+    displayName: 'USPS Priority Mail',
     estimatedDays: { min: 1, max: 3 },
     isValid: true
   },
-  'ShippingMethodOvernight': {
-    serviceCode: 'ShippingMethodOvernight',
-    displayName: 'Overnight Shipping',
-    estimatedDays: { min: 1, max: 1 },
+  'USPSGround': {
+    serviceCode: 'USPSGround', 
+    displayName: 'USPS Ground',
+    estimatedDays: { min: 2, max: 8 },
+    isValid: true
+  },
+  'USPSFirstClass': {
+    serviceCode: 'USPSFirstClass',
+    displayName: 'USPS First Class',
+    estimatedDays: { min: 1, max: 5 },
+    isValid: true
+  },
+  'USPSMedia': {
+    serviceCode: 'USPSMedia',
+    displayName: 'USPS Media Mail',
+    estimatedDays: { min: 2, max: 8 },
     isValid: true
   }
 };
 
-// User preference to most basic eBay service mapping
+// User preference to VALID eBay service mapping
 const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
-  // ✅ Map all preferences to basic shipping methods that work for individual accounts
-  'other': 'ShippingMethodStandard',
-  'usps_media': 'ShippingMethodStandard',
-  'usps_priority_flat': 'ShippingMethodExpress', 
-  'usps_express_flat': 'ShippingMethodExpress',
-  'usps_ground': 'ShippingMethodStandard',
-  'usps_priority': 'ShippingMethodExpress',
-  'usps_first_class': 'ShippingMethodStandard',
-  'standard': 'ShippingMethodStandard',
-  'expedited': 'ShippingMethodExpress',
-  'overnight': 'ShippingMethodOvernight',
-  'express': 'ShippingMethodExpress',
-  'flat_rate': 'ShippingMethodStandard',
-  'ups_ground': 'ShippingMethodStandard',
-  'fedex_ground': 'ShippingMethodStandard'
+  // ✅ Map all preferences to official eBay shipping service codes
+  'other': 'USPSPriority',
+  'usps_media': 'USPSMedia',
+  'usps_priority_flat': 'USPSPriority', 
+  'usps_express_flat': 'USPSPriority',
+  'usps_ground': 'USPSGround',
+  'usps_priority': 'USPSPriority',
+  'usps_first_class': 'USPSFirstClass',
+  'standard': 'USPSPriority',
+  'expedited': 'USPSPriority',
+  'overnight': 'USPSPriority',
+  'express': 'USPSPriority',
+  'flat_rate': 'USPSPriority',
+  'ups_ground': 'USPSGround',
+  'fedex_ground': 'USPSGround'
 };
 
-const DEFAULT_SERVICE = 'ShippingMethodStandard';  // Most basic and compatible service
-const FALLBACK_SERVICE = 'ShippingMethodStandard';  // Same fallback for consistency
+const DEFAULT_SERVICE = 'USPSPriority';  // Most reliable USPS service for individual accounts
+const FALLBACK_SERVICE = 'USPSPriority';  // Same fallback for consistency
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
@@ -384,11 +390,11 @@ export class EbayShippingServices {
     const handlingTime = options.handlingTimeDays || userProfile.handling_time_days || 1;
     const preferredService = userProfile.preferred_shipping_service;
     
-    // Define fallback service priority order
+    // Define fallback service priority order using VALID eBay codes
     const fallbackOrder = [
-      'ShippingMethodStandard',    // Most basic and widely accepted
-      'ShippingMethodExpress',     // Express shipping
-      'ShippingMethodOvernight'    // Last resort
+      'USPSPriority',    // Most reliable USPS service
+      'USPSGround',      // Backup ground service
+      'USPSFirstClass'   // Last resort
     ];
     
     let serviceCode: string;
@@ -411,7 +417,7 @@ export class EbayShippingServices {
           totalOptions: fallbackOrder.length
         });
       } else {
-        serviceCode = 'ShippingMethodStandard'; // Ultimate fallback
+        serviceCode = 'USPSPriority'; // Ultimate fallback to reliable USPS service
         this.logStep('Using ultimate fallback service', { selectedService: serviceCode });
       }
     } else {
