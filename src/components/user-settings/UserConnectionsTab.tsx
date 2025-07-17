@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Link } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 import EbayOAuthConnection from './connections/EbayOAuthConnection';
 import EbayPolicyStatusCard from './connections/EbayPolicyStatusCard';
@@ -15,7 +16,7 @@ interface Platform {
   icon: string;
 }
 const UserConnectionsTab = () => {
-  
+  const [ebayAccountType, setEbayAccountType] = useState<string>('individual');
 
   const [platforms, setPlatforms] = useState<Platform[]>([{
     name: 'Mercari',
@@ -38,6 +39,42 @@ const UserConnectionsTab = () => {
     autoList: false,
     icon: '🎨'
   }]);
+
+  React.useEffect(() => {
+    loadEbayAccountType();
+  }, []);
+
+  const loadEbayAccountType = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Check user profile first
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('ebay_account_type')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.ebay_account_type) {
+        setEbayAccountType(profile.ebay_account_type);
+      }
+
+      // Also check marketplace account
+      const { data: marketplaceAccount } = await supabase
+        .from('marketplace_accounts')
+        .select('ebay_account_type')
+        .eq('user_id', user.id)
+        .eq('platform', 'ebay')
+        .single();
+
+      if (marketplaceAccount?.ebay_account_type) {
+        setEbayAccountType(marketplaceAccount.ebay_account_type);
+      }
+    } catch (error) {
+      console.error('Error loading eBay account type:', error);
+    }
+  };
   const handleImportListings = async () => {
     // await importSoldListings(10); // Temporarily disabled - using newer sync operation
     console.log('Import listings functionality temporarily disabled');
@@ -59,8 +96,23 @@ const UserConnectionsTab = () => {
         <div>
           <EbayOAuthConnection />
           <Separator className="mt-6" />
-          <EbayPolicyStatusCard />
-          <Separator className="mt-6" />
+          
+          {ebayAccountType === 'individual' && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md mb-6">
+              <h4 className="font-medium text-blue-900 mb-2">Individual eBay Account</h4>
+              <p className="text-sm text-blue-800">
+                Your eBay account uses built-in policies. No custom business policies needed - eBay handles payment, returns, and shipping policies automatically.
+              </p>
+            </div>
+          )}
+          
+          {ebayAccountType === 'business' && (
+            <>
+              <EbayPolicyStatusCard />
+              <Separator className="mt-6" />
+            </>
+          )}
+          
           <EbayCategorySync />
           <Separator className="mt-6" />
         </div>

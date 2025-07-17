@@ -694,6 +694,11 @@ export type Database = {
           account_username: string | null
           api_permissions: string[] | null
           created_at: string
+          ebay_account_capabilities: Json | null
+          ebay_account_type: string | null
+          ebay_business_policies: Json | null
+          ebay_seller_level: string | null
+          ebay_store_subscription: string | null
           id: string
           is_active: boolean
           is_connected: boolean
@@ -718,6 +723,11 @@ export type Database = {
           account_username?: string | null
           api_permissions?: string[] | null
           created_at?: string
+          ebay_account_capabilities?: Json | null
+          ebay_account_type?: string | null
+          ebay_business_policies?: Json | null
+          ebay_seller_level?: string | null
+          ebay_store_subscription?: string | null
           id?: string
           is_active?: boolean
           is_connected?: boolean
@@ -742,6 +752,11 @@ export type Database = {
           account_username?: string | null
           api_permissions?: string[] | null
           created_at?: string
+          ebay_account_capabilities?: Json | null
+          ebay_account_type?: string | null
+          ebay_business_policies?: Json | null
+          ebay_seller_level?: string | null
+          ebay_store_subscription?: string | null
           id?: string
           is_active?: boolean
           is_connected?: boolean
@@ -1075,11 +1090,15 @@ export type Database = {
           created_at: string | null
           default_markup_percentage: number | null
           domestic_shipping_type: string | null
+          ebay_account_capabilities: Json | null
+          ebay_account_type: string | null
           ebay_category_preferences: Json | null
           ebay_fulfillment_policy_id: string | null
           ebay_payment_policy_id: string | null
           ebay_policies_created_at: string | null
           ebay_return_policy_id: string | null
+          ebay_seller_level: string | null
+          ebay_store_subscription: string | null
           email: string
           fulfillment_policy_id: string | null
           full_name: string | null
@@ -1144,11 +1163,15 @@ export type Database = {
           created_at?: string | null
           default_markup_percentage?: number | null
           domestic_shipping_type?: string | null
+          ebay_account_capabilities?: Json | null
+          ebay_account_type?: string | null
           ebay_category_preferences?: Json | null
           ebay_fulfillment_policy_id?: string | null
           ebay_payment_policy_id?: string | null
           ebay_policies_created_at?: string | null
           ebay_return_policy_id?: string | null
+          ebay_seller_level?: string | null
+          ebay_store_subscription?: string | null
           email: string
           fulfillment_policy_id?: string | null
           full_name?: string | null
@@ -1213,11 +1236,15 @@ export type Database = {
           created_at?: string | null
           default_markup_percentage?: number | null
           domestic_shipping_type?: string | null
+          ebay_account_capabilities?: Json | null
+          ebay_account_type?: string | null
           ebay_category_preferences?: Json | null
           ebay_fulfillment_policy_id?: string | null
           ebay_payment_policy_id?: string | null
           ebay_policies_created_at?: string | null
           ebay_return_policy_id?: string | null
+          ebay_seller_level?: string | null
+          ebay_store_subscription?: string | null
           email?: string
           fulfillment_policy_id?: string | null
           full_name?: string | null

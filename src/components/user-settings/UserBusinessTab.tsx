@@ -72,10 +72,12 @@ const UserBusinessTab = () => {
     return_method: 'REPLACEMENT',
     international_shipping_enabled: false,
     default_markup_percentage: 100,
-    preferred_shipping_service: 'other',
+    preferred_shipping_service: 'usps_priority',
     shipping_cost_domestic: 9.95,
     shipping_cost_additional: 2.00
   });
+
+  const [ebayAccountType, setEbayAccountType] = useState<string>('individual');
 
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
@@ -123,10 +125,25 @@ const UserBusinessTab = () => {
           return_method: data.return_method || 'REPLACEMENT',
           international_shipping_enabled: data.international_shipping_enabled || false,
           default_markup_percentage: data.default_markup_percentage || 100,
-          preferred_shipping_service: data.preferred_shipping_service || 'other',
+          preferred_shipping_service: data.preferred_shipping_service || 'usps_priority',
           shipping_cost_domestic: data.shipping_cost_domestic || 9.95,
           shipping_cost_additional: data.shipping_cost_additional || 2.00
         });
+
+        // Load eBay account type
+        setEbayAccountType(data.ebay_account_type || 'individual');
+      }
+
+      // Also check marketplace account for eBay account type
+      const { data: marketplaceAccount } = await supabase
+        .from('marketplace_accounts')
+        .select('ebay_account_type')
+        .eq('user_id', user.id)
+        .eq('platform', 'ebay')
+        .single();
+
+      if (marketplaceAccount?.ebay_account_type) {
+        setEbayAccountType(marketplaceAccount.ebay_account_type);
       }
     } catch (error) {
       console.error('Error loading business profile:', error);
@@ -199,9 +216,24 @@ const UserBusinessTab = () => {
             </Select>
             <p className="text-sm text-muted-foreground">
               {profile.business_type === 'individual' || profile.business_type === 'sole_proprietorship' 
-                ? "Individual/sole proprietors file taxes under personal SSN"
-                : "Business entities require separate tax identification"}
+                ? "Individual/sole proprietors file taxes under personal SSN and use eBay's built-in policies"
+                : "Business entities require separate tax identification and can create custom eBay policies"}
             </p>
+            {(profile.business_type === 'individual' || profile.business_type === 'sole_proprietorship') && (
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-800">
+                  <strong>Individual eBay Account:</strong> You'll use eBay's standard payment, return, and shipping policies. 
+                  This simplifies setup and is perfect for casual selling.
+                </p>
+              </div>
+            )}
+            {(profile.business_type === 'llc' || profile.business_type === 'corporation') && ebayAccountType === 'business' && (
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-800">
+                  <strong>Business eBay Account:</strong> You can create custom business policies for more professional presentation and control.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -486,13 +518,12 @@ const UserBusinessTab = () => {
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="other">Standard Shipping (Most Compatible)</SelectItem>
-                  <SelectItem value="usps_media">USPS Media Mail</SelectItem>
-                  <SelectItem value="usps_priority_flat">USPS Priority Flat Rate Box</SelectItem>
-                  <SelectItem value="usps_express_flat">USPS Express Flat Rate Box</SelectItem>
-                  <SelectItem value="usps_ground">USPS Ground Advantage</SelectItem>
-                </SelectContent>
+                 <SelectContent>
+                   <SelectItem value="usps_priority">USPS Priority Mail (Recommended)</SelectItem>
+                   <SelectItem value="usps_ground">USPS Ground Advantage</SelectItem>
+                   <SelectItem value="usps_media">USPS Media Mail</SelectItem>
+                   <SelectItem value="other">Standard Shipping</SelectItem>
+                 </SelectContent>
               </Select>
             </div>
           </div>

@@ -23,7 +23,7 @@ const OnboardingBusinessInfo = ({ data, onChange }: OnboardingBusinessInfoProps)
         </div>
         <h2 className="text-xl font-bold text-gray-900 mb-2">Business Information</h2>
         <p className="text-gray-600">
-          Tell us about your reselling business. This helps us set up your listings and shipping correctly.
+          Tell us about your reselling business. This helps us set up your listings, shipping, and eBay account type correctly.
         </p>
       </div>
 
@@ -43,9 +43,25 @@ const OnboardingBusinessInfo = ({ data, onChange }: OnboardingBusinessInfoProps)
           </Select>
           <p className="text-sm text-gray-600">
             {data.business_type === 'individual' || data.business_type === 'sole_proprietorship' 
-              ? "As an individual/sole proprietor, you'll file taxes under your personal SSN"
-              : "Business entities require separate tax identification and legal structure"}
+              ? "As an individual/sole proprietor, you'll file taxes under your personal SSN and use eBay's built-in policies"
+              : "Business entities require separate tax identification and can create custom eBay business policies"}
           </p>
+          {(data.business_type === 'individual' || data.business_type === 'sole_proprietorship') && (
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                <strong>eBay Individual Account:</strong> You'll use eBay's built-in payment, return, and shipping policies. 
+                This is simpler to set up and perfect for casual sellers.
+              </p>
+            </div>
+          )}
+          {(data.business_type === 'llc' || data.business_type === 'corporation') && (
+            <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-sm text-green-800">
+                <strong>eBay Business Account:</strong> You can create custom business policies for payment, returns, and shipping. 
+                This provides more control and professional presentation.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

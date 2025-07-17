@@ -101,7 +101,7 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json();
       console.log('✅ eBay token exchange successful');
 
-      // Get user info
+      // Get user info and account details
       const userResponse = await fetch('https://apiz.ebay.com/commerce/identity/v1/user/', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
@@ -109,10 +109,61 @@ serve(async (req) => {
       });
 
       let username = 'eBay User';
+      let accountType = 'individual';
+      let sellerLevel = null;
+      let storeSubscription = null;
+      let accountCapabilities = {};
+
       if (userResponse.ok) {
         const userData = await userResponse.json();
         username = userData.username || userData.email || 'eBay User';
       }
+
+      // Detect account type using Account API
+      try {
+        const accountResponse = await fetch('https://api.ebay.com/sell/account/v1/user_program/get_user_programs', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Content-Type': 'application/json',
+            'Content-Language': 'en-US'
+          }
+        });
+
+        if (accountResponse.ok) {
+          const accountData = await accountResponse.json();
+          console.log('🔍 eBay Account Programs:', accountData);
+          
+          // Check for business policies eligibility
+          const businessPoliciesProgram = accountData.programs?.find((p: any) => 
+            p.programType === 'BUSINESS_POLICIES'
+          );
+          
+          if (businessPoliciesProgram && businessPoliciesProgram.status === 'ENROLLED') {
+            accountType = 'business';
+            console.log('✅ Business account detected');
+          } else {
+            accountType = 'individual';
+            console.log('✅ Individual account detected');
+          }
+          
+          accountCapabilities = {
+            businessPolicies: businessPoliciesProgram?.status === 'ENROLLED',
+            programs: accountData.programs?.map((p: any) => ({
+              type: p.programType,
+              status: p.status
+            }))
+          };
+        }
+      } catch (error) {
+        console.log('⚠️ Could not detect account type, defaulting to individual:', error.message);
+        accountType = 'individual';
+      }
+
+      console.log('🎯 Account Detection Complete', {
+        username,
+        accountType,
+        hasBusinessPolicies: accountCapabilities.businessPolicies
+      });
 
       // Get current user from auth header
       const authHeader = req.headers.get('authorization');
@@ -131,7 +182,7 @@ serve(async (req) => {
         );
       }
 
-      // Store connection in database
+      // Store connection in database with account type detection
       const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
       
       const { error: dbError } = await supabase
@@ -145,6 +196,10 @@ serve(async (req) => {
           oauth_expires_at: expiresAt.toISOString(),
           is_connected: true,
           is_active: true,
+          ebay_account_type: accountType,
+          ebay_seller_level: sellerLevel,
+          ebay_store_subscription: storeSubscription,
+          ebay_account_capabilities: accountCapabilities
         }, {
           onConflict: 'user_id,platform'
         });
@@ -157,12 +212,35 @@ serve(async (req) => {
         );
       }
 
-      console.log('✅ eBay connection saved to database');
+      // Update user profile with account type and proper settings
+      const profileUpdates: any = {
+        ebay_account_type: accountType
+      };
+
+      if (accountType === 'individual') {
+        profileUpdates.ebay_payment_policy_id = 'INDIVIDUAL_DEFAULT_PAYMENT';
+        profileUpdates.ebay_return_policy_id = 'INDIVIDUAL_DEFAULT_RETURN';
+        profileUpdates.ebay_fulfillment_policy_id = 'INDIVIDUAL_DEFAULT_FULFILLMENT';
+        profileUpdates.preferred_shipping_service = 'usps_priority';
+      }
+
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .update(profileUpdates)
+        .eq('id', userId);
+
+      if (profileError) {
+        console.log('⚠️ Profile update warning:', profileError);
+      }
+
+      console.log('✅ eBay connection and profile updated');
       return new Response(
         JSON.stringify({ 
           status: 'success',
           success: true,
-          username: username 
+          username: username,
+          accountType: accountType,
+          hasBusinessPolicies: accountCapabilities.businessPolicies
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

@@ -575,10 +575,71 @@ serve(async (req) => {
       throw error;
     }
 
+    // Check eBay account type from marketplace account
+    let ebayAccountType = userProfile.ebay_account_type || 'individual';
+    
+    try {
+      const { data: marketplaceAccount } = await supabaseClient
+        .from('marketplace_accounts')
+        .select('ebay_account_type, ebay_account_capabilities')
+        .eq('user_id', user.id)
+        .eq('platform', 'ebay')
+        .single();
+      
+      if (marketplaceAccount?.ebay_account_type) {
+        ebayAccountType = marketplaceAccount.ebay_account_type;
+      }
+    } catch (error) {
+      logStep('Could not fetch marketplace account, using profile account type', { error: error.message });
+    }
+
+    logStep('Account type determined', { 
+      accountType: ebayAccountType, 
+      profileAccountType: userProfile.ebay_account_type 
+    });
+
+    // For individual accounts, skip policy creation entirely
+    if (ebayAccountType === 'individual') {
+      logStep('Individual account detected - setting default policies without eBay API calls');
+      
+      const individualPolicies = {
+        ebay_payment_policy_id: 'INDIVIDUAL_DEFAULT_PAYMENT',
+        ebay_return_policy_id: 'INDIVIDUAL_DEFAULT_RETURN',
+        ebay_fulfillment_policy_id: 'INDIVIDUAL_DEFAULT_FULFILLMENT'
+      };
+
+      // Update user profile with individual account defaults
+      const { error: updateError } = await supabaseClient
+        .from('user_profiles')
+        .update(individualPolicies)
+        .eq('id', user.id);
+
+      if (updateError) {
+        logStep('Failed to update individual account policies', { error: updateError.message });
+        throw new Error(`Failed to update policies: ${updateError.message}`);
+      }
+
+      logStep('Individual account policies set successfully');
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          accountType: 'individual',
+          message: 'Individual account policies configured',
+          policies: individualPolicies
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Business account handling - continue with existing logic
+    logStep('Business account detected - proceeding with policy creation/fetch');
+
     // Check if policies are placeholders (need to fetch real ones)
     const placeholderValues = [
       'DEFAULT_PAYMENT_POLICY', 'DEFAULT_RETURN_POLICY', 'DEFAULT_FULFILLMENT_POLICY',
       'INDIVIDUAL_PAYMENT_POLICY', 'INDIVIDUAL_RETURN_POLICY', 'INDIVIDUAL_FULFILLMENT_POLICY',
+      'INDIVIDUAL_DEFAULT_PAYMENT', 'INDIVIDUAL_DEFAULT_RETURN', 'INDIVIDUAL_DEFAULT_FULFILLMENT',
       'MANUAL_ENTRY_REQUIRED_PAYMENT', 'MANUAL_ENTRY_REQUIRED_RETURN', 'MANUAL_ENTRY_REQUIRED_FULFILLMENT'
     ];
     
