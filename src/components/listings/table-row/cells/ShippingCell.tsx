@@ -8,7 +8,7 @@ interface ShippingCellProps {
 }
 
 const ShippingCell = ({ shippingCost }: ShippingCellProps) => {
-  const [defaultShippingCost, setDefaultShippingCost] = useState<number>(9.95);
+  const [defaultShippingCost, setDefaultShippingCost] = useState<number>(7.95);
   
   useEffect(() => {
     const loadUserShippingDefault = async () => {
@@ -29,12 +29,12 @@ const ShippingCell = ({ shippingCost }: ShippingCellProps) => {
             'usps_ground': 7.95,
             'usps_first_class': 5.95,
             'usps_media': 4.95,
-            'usps_express': 24.95,
-            'ups_ground': 12.95,
-            'fedex_ground': 11.95,
-            'other': 9.95
+            'usps_express': 9.95, // Same as priority flat rate box
+            'ups_ground': 7.95, // Map to USPS ground equivalent
+            'fedex_ground': 7.95, // Map to USPS ground equivalent
+            'other': 7.95
           };
-          setDefaultShippingCost(serviceCosts[profile.preferred_shipping_service as keyof typeof serviceCosts] || 9.95);
+          setDefaultShippingCost(serviceCosts[profile.preferred_shipping_service as keyof typeof serviceCosts] || 7.95);
         }
       } catch (error) {
         console.error('Error loading user shipping preferences:', error);

@@ -40,12 +40,6 @@ export interface FulfillmentDetails {
 // Using real eBay shipping service codes from official documentation
 const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
   // ✅ Official eBay shipping service codes that work for individual accounts
-  'USPSPriority': {
-    serviceCode: 'USPSPriority',
-    displayName: 'USPS Priority Mail',
-    estimatedDays: { min: 1, max: 3 },
-    isValid: true
-  },
   'USPSGround': {
     serviceCode: 'USPSGround', 
     displayName: 'USPS Ground',
@@ -63,30 +57,36 @@ const VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {
     displayName: 'USPS Media Mail',
     estimatedDays: { min: 2, max: 8 },
     isValid: true
+  },
+  'USPSPriorityMailFlatRateBox': {
+    serviceCode: 'USPSPriorityMailFlatRateBox',
+    displayName: 'USPS Priority Mail Flat Rate Box',
+    estimatedDays: { min: 1, max: 3 },
+    isValid: true
   }
 };
 
 // User preference to VALID eBay service mapping
 const PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {
   // ✅ Map all preferences to official eBay shipping service codes
-  'other': 'USPSPriority',
+  'other': 'USPSGround',
   'usps_media': 'USPSMedia',
-  'usps_priority_flat': 'USPSPriority', 
-  'usps_express_flat': 'USPSPriority',
+  'usps_priority_flat': 'USPSPriorityMailFlatRateBox', 
+  'usps_express_flat': 'USPSPriorityMailFlatRateBox',
   'usps_ground': 'USPSGround',
-  'usps_priority': 'USPSPriority',
+  'usps_priority': 'USPSPriorityMailFlatRateBox',
   'usps_first_class': 'USPSFirstClass',
-  'standard': 'USPSPriority',
-  'expedited': 'USPSPriority',
-  'overnight': 'USPSPriority',
-  'express': 'USPSPriority',
-  'flat_rate': 'USPSPriority',
+  'standard': 'USPSGround',
+  'expedited': 'USPSPriorityMailFlatRateBox',
+  'overnight': 'USPSPriorityMailFlatRateBox',
+  'express': 'USPSPriorityMailFlatRateBox',
+  'flat_rate': 'USPSPriorityMailFlatRateBox',
   'ups_ground': 'USPSGround',
   'fedex_ground': 'USPSGround'
 };
 
-const DEFAULT_SERVICE = 'USPSPriority';  // Most reliable USPS service for individual accounts
-const FALLBACK_SERVICE = 'USPSPriority';  // Same fallback for consistency
+const DEFAULT_SERVICE = 'USPSGround';  // Most reliable USPS service for individual accounts
+const FALLBACK_SERVICE = 'USPSFirstClass';  // Fallback option
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
@@ -421,8 +421,8 @@ export class EbayShippingServices {
         this.logStep('Using ultimate fallback service', { selectedService: serviceCode });
       }
     } else {
-      // Normal service selection
-      serviceCode = this.mapUserPreferenceToEbayService(preferredService);
+      // Normal service selection - for this fallback function, use sync mapping
+      serviceCode = PREFERENCE_TO_EBAY_SERVICE[preferredService || 'usps_ground'] || DEFAULT_SERVICE;
     }
     
     const serviceConfig = this.getServiceConfig(serviceCode);

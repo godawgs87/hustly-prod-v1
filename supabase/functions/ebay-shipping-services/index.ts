@@ -14,8 +14,8 @@ const logStep = (step: string, details?: any) => {
 // Hardcoded shipping services for individual accounts using VALID eBay service codes
 const INDIVIDUAL_SHIPPING_SERVICES = {
   'usps_priority': {
-    serviceCode: 'USPSPriority',
-    serviceName: 'USPS Priority Mail',
+    serviceCode: 'USPSPriorityMailFlatRateBox',
+    serviceName: 'USPS Priority Mail Flat Rate Box',
     isDomestic: true,
     isInternational: false
   },
@@ -38,8 +38,8 @@ const INDIVIDUAL_SHIPPING_SERVICES = {
     isInternational: false
   },
   'other': {
-    serviceCode: 'USPSPriority',
-    serviceName: 'USPS Priority Mail',
+    serviceCode: 'USPSGround',
+    serviceName: 'USPS Ground',
     isDomestic: true,
     isInternational: false
   }
@@ -51,7 +51,7 @@ function createIndividualFulfillmentDetails(
   shippingService: string = 'usps_priority'
 ): any {
   const serviceMapping = INDIVIDUAL_SHIPPING_SERVICES[shippingService as keyof typeof INDIVIDUAL_SHIPPING_SERVICES] || 
-                        INDIVIDUAL_SHIPPING_SERVICES.usps_priority;
+                        INDIVIDUAL_SHIPPING_SERVICES.usps_ground;
 
   const domesticCost = userProfile.shipping_cost_domestic || 9.95;
   const additionalCost = userProfile.shipping_cost_additional || 2.00;
