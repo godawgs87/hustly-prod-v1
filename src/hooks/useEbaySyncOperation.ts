@@ -59,10 +59,23 @@ export const useEbaySyncOperation = () => {
 
       console.log('✅ eBay account found:', ebayAccount.account_username);
 
+      // Get current user to filter profile query
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('❌ Failed to get current user:', userError);
+        toast({
+          title: "Authentication Error",
+          description: "Unable to verify user identity",
+          variant: "destructive"
+        });
+        return { success: false, error: 'Authentication failed' };
+      }
+
       // Check user profile and determine account type
       const { data: userProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('ebay_payment_policy_id, ebay_return_policy_id, ebay_fulfillment_policy_id')
+        .eq('id', user.id)
         .single();
 
       if (profileError || !userProfile) {
