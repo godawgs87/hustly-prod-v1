@@ -40,11 +40,12 @@ export interface FulfillmentDetails {
 let VALIDATED_EBAY_SERVICES: Record<string, ShippingServiceConfig> = {};
 let PREFERENCE_TO_EBAY_SERVICE: Record<string, string> = {};
 
-// Fallback hardcoded services only used if eBay API fails - using validated service codes
+// REAL eBay shipping service codes from eBay's Trading API documentation
+// Source: https://developer.ebay.com/DevZone/XML/docs/Reference/ebay/types/ShippingServiceCodeType.html
 const HARDCODED_FALLBACK_SERVICES: Record<string, ShippingServiceConfig> = {
   'USPSGround': {
     serviceCode: 'USPSGround',
-    displayName: 'USPS Ground',
+    displayName: 'US Postal Service Ground',
     estimatedDays: { min: 2, max: 8 },
     isValid: true
   },
@@ -56,8 +57,14 @@ const HARDCODED_FALLBACK_SERVICES: Record<string, ShippingServiceConfig> = {
   },
   'USPSMedia': {
     serviceCode: 'USPSMedia',
-    displayName: 'USPS Media Mail',
+    displayName: 'USPS Media',
     estimatedDays: { min: 3, max: 8 },
+    isValid: true
+  },
+  'USPSPriority': {
+    serviceCode: 'USPSPriority',
+    displayName: 'USPS Priority',
+    estimatedDays: { min: 1, max: 3 },
     isValid: true
   },
   'USPSPriorityMailFlatRateBox': {
@@ -65,11 +72,17 @@ const HARDCODED_FALLBACK_SERVICES: Record<string, ShippingServiceConfig> = {
     displayName: 'USPS Priority Mail Flat Rate Box',
     estimatedDays: { min: 1, max: 3 },
     isValid: true
+  },
+  'USPSParcel': {
+    serviceCode: 'USPSParcel',
+    displayName: 'USPS Parcel Select Non-Presort',
+    estimatedDays: { min: 2, max: 8 },
+    isValid: true
   }
 };
 
-const DEFAULT_SERVICE = 'USPSGround';  // Most reliable validated service
-const FALLBACK_SERVICE = 'USPSFirstClass';  // Secondary fallback option
+const DEFAULT_SERVICE = 'USPSPriority';  // Most reliable service from real eBay API
+const FALLBACK_SERVICE = 'USPSGround';     // Secondary fallback from real eBay API
 
 export class EbayShippingServices {
   private static logStep(step: string, details?: any) {
@@ -167,18 +180,18 @@ export class EbayShippingServices {
       const firstClassService = this.findBestService(realServiceCodes, ['first', 'class', 'economy']);
       const mediaService = this.findBestService(realServiceCodes, ['media', 'book']);
 
-      // Create preference mapping with validated services as fallback
+      // Create preference mapping with REAL eBay service codes as fallback
       PREFERENCE_TO_EBAY_SERVICE = {
-        'usps_priority': priorityService || 'USPSPriorityMailFlatRateBox',
+        'usps_priority': priorityService || 'USPSPriority',
         'usps_priority_flat': priorityService || 'USPSPriorityMailFlatRateBox',
         'usps_express_flat': priorityService || 'USPSPriorityMailFlatRateBox',
         'usps_ground': groundService || 'USPSGround',
         'usps_first_class': firstClassService || 'USPSFirstClass',
         'usps_media': mediaService || 'USPSMedia',
         'standard': groundService || 'USPSGround',
-        'expedited': priorityService || 'USPSPriorityMailFlatRateBox',
-        'overnight': priorityService || 'USPSPriorityMailFlatRateBox',
-        'express': priorityService || 'USPSPriorityMailFlatRateBox',
+        'expedited': priorityService || 'USPSPriority',
+        'overnight': priorityService || 'USPSPriority',
+        'express': priorityService || 'USPSPriority',
         'flat_rate': priorityService || 'USPSPriorityMailFlatRateBox',
         'other': groundService || 'USPSGround'
       };
