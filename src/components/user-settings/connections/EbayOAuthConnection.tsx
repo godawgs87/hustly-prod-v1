@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, AlertCircle, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { cleanupExpiredEbayConnections, forceCleanupEbayConnection } from '@/utils/ebayConnectionCleaner';
 
 interface EbayOAuthConnectionProps {
   onConnectionSuccess?: () => void;
@@ -21,34 +23,12 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
     handleOAuthCallback();
   }, []);
 
-  const cleanupExpiredConnections = async () => {
-    try {
-      // Clean up any expired eBay connections for the current user
-      const { error } = await supabase
-        .from('marketplace_accounts')
-        .update({ 
-          is_active: false, 
-          is_connected: false,
-          oauth_token: null,
-          refresh_token: null
-        })
-        .eq('platform', 'ebay')
-        .lt('oauth_expires_at', new Date().toISOString());
-
-      if (error) {
-        console.error('Error cleaning up expired connections:', error);
-      } else {
-        console.log('✅ Cleaned up expired eBay connections');
-      }
-    } catch (error) {
-      console.error('Error in cleanup function:', error);
-    }
-  };
-
   const checkExistingConnection = async () => {
     try {
-      // First clean up any expired connections
-      await cleanupExpiredConnections();
+      console.log('🔍 Checking existing eBay connection...');
+      
+      // Clean up expired connections first
+      await cleanupExpiredEbayConnections();
 
       // Now check for active connections
       const { data } = await supabase
@@ -59,9 +39,8 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
         .eq('is_connected', true)
         .maybeSingle();
 
-      console.log('🔍 eBay connection check:', data);
+      console.log('🔍 eBay connection check result:', data);
       
-      // Validate the connection more thoroughly
       if (data && data.oauth_token && data.oauth_token.length > 50) {
         // Double-check token expiration
         if (data.oauth_expires_at && new Date(data.oauth_expires_at) < new Date()) {
@@ -254,7 +233,7 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
     try {
       const { error } = await supabase
         .from('marketplace_accounts')
-        .update({ is_active: false })
+        .update({ is_active: false, is_connected: false })
         .eq('id', ebayAccount.id);
 
       if (error) throw error;
@@ -268,6 +247,23 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
       toast({
         title: "Disconnect Failed",
         description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleForceCleanup = async () => {
+    try {
+      await forceCleanupEbayConnection();
+      await checkExistingConnection();
+      toast({
+        title: "eBay Connection Reset",
+        description: "All eBay connections have been cleared. You can now connect fresh."
+      });
+    } catch (error) {
+      toast({
+        title: "Cleanup Failed",
+        description: "Failed to cleanup connections",
         variant: "destructive"
       });
     }
@@ -347,23 +343,33 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
           </ul>
         </div>
 
-        <Button 
-          onClick={initiateOAuthFlow} 
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Connecting...
-            </>
-          ) : (
-            <>
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Connect eBay Account
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={initiateOAuthFlow} 
+            disabled={loading}
+            className="flex-1 bg-blue-600 hover:bg-blue-700"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              <>
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Connect eBay Account
+              </>
+            )}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleForceCleanup}
+            title="Reset all eBay connections"
+          >
+            Reset
+          </Button>
+        </div>
         
         <div className="text-xs text-gray-500">
           🔒 Your eBay credentials are never stored. We only receive a secure access token.

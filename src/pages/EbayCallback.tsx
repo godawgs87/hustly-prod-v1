@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,7 +19,7 @@ const EbayCallback = () => {
         const state = searchParams.get('state');
         const error = searchParams.get('error');
 
-        console.log('eBay OAuth callback received:', { 
+        console.log('🔄 eBay OAuth callback received:', { 
           code: code ? 'present' : 'missing', 
           state: state ? 'present' : 'missing', 
           error 
@@ -32,59 +33,55 @@ const EbayCallback = () => {
           throw new Error('No authorization code received from eBay');
         }
 
-        console.log('Processing eBay OAuth callback with code:', code);
+        console.log('🔍 Processing eBay OAuth callback with code');
 
-        // Get current session for authentication - with retry logic
+        // Get current session with extended retry logic
         let session = null;
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 5;
         
         while (!session && attempts < maxAttempts) {
           attempts++;
-          console.log(`Attempting to get session (attempt ${attempts}/${maxAttempts})`);
+          console.log(`🔍 Attempting to get session (attempt ${attempts}/${maxAttempts})`);
           
           const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
           
           if (sessionError) {
-            console.error('Session error:', sessionError);
-            throw new Error(`Session error: ${sessionError.message}`);
+            console.error('❌ Session error:', sessionError);
+            if (attempts === maxAttempts) {
+              throw new Error(`Session error: ${sessionError.message}`);
+            }
           }
           
           session = currentSession;
           
           if (!session && attempts < maxAttempts) {
-            console.log('No session found, waiting 1 second before retry...');
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log('⏳ No session found, waiting 2 seconds before retry...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
         
         if (!session) {
-          // User is not authenticated, store the OAuth data and redirect to login
-          console.log('No session found after retries, storing OAuth data for later');
+          // Instead of redirecting to auth, store OAuth data and show a message
+          console.log('⚠️ No session found after retries, storing OAuth data');
           localStorage.setItem('ebay_oauth_pending', JSON.stringify({ code, state }));
+          
           toast({
-            title: "Please Log In",
-            description: "You need to be logged in to complete the eBay connection. Please sign in first.",
+            title: "Session Required",
+            description: "Please log in to complete the eBay connection. Your connection will be completed automatically after login.",
             variant: "destructive"
           });
-          navigate('/auth');
+          
+          // Wait a moment then redirect to auth
+          setTimeout(() => {
+            navigate('/auth', { replace: true });
+          }, 3000);
           return;
         }
 
-        console.log('Session found, proceeding with token exchange:', {
-          userId: session.user?.id,
-          tokenPresent: !!session.access_token
-        });
+        console.log('✅ Session found, proceeding with token exchange');
 
-        const requestBody = { 
-          action: 'exchange_code',
-          code: code,
-          state: state
-        };
-        
-        console.log('Sending request to ebay-oauth with body:', requestBody);
-
-        // Use Supabase function invoke for proper authentication
+        // Exchange code for token
         const { data: responseData, error: functionError } = await supabase.functions.invoke('ebay-oauth-modern', {
           body: {
             action: 'exchange_code',
@@ -93,41 +90,45 @@ const EbayCallback = () => {
           }
         });
 
-        console.log('Function response:', { data: responseData, error: functionError });
+        console.log('📡 Function response:', { data: responseData, error: functionError });
 
         if (functionError) {
-          console.error('Function returned error:', functionError);
+          console.error('❌ Function returned error:', functionError);
           throw new Error(`Function error: ${functionError.message}`);
         }
 
-        console.log('Token exchange response:', responseData);
+        console.log('📊 Token exchange response:', responseData);
         
-        if (responseData?.status === 'success') {
+        if (responseData?.success || responseData?.status === 'success') {
           // Clear any pending OAuth data
           localStorage.removeItem('ebay_oauth_pending');
           
           toast({
-            title: "eBay Connected Successfully",
+            title: "eBay Connected Successfully! 🎉",
             description: "Your eBay account is now connected and ready to use"
           });
 
-          // Redirect to settings page
-          navigate('/settings');
+          // Wait a moment then redirect to settings
+          setTimeout(() => {
+            navigate('/settings', { replace: true });
+          }, 2000);
         } else {
-          console.error('eBay connection failed - unexpected response:', responseData);
+          console.error('❌ eBay connection failed - unexpected response:', responseData);
           throw new Error(responseData?.error || 'Failed to complete eBay connection');
         }
 
       } catch (error: any) {
-        console.error('eBay OAuth callback error:', error);
+        console.error('❌ eBay OAuth callback error:', error);
         toast({
           title: "Connection Failed",
           description: error.message || 'Failed to connect your eBay account',
           variant: "destructive"
         });
 
-        // Redirect to settings page even on error
-        navigate('/settings');
+        // Wait a moment then redirect to settings
+        setTimeout(() => {
+          navigate('/settings', { replace: true });
+        }, 3000);
       } finally {
         setProcessing(false);
       }
