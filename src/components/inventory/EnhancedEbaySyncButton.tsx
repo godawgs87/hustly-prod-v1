@@ -147,31 +147,100 @@ const EnhancedEbaySyncButton = ({ listing, onSyncComplete }: EnhancedEbaySyncBut
     handleSync();
   };
 
-  // 🧪 DEBUG: Test shipping service in isolation
-  const handleShippingTest = async (preference = 'usps_priority') => {
-    console.log(`🧪 Testing shipping service for preference: ${preference}`);
-    const result = await testEbayShippingService(preference);
+  // 🧪 DEBUG: Enhanced shipping service testing
+  const handleShippingTest = async (preference = 'USPSPriority') => {
+    console.log(`🧪 Testing eBay shipping service: ${preference}`);
     
-    toast({
-      title: result.success ? "Shipping Test Complete" : "Shipping Test Failed",
-      description: result.success 
-        ? `Mapped "${preference}" to "${result.data?.exactServiceCodeToBeSent}"` 
-        : result.error?.message || "Test failed",
-      variant: result.success ? "default" : "destructive",
-      duration: 5000
-    });
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // First refresh shipping services
+      const { data: refreshData, error: refreshError } = await supabase.functions.invoke('ebay-shipping-services-fetcher', {
+        body: { 
+          userId: userProfile?.id,
+          forceRefresh: true
+        }
+      });
+
+      if (refreshError) {
+        console.error('❌ Shipping service refresh failed:', refreshError);
+        toast({
+          title: "Refresh Failed",
+          description: `Failed to refresh shipping services: ${refreshError.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ Shipping services refreshed:', refreshData);
+      
+      // Test the original service too
+      const result = await testEbayShippingService(preference);
+      
+      toast({
+        title: result.success ? "Shipping Test Complete" : "Shipping Test Failed",
+        description: result.success 
+          ? `"${preference}" → "${result.data?.exactServiceCodeToBeSent}" (${refreshData.services?.length || 0} total services available)` 
+          : `${result.error?.message || "Test failed"} (${refreshData.services?.length || 0} services available)`,
+        variant: result.success ? "default" : "destructive",
+        duration: 5000
+      });
+
+    } catch (error) {
+      console.error('❌ Shipping test exception:', error);
+      toast({
+        title: "Test Error",
+        description: `Test failed: ${error}`,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAllShippingTests = async () => {
     console.log('🧪 Testing all shipping preferences...');
-    const results = await testAllShippingPreferences();
+    const services = ['USPSGround', 'USPSPriority', 'USPSPriorityFlatRateBox', 'USPSPriorityExpress'];
     
-    const successCount = results.filter(r => r.success).length;
-    toast({
-      title: "All Shipping Tests Complete",
-      description: `${successCount}/${results.length} tests passed. Check console for details.`,
-      duration: 8000
-    });
+    for (const service of services) {
+      await handleShippingTest(service);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  };
+
+  // Function to sync eBay Motors categories
+  const handleMotorsCategorySync = async () => {
+    console.log('🚗 Syncing eBay Motors categories');
+    
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { data, error } = await supabase.functions.invoke('ebay-motors-category-sync', {
+        body: { 
+          userId: userProfile?.id
+        }
+      });
+
+      if (error) {
+        console.error('❌ Motors category sync failed:', error);
+        toast({
+          title: "Sync Failed",
+          description: `Failed to sync Motors categories: ${error.message}`,
+          variant: "destructive",
+        });
+      } else {
+        console.log('✅ Motors categories synced:', data);
+        toast({
+          title: "Sync Successful",
+          description: `Successfully synced ${data.categoriesAdded} eBay Motors categories`,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Motors sync exception:', error);
+      toast({
+        title: "Sync Error",
+        description: `Sync failed: ${error}`,
+        variant: "destructive",
+      });
+    }
   };
 
   if (checkingStatus) {
@@ -332,18 +401,26 @@ const EnhancedEbaySyncButton = ({ listing, onSyncComplete }: EnhancedEbaySyncBut
                     >
                       Test First Class
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAllShippingTests}
-                      className="text-xs bg-yellow-100"
-                    >
-                      Test All Services
-                    </Button>
-                  </div>
-                  <p className="text-xs text-yellow-700 mt-2">
-                    User preference: <code>{userProfile?.preferred_shipping_service || 'usps_priority'}</code>
-                  </p>
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={handleAllShippingTests}
+                       className="text-xs bg-yellow-100"
+                     >
+                       Test All Services
+                     </Button>
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={handleMotorsCategorySync}
+                       className="text-xs bg-blue-100"
+                     >
+                       🚗 Sync Motors Categories
+                     </Button>
+                   </div>
+                   <p className="text-xs text-yellow-700 mt-2">
+                     User preference: <code>{userProfile?.preferred_shipping_service || 'usps_priority'}</code>
+                   </p>
                 </div>
               )}
               
