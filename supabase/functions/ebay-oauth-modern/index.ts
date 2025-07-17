@@ -42,7 +42,7 @@ serve(async (req) => {
 
     if (action === 'get_auth_url') {
       // Generate OAuth URL
-      const redirectUri = `https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth-modern/callback`;
+      const redirectUri = `https://preview--hustly-mvp3.lovable.app/ebay/callback`;
       const scopes = 'https://api.ebay.com/oauth/api_scope https://api.ebay.com/oauth/api_scope/sell.marketing.readonly https://api.ebay.com/oauth/api_scope/sell.marketing https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment https://api.ebay.com/oauth/api_scope/sell.analytics.readonly';
       
       const authUrl = `https://auth.ebay.com/oauth2/authorize?` +
@@ -71,7 +71,7 @@ serve(async (req) => {
       }
 
       // Exchange code for token
-      const redirectUri = `https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/ebay-oauth-modern/callback`;
+      const redirectUri = `https://preview--hustly-mvp3.lovable.app/ebay/callback`;
       const tokenUrl = 'https://api.ebay.com/identity/v1/oauth2/token';
       
       const credentials = btoa(`${ebayClientId}:${ebayClientSecret}`);
