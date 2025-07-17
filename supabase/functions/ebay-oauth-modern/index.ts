@@ -145,6 +145,8 @@ serve(async (req) => {
           oauth_expires_at: expiresAt.toISOString(),
           is_connected: true,
           is_active: true,
+        }, {
+          onConflict: 'user_id,platform'
         });
 
       if (dbError) {
