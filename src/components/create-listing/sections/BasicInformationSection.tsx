@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import InlineEditableField from './InlineEditableField';
 import PlatformCategorySection from '../PlatformCategorySection';
 import { CategoryMappingService } from '@/services/CategoryMappingService';
+import { EnhancedCategoryMappingService } from '@/services/category/EnhancedCategoryMappingService';
 import { ListingData } from '@/types/CreateListing';
 
 interface BasicInformationSectionProps {
@@ -26,7 +27,11 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
   const autoApplyCategorySuggestions = async () => {
     if (!listingData.category) return;
     
-    const suggestions = await CategoryMappingService.autoApplyCategories(listingData.category);
+    const suggestions = await EnhancedCategoryMappingService.autoApplySmartCategories(
+      listingData.category,
+      listingData.title,
+      listingData.description
+    );
     
     const updates: Partial<ListingData> = {};
     
@@ -154,6 +159,8 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
           internalCategory={listingData.category}
           currentCategoryId={listingData.ebay_category_id}
           currentCategoryPath={listingData.ebay_category_path}
+          title={listingData.title}
+          description={listingData.description}
           onCategoryChange={(categoryId, categoryPath) => {
             onUpdate({ 
               ebay_category_id: categoryId,
@@ -169,6 +176,8 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
           internalCategory={listingData.category}
           currentCategoryId={listingData.mercari_category_id}
           currentCategoryPath={listingData.mercari_category_path}
+          title={listingData.title}
+          description={listingData.description}
           onCategoryChange={(categoryId, categoryPath) => {
             onUpdate({ 
               mercari_category_id: categoryId,
@@ -183,6 +192,8 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
           internalCategory={listingData.category}
           currentCategoryId={listingData.poshmark_category_id}
           currentCategoryPath={listingData.poshmark_category_path}
+          title={listingData.title}
+          description={listingData.description}
           onCategoryChange={(categoryId, categoryPath) => {
             onUpdate({ 
               poshmark_category_id: categoryId,
@@ -197,6 +208,8 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
           internalCategory={listingData.category}
           currentCategoryId={listingData.depop_category_id}
           currentCategoryPath={listingData.depop_category_path}
+          title={listingData.title}
+          description={listingData.description}
           onCategoryChange={(categoryId, categoryPath) => {
             onUpdate({ 
               depop_category_id: categoryId,
@@ -211,6 +224,8 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
           internalCategory={listingData.category}
           currentCategoryId={listingData.facebook_category_id}
           currentCategoryPath={listingData.facebook_category_path}
+          title={listingData.title}
+          description={listingData.description}
           onCategoryChange={(categoryId, categoryPath) => {
             onUpdate({ 
               facebook_category_id: categoryId,

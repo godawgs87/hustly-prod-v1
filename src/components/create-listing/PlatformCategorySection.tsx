@@ -36,10 +36,11 @@ const PlatformCategorySection = ({
   const [isAutoApplied, setIsAutoApplied] = useState(false);
 
   useEffect(() => {
-    if (internalCategory && !currentCategoryId) {
+    // Load suggestions when internal category, title, or description changes
+    if (internalCategory || title || description) {
       loadSuggestions();
     }
-  }, [internalCategory, currentCategoryId]);
+  }, [internalCategory, title, description, currentCategoryId]);
 
   // Auto-apply suggestions with high confidence
   useEffect(() => {
@@ -104,10 +105,10 @@ const PlatformCategorySection = ({
   const isMinimized = hasCategory && isAutoApplied;
 
   return (
-    <Card className={`border-l-4 border-l-primary/20 ${isMinimized ? 'shadow-sm' : ''}`}>
+    <Card className={`border-l-4 border-l-primary/20 ${isMinimized ? 'shadow-sm' : ''} mb-4`}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
-          <CardHeader className={`cursor-pointer hover:bg-muted/50 transition-colors ${isMinimized ? 'py-3' : ''}`}>
+          <CardHeader className={`cursor-pointer hover:bg-muted/50 transition-colors ${isMinimized ? 'py-3 px-4' : 'p-4'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className={`${isMinimized ? 'text-base' : 'text-lg'}`}>{getPlatformIcon()}</span>
@@ -173,7 +174,7 @@ const PlatformCategorySection = ({
         </CollapsibleTrigger>
         
         <CollapsibleContent>
-          <CardContent className="pt-0">
+          <CardContent className="pt-0 px-4 pb-4 space-y-4">
             {hasSuggestion && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center justify-between">
