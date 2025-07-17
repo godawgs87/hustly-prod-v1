@@ -36,6 +36,15 @@ const PlatformCategorySection = ({
     }
   }, [internalCategory, currentCategoryId]);
 
+  // Auto-apply suggestions with high confidence
+  useEffect(() => {
+    if (suggestedCategory && !currentCategoryId && !isAutoApplied) {
+      // Auto-apply the suggestion immediately
+      handleCategoryChange(suggestedCategory.categoryId, suggestedCategory.categoryPath || '');
+      setIsAutoApplied(true);
+    }
+  }, [suggestedCategory, currentCategoryId, isAutoApplied]);
+
   const loadSuggestions = async () => {
     if (!internalCategory) return;
 
@@ -84,20 +93,25 @@ const PlatformCategorySection = ({
 
   const hasCategory = currentCategoryId && currentCategoryId.length > 0;
   const hasSuggestion = suggestedCategory && !hasCategory;
+  const isMinimized = hasCategory && isAutoApplied;
 
   return (
-    <Card className="border-l-4 border-l-primary/20">
+    <Card className={`border-l-4 border-l-primary/20 ${isMinimized ? 'shadow-sm' : ''}`}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+          <CardHeader className={`cursor-pointer hover:bg-muted/50 transition-colors ${isMinimized ? 'py-3' : ''}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-lg">{getPlatformIcon()}</span>
+                <span className={`${isMinimized ? 'text-base' : 'text-lg'}`}>{getPlatformIcon()}</span>
                 <div>
-                  <CardTitle className="text-base flex items-center gap-2">
+                  <CardTitle className={`${isMinimized ? 'text-sm' : 'text-base'} flex items-center gap-2`}>
                     {platformName} Category
                     {isRequired && <Badge variant="destructive" className="text-xs">Required</Badge>}
-                    {hasCategory && <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">Set</Badge>}
+                    {hasCategory && (
+                      <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                        {isAutoApplied ? '✨ Auto-Set' : 'Set'}
+                      </Badge>
+                    )}
                     {hasSuggestion && (
                       <Badge variant="outline" className="text-xs border-blue-200 text-blue-600">
                         <Sparkles className="w-3 h-3 mr-1" />
@@ -106,7 +120,7 @@ const PlatformCategorySection = ({
                     )}
                   </CardTitle>
                   {hasCategory && currentCategoryPath && (
-                    <p className="text-sm text-muted-foreground truncate max-w-md">
+                    <p className={`${isMinimized ? 'text-xs' : 'text-sm'} text-muted-foreground truncate max-w-md`}>
                       {currentCategoryPath}
                     </p>
                   )}
@@ -125,6 +139,19 @@ const PlatformCategorySection = ({
                   >
                     <Sparkles className="w-3 h-3 mr-1" />
                     Apply
+                  </Button>
+                )}
+                {hasCategory && isMinimized && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(true);
+                    }}
+                    className="text-xs text-muted-foreground"
+                  >
+                    Change
                   </Button>
                 )}
                 {isOpen ? (
