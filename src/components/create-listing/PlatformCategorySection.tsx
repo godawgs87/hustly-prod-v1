@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight, Sparkles, Check } from 'lucide-react';
 import { CategoryMappingService, Platform, PlatformCategoryField } from '@/services/CategoryMappingService';
+import { EnhancedCategoryMappingService } from '@/services/category/EnhancedCategoryMappingService';
 import EditableCategoryCell from '@/components/listings/table-row/cells/EditableCategoryCell';
 
 interface PlatformCategorySectionProps {
@@ -15,6 +16,8 @@ interface PlatformCategorySectionProps {
   currentCategoryPath?: string;
   onCategoryChange: (categoryId: string, categoryPath: string) => void;
   isRequired?: boolean;
+  title?: string;
+  description?: string;
 }
 
 const PlatformCategorySection = ({
@@ -24,7 +27,9 @@ const PlatformCategorySection = ({
   currentCategoryId,
   currentCategoryPath,
   onCategoryChange,
-  isRequired = false
+  isRequired = false,
+  title,
+  description
 }: PlatformCategorySectionProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [suggestedCategory, setSuggestedCategory] = useState<PlatformCategoryField | null>(null);
@@ -46,9 +51,12 @@ const PlatformCategorySection = ({
   }, [suggestedCategory, currentCategoryId, isAutoApplied]);
 
   const loadSuggestions = async () => {
-    if (!internalCategory) return;
-
-    const suggestions = await CategoryMappingService.getSuggestedCategories(internalCategory);
+    // Use enhanced suggestions that include smart detection
+    const suggestions = await EnhancedCategoryMappingService.getSmartCategorySuggestions(
+      internalCategory,
+      title,
+      description
+    );
     const platformSuggestion = suggestions[platform];
     
     if (platformSuggestion) {
