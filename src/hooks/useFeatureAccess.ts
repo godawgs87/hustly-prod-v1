@@ -29,7 +29,7 @@ export const useFeatureAccess = () => {
 
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('user_role, subscription_tier, subscription_status, billing_cycle_start, billing_cycle_end, listings_used_this_cycle')
+        .select('user_role, subscription_tier, subscription_status, billing_cycle_start, billing_cycle_end, listings_used_this_cycle, photos_used_this_month, monthly_photo_limit, last_photo_reset_date')
         .eq('id', session.user.id)
         .maybeSingle();
 
@@ -179,13 +179,15 @@ export const useFeatureAccess = () => {
 
       case 'photo_analysis':
         const maxAnalyses = limits.photo_analyses_per_month;
-        const isAtAnalysisLimit = maxAnalyses !== -1 && currentUsage >= maxAnalyses;
+        const photosUsed = userProfile?.photos_used_this_month || 0;
+        const actualUsage = currentUsage !== 0 ? currentUsage : photosUsed;
+        const isAtAnalysisLimit = maxAnalyses !== -1 && actualUsage >= maxAnalyses;
         return {
           hasAccess: !isAtAnalysisLimit,
           isAtLimit: isAtAnalysisLimit,
-          currentUsage,
+          currentUsage: actualUsage,
           limit: maxAnalyses,
-          upgradeRequired: isAtAnalysisLimit ? getNextTierForPhotoAnalysis(currentUsage + 1) : null,
+          upgradeRequired: isAtAnalysisLimit ? getNextTierForPhotoAnalysis(actualUsage + 1) : null,
           tierName: limits.name
         };
 
@@ -250,6 +252,14 @@ export const useFeatureAccess = () => {
     };
   };
 
+  const getPhotoUsageInfo = () => {
+    return {
+      photosUsed: userProfile?.photos_used_this_month || 0,
+      photoLimit: userProfile?.monthly_photo_limit || 50,
+      lastResetDate: userProfile?.last_photo_reset_date
+    };
+  };
+
   return {
     currentTier,
     tierLimits,
@@ -259,6 +269,7 @@ export const useFeatureAccess = () => {
     isAdminOrTester,
     subscriptionStatus,
     userAddons: userAddons || [],
-    getBillingCycleInfo
+    getBillingCycleInfo,
+    getPhotoUsageInfo
   };
 };

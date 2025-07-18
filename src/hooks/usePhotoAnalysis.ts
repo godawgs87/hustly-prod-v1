@@ -4,16 +4,30 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ListingData } from '@/types/CreateListing';
 import { convertFilesToBase64 } from '@/utils/photoUtils';
+import { usePhotoUsageTracking } from './usePhotoUsageTracking';
 
 export const usePhotoAnalysis = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
+  const { trackPhotoUsage, checkPhotoUsageLimit } = usePhotoUsageTracking();
 
   const analyzePhotos = async (photos: File[]): Promise<ListingData | null> => {
     if (photos.length === 0) {
       toast({
         title: "No Photos",
         description: "Please upload at least one photo to analyze.",
+        variant: "destructive"
+      });
+      return null;
+    }
+
+    // Check photo usage limit before proceeding
+    const { canProceed, currentUsage, limit } = await checkPhotoUsageLimit(photos.length);
+    if (!canProceed) {
+      const limitText = limit === -1 ? 'unlimited' : limit.toString();
+      toast({
+        title: "Photo Analysis Limit Reached",
+        description: `You have used ${currentUsage}/${limitText} photos this month. Please upgrade your plan to analyze more photos.`,
         variant: "destructive"
       });
       return null;
@@ -115,6 +129,9 @@ export const usePhotoAnalysis = () => {
         };
         
         console.log('Analysis completed successfully');
+        
+        // Track photo usage after successful analysis
+        await trackPhotoUsage(photos.length);
         
         toast({
           title: "Analysis Complete! 🎯",

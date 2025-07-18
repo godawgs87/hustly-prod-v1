@@ -262,6 +262,19 @@ const UserBillingFinanceTab = () => {
               )}
             </div>
             
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span>Photos Analyzed This Month</span>
+                <span>{userProfile?.photos_used_this_month || 0} / {userProfile?.monthly_photo_limit || 50}</span>
+              </div>
+              {(userProfile?.monthly_photo_limit || 50) !== -1 && (
+                <Progress 
+                  value={Math.min(((userProfile?.photos_used_this_month || 0) / (userProfile?.monthly_photo_limit || 50)) * 100, 100)} 
+                  className="h-2" 
+                />
+              )}
+            </div>
+            
             <div className="flex justify-between text-sm">
               <span>Marketplace Connections</span>
               <span>1 / {currentLimits.marketplaces === -1 ? '∞' : currentLimits.marketplaces}</span>
