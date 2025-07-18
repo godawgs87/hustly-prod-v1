@@ -16,6 +16,7 @@ import UniversalOnboardingFlow from '@/components/onboarding/UniversalOnboarding
 import { useOnboardingStatus } from '@/hooks/useOnboardingStatus';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminRoute from '@/components/admin/AdminRoute';
+import SubscriptionPlans from '@/pages/SubscriptionPlans';
 
 const AppContent = () => {
   const { needsOnboarding, markOnboardingComplete, currentStep, saveCurrentStep, loadSavedStep } = useOnboardingStatus();
@@ -30,6 +31,7 @@ const AppContent = () => {
         <Route path="/active-listings" element={<ActiveListingsWrapper />} />
         <Route path="/data-management" element={<DataManagementWrapper />} />
         <Route path="/settings" element={<UserSettings />} />
+        <Route path="/plans" element={<SubscriptionPlans />} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/ebay/callback" element={<EbayCallback />} />
         <Route path="*" element={<Index />} />

@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscriptionManagement } from '@/hooks/useSubscriptionManagement';
 import MarketplaceSelection from '@/components/addons/MarketplaceSelection';
+import SubscriptionStatusCard from '@/components/subscription/SubscriptionStatusCard';
+import PlanComparisonTable from '@/components/subscription/PlanComparisonTable';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { CreditCard, Plus, ShoppingCart, FileText, Download, Calendar, TrendingUp, Package, Receipt } from 'lucide-react';
+import { CreditCard, Plus, ShoppingCart, FileText, Download, Calendar, TrendingUp, Package, Receipt, Crown } from 'lucide-react';
 
 const UserBillingFinanceTab = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const { subscriptionStatus, checking: subscriptionLoading } = useSubscriptionManagement();
@@ -19,6 +23,7 @@ const UserBillingFinanceTab = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [userAddons, setUserAddons] = useState<any[]>([]);
   const [showMarketplaceSelection, setShowMarketplaceSelection] = useState(false);
+  const [showPlanComparison, setShowPlanComparison] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -196,47 +201,33 @@ const UserBillingFinanceTab = () => {
 
   return (
     <div className="space-y-6">
-      {/* Current Subscription */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Current Subscription
-          </CardTitle>
-          <CardDescription>
-            Manage your subscription and billing information
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {subscriptionStatus?.subscribed ? (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h4 className="font-medium">
-                    {getTierDisplayName(subscriptionStatus.subscription_tier)} Plan
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    Status: <Badge variant="default">Active</Badge>
-                  </p>
-                  {subscriptionStatus.subscription_end && (
-                    <p className="text-sm text-muted-foreground">
-                      Next billing: {new Date(subscriptionStatus.subscription_end).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-                <Button onClick={() => {}} variant="outline">
-                  Manage Subscription
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">No active subscription found</p>
-              <Button>Subscribe Now</Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Subscription Status */}
+      <SubscriptionStatusCard 
+        onUpgradeClick={() => navigate('/plans')}
+        onManageClick={() => setShowPlanComparison(!showPlanComparison)}
+      />
+
+      {/* Plan Comparison Toggle */}
+      {showPlanComparison && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Crown className="h-5 w-5" />
+              Available Plans
+            </h3>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/plans')}
+            >
+              View Full Plans Page
+            </Button>
+          </div>
+          <PlanComparisonTable 
+            compact={true}
+            onSelectPlan={() => navigate('/plans')}
+          />
+        </div>
+      )}
 
       {/* Add-ons & Usage */}
       <Card>
@@ -285,18 +276,23 @@ const UserBillingFinanceTab = () => {
 
           {/* Purchase Add-ons */}
           <div className="space-y-4">
-            <h4 className="font-medium">Purchase Add-ons</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">Purchase Add-ons</h4>
+              <p className="text-sm text-muted-foreground">
+                Boost your current plan without upgrading
+              </p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="border rounded-lg p-4 space-y-3">
+              <div className="border rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4 text-blue-500" />
                   <h5 className="font-medium">Extra Listings</h5>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Add 25 additional listings to your current cycle
+                  Add 25 additional listings to your current billing cycle
                 </p>
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">{formatAmount(5.00)}</span>
+                  <span className="font-medium text-lg">{formatAmount(5.00)}</span>
                   <Button 
                     size="sm"
                     onClick={() => handlePurchaseAddon('extra_listings', 25, 5.00)}
@@ -306,21 +302,43 @@ const UserBillingFinanceTab = () => {
                 </div>
               </div>
               
-              <div className="border rounded-lg p-4 space-y-3">
+              <div className="border rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-2">
-                  <ShoppingCart className="h-4 w-4" />
+                  <ShoppingCart className="h-4 w-4 text-green-500" />
                   <h5 className="font-medium">Extra Marketplace</h5>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Add additional marketplaces - $10.00 each
+                  Connect to additional marketplaces - $10.00 each
                 </p>
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">From {formatAmount(10.00)}</span>
+                  <span className="font-medium text-lg">From {formatAmount(10.00)}</span>
                   <Button 
                     size="sm"
                     onClick={() => setShowMarketplaceSelection(true)}
                   >
                     Purchase
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-blue-500 mt-0.5">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+                <div>
+                  <h5 className="font-medium text-blue-900 mb-1">Need more capacity?</h5>
+                  <p className="text-sm text-blue-700">
+                    Consider upgrading to a higher plan for better value and more features.
+                  </p>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="mt-2 border-blue-300 text-blue-700 hover:bg-blue-100"
+                    onClick={() => navigate('/plans')}
+                  >
+                    View Plans
                   </Button>
                 </div>
               </div>

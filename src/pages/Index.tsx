@@ -12,6 +12,7 @@ import LoadingState from "@/components/LoadingState";
 import { useAuth } from "@/components/AuthProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { UsageTracker } from "@/components/layout/UsageTracker";
+import SubscriptionStatusCard from "@/components/subscription/SubscriptionStatusCard";
 
 type ViewType = 'dashboard' | 'create' | 'inventory' | 'active-listings' | 'data-management';
 
@@ -126,6 +127,15 @@ const Index = () => {
           <p className="text-base md:text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
             Manage inventory, create listings, track profits, and grow your reselling business.
           </p>
+        </div>
+
+        {/* Subscription Status */}
+        <div className="max-w-md mx-auto">
+          <SubscriptionStatusCard 
+            compact={true}
+            onUpgradeClick={() => navigate('/plans')}
+            onManageClick={() => navigate('/settings?tab=billing')}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
