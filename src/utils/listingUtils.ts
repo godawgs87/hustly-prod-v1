@@ -1,4 +1,3 @@
-
 // Utility functions for extracting measurements from listing data
 
 export const getWeightFromListing = (listingData: any): number => {
@@ -8,7 +7,11 @@ export const getWeightFromListing = (listingData: any): number => {
     // Handle "N/A" or other non-numeric values
     if (weightStr === 'n/a' || weightStr === 'unknown' || weightStr === '') {
       // For identified products, provide better defaults based on category
-      const category = listingData?.category?.toLowerCase() || '';
+      const categoryText = typeof listingData?.category === 'object' && listingData?.category
+        ? String((listingData.category as any).primary || '')
+        : String(listingData?.category || '');
+      const category = categoryText.toLowerCase();
+      
       if (category.includes('pool')) {
         return 12.0; // Typical pool cleaner weight
       } else if (category.includes('tool')) {

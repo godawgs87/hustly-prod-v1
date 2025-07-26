@@ -16,12 +16,28 @@ export const calculateShippingCost = (
   dimensions: { length: number; width: number; height: number },
   serviceType: 'ground' | 'expedited' | 'priority' = 'ground'
 ): number => {
-  // Basic shipping cost calculation
-  const baseRate = 5.95;
-  const weightRate = weight * 2.50;
-  const sizeMultiplier = serviceType === 'priority' ? 1.8 : serviceType === 'expedited' ? 1.5 : 1.0;
+  // More realistic shipping cost calculation based on weight and size
+  const baseRate = 4.95;
   
-  return Math.round((baseRate + weightRate) * sizeMultiplier * 100) / 100;
+  // Calculate dimensional weight (length * width * height / 166 for USPS)
+  const dimensionalWeight = (dimensions.length * dimensions.width * dimensions.height) / 166;
+  const billableWeight = Math.max(weight, dimensionalWeight);
+  
+  // Weight-based pricing tiers
+  let weightRate;
+  if (billableWeight <= 0.5) {
+    weightRate = 1.50; // Small items like key fobs
+  } else if (billableWeight <= 1) {
+    weightRate = 2.25;
+  } else if (billableWeight <= 2) {
+    weightRate = 3.50;
+  } else {
+    weightRate = billableWeight * 2.25;
+  }
+  
+  const serviceMultiplier = serviceType === 'priority' ? 1.8 : serviceType === 'expedited' ? 2.2 : 1.0;
+  
+  return Math.round((baseRate + weightRate) * serviceMultiplier * 100) / 100;
 };
 
 export const generateShippingOptions = (weight: number = 1): ShippingOption[] => {

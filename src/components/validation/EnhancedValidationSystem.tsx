@@ -96,11 +96,11 @@ const VALIDATION_RULES: ValidationRule[] = [
     category: 'required',
     field: 'category',
     name: 'Category Required',
-    description: 'Items must be assigned to an eBay category',
+    description: 'Items must be assigned to a category',
     validate: (data) => ({
-      isValid: !!data.ebay_category_id,
-      message: data.ebay_category_id ? 'Category selected' : 'eBay category is required',
-      severity: data.ebay_category_id ? 'success' : 'error'
+      isValid: !!data.category,
+      message: data.category ? 'Category selected' : 'Category is required',
+      severity: data.category ? 'success' : 'error'
     })
   },
   {

@@ -12,6 +12,11 @@ export interface Listing {
     width?: string;
     height?: string;
     weight?: string;
+    chest?: string;
+    waist?: string;
+    inseam?: string;
+    sleeve?: string;
+    shoulder?: string;
   };
   keywords: string[] | null;
   photos: string[] | null;

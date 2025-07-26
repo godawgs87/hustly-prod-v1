@@ -39,8 +39,9 @@ const CategorySelector = ({
   const [currentLevel, setCurrentLevel] = useState<EbayCategory[]>([]);
   const { toast } = useToast();
 
+  // No longer loads categories from DB. Expect categories from AI or as prop.
   React.useEffect(() => {
-    loadRootCategories();
+    setCategories([]);
   }, []);
 
   React.useEffect(() => {

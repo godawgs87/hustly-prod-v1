@@ -38,7 +38,7 @@ const subscriptionPlans: SubscriptionPlan[] = [
   {
     id: 'side_hustler',
     name: 'Side Hustler',
-    description: 'Perfect for getting started with reselling',
+    description: 'For new resellers testing the platform',
     price: 19,
     billingPeriod: 'month',
     icon: <Zap className="h-5 w-5" />,
@@ -49,51 +49,48 @@ const subscriptionPlans: SubscriptionPlan[] = [
       aiAnalysis: 100
     },
     features: [
-      { name: '100 listings per month', included: true },
+      { name: '100 listings with AI analysis per month', included: true },
       { name: '2 marketplace connections', included: true },
-      { name: '500 photo analyses', included: true },
-      { name: 'Basic listing templates', included: true },
-      { name: 'Basic analytics', included: true },
-      { name: 'Email support', included: true },
-      { name: 'Bulk operations', included: false },
-      { name: 'Advanced automation', included: false },
-      { name: 'Custom integrations', included: false }
+      { name: 'Basic inventory management', included: true },
+      { name: 'Standard email support', included: true },
+      { name: 'AI analysis with every listing', included: true },
+      { name: 'Mobile access (PWA)', included: true },
+      { name: 'Full inventory tools', included: true }
     ]
   },
   {
     id: 'serious_seller',
     name: 'Serious Seller',
-    description: 'For growing your reselling business',
+    description: 'Save $240/year vs competitors',
     price: 49,
     billingPeriod: 'month',
     popular: true,
-    badge: 'Most Popular',
+    badge: '⭐ Most Popular',
     icon: <TrendingUp className="h-5 w-5" />,
     limits: {
       listings: 300,
       marketplaces: 4,
       photos: 1500,
-      aiAnalysis: 500
+      aiAnalysis: 300
     },
     features: [
-      { name: '300 listings per month', included: true },
-      { name: '4 marketplace connections', included: true },
-      { name: '1,500 photo analyses', included: true },
-      { name: 'Advanced listing templates', included: true },
-      { name: 'Advanced analytics & reporting', included: true },
-      { name: 'Priority email support', included: true },
-      { name: 'Bulk operations', included: true },
-      { name: 'Basic automation rules', included: true },
-      { name: 'Custom integrations', included: false }
+      { name: '300 listings with AI analysis per month', included: true },
+      { name: '4 marketplace integrations (eBay, Poshmark, Mercari, Depop)', included: true },
+      { name: 'Bulk upload and processing', included: true },
+      { name: 'Profit tracking & sales analytics', included: true },
+      { name: 'Priority support with live chat', included: true },
+      { name: 'AI analysis with every listing', included: true },
+      { name: 'Mobile access (PWA)', included: true },
+      { name: 'Full inventory tools', included: true }
     ]
   },
   {
     id: 'full_time_flipper',
     name: 'Full-Time Flipper',
-    description: 'Unlimited everything for serious businesses',
-    price: 99,
+    description: 'Advanced tools for power sellers and teams',
+    price: 89,
     billingPeriod: 'month',
-    badge: 'Best Value',
+    badge: '🏆 Best Value',
     icon: <Crown className="h-5 w-5" />,
     limits: {
       listings: 'unlimited',
@@ -102,15 +99,14 @@ const subscriptionPlans: SubscriptionPlan[] = [
       aiAnalysis: 'unlimited'
     },
     features: [
-      { name: 'Unlimited listings', included: true },
-      { name: 'Unlimited marketplace connections', included: true },
-      { name: 'Unlimited photo analyses', included: true },
-      { name: 'Premium listing templates', included: true },
-      { name: 'Enterprise analytics & reporting', included: true },
-      { name: 'Priority phone & email support', included: true },
-      { name: 'Advanced bulk operations', included: true },
-      { name: 'Advanced automation rules', included: true },
-      { name: 'Custom integrations & API access', included: true }
+      { name: 'Unlimited listings with AI analysis', included: true },
+      { name: 'All current + future marketplace integrations', included: true },
+      { name: 'Team collaboration features', included: true },
+      { name: 'API access and webhooks', included: true },
+      { name: 'Dedicated customer success manager', included: true },
+      { name: 'AI analysis with every listing', included: true },
+      { name: 'Mobile access (PWA)', included: true },
+      { name: 'Full inventory tools', included: true }
     ]
   }
 ];
@@ -299,6 +295,119 @@ const SubscriptionPlans = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Add-ons Section */}
+        <div className="mt-16 max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold mb-2">Boost your plan without upgrading</h2>
+            <p className="text-muted-foreground">Add extra capacity to your current plan as needed</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-blue-500" />
+                  Extra Listings
+                </CardTitle>
+                <CardDescription>
+                  Add 25 additional listings for the current billing cycle
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold">$5.00</div>
+                  <Button variant="outline">Purchase</Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-green-500" />
+                  Extra Marketplace
+                </CardTitle>
+                <CardDescription>
+                  Connect to more marketplaces – $10.00 per marketplace per month
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold">$10.00<span className="text-sm text-muted-foreground">/mo</span></div>
+                  <Button variant="outline">Purchase</Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Only show Bulk Upload add-on for Side Hustler users - higher tiers include it */}
+            {currentTier === 'side_hustler' ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Crown className="h-5 w-5 text-purple-500" />
+                    Bulk Upload
+                  </CardTitle>
+                  <CardDescription>
+                    Upload and process multiple items at once with advanced batch tools
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="text-2xl font-bold">$15.00<span className="text-sm text-muted-foreground">/mo</span></div>
+                    <Button variant="outline">Purchase</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="opacity-60">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Crown className="h-5 w-5 text-purple-500" />
+                    Bulk Upload
+                  </CardTitle>
+                  <CardDescription>
+                    Upload and process multiple items at once with advanced batch tools
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">Included in your plan</div>
+                    <Badge variant="secondary">Included</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+
+        {/* All Plans Include Section */}
+        <div className="mt-12 max-w-3xl mx-auto">
+          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+            <CardHeader className="text-center">
+              <CardTitle className="flex items-center justify-center gap-2">
+                <Check className="h-5 w-5 text-green-500" />
+                All Plans Include
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div className="flex flex-col items-center gap-2">
+                  <Zap className="h-6 w-6 text-blue-500" />
+                  <span className="font-medium">AI analysis with every listing</span>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                  <TrendingUp className="h-6 w-6 text-green-500" />
+                  <span className="font-medium">Mobile access (PWA)</span>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                  <Crown className="h-6 w-6 text-purple-500" />
+                  <span className="font-medium">Full inventory tools</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* FAQ Section */}

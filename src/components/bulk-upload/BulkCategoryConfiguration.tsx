@@ -195,7 +195,13 @@ const BulkCategoryConfiguration = ({
               </h3>
               {currentGroup.listingData?.category && (
                 <p className="text-sm text-muted-foreground">
-                  Internal Category: {currentGroup.listingData.category}
+                  Internal Category: {(() => {
+                    const category = currentGroup.listingData.category;
+                    if (category && typeof category === 'object' && 'primary' in category) {
+                      return String((category as any).primary || '');
+                    }
+                    return String(category || '');
+                  })()}
                 </p>
               )}
               {currentGroup.listingData?.price && (
@@ -245,7 +251,7 @@ const BulkCategoryConfiguration = ({
           <div className="flex items-center gap-4">
             {!hasCategories && (
               <span className="text-sm text-amber-600 flex items-center gap-1">
-                ⚠️ eBay category required
+                ⚠️ Category required
               </span>
             )}
             <Button

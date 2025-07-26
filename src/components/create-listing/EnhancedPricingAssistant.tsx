@@ -323,7 +323,7 @@ const EnhancedPricingAssistant = ({
               <AlertCircle className="w-4 h-4" />
               <span>
                 Based on {pricingData.competitors.length} recent {condition.toLowerCase()} condition listings
-                {category && ` in ${category}`}
+                {category && ` in ${typeof category === 'object' && category ? (category as any).primary || '' : category || ''}`}
               </span>
             </div>
           </div>

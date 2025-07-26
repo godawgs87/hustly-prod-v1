@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -130,7 +129,13 @@ const AutomatedListingAssistant = ({
           <h4 className="font-medium mb-2">Current Listing Preview</h4>
           <div className="space-y-2 text-sm">
             <div><strong>Title:</strong> {currentListing.title || 'Not set'}</div>
-            <div><strong>Category:</strong> {currentListing.category || 'Not set'}</div>
+            <div><strong>Category:</strong> {(() => {
+              const category = currentListing.category;
+              if (category && typeof category === 'object' && 'primary' in category) {
+                return String((category as any).primary || 'Not set');
+              }
+              return String(category || 'Not set');
+            })()}</div>
             <div><strong>Condition:</strong> {currentListing.condition || 'Not set'}</div>
             <div><strong>Price:</strong> {currentListing.price ? `$${currentListing.price}` : 'Not set'}</div>
             {currentListing.keywords && currentListing.keywords.length > 0 && (

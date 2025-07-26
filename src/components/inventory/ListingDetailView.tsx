@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -254,7 +253,13 @@ const ListingDetailView = ({ listing, onClose, onEdit }: ListingDetailViewProps)
             <Badge variant={detailedListing.status === 'active' ? 'default' : 'secondary'}>
               {detailedListing.status}
             </Badge>
-            <Badge variant="outline">{detailedListing.category}</Badge>
+            <Badge variant="outline">{(() => {
+              const category = detailedListing.category;
+              if (category && typeof category === 'object' && 'primary' in category) {
+                return String((category as any).primary || 'Uncategorized');
+              }
+              return String(category || 'Uncategorized');
+            })()}</Badge>
             <Badge variant="outline">{detailedListing.condition}</Badge>
             {onEdit && (
               <Button variant="outline" size="sm" onClick={onEdit} className="ml-auto">

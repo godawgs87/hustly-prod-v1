@@ -52,7 +52,13 @@ const ListingDetails = ({
         </div>
         <div>
           <span className="text-sm text-gray-500">Shipping</span>
-          <p className="text-lg font-semibold">${shippingCost?.toFixed(2) || '9.95'}</p>
+          <p className="text-lg font-semibold">
+            {shippingCost === 0 ? (
+              <span className="text-green-600">Free</span>
+            ) : (
+              `$${shippingCost?.toFixed(2) || '9.95'}`
+            )}
+          </p>
         </div>
       </div>
 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -16,6 +15,7 @@ interface StreamlinedHeaderProps {
     inventory?: number;
     listings?: number;
   };
+  isLoading?: boolean; // Add loading prop
 }
 
 const StreamlinedHeader = ({ 
@@ -24,19 +24,43 @@ const StreamlinedHeader = ({
   showBack = false, 
   onBack,
   loading,
-  notifications
+  notifications,
+  isLoading = false // Add loading prop
 }: StreamlinedHeaderProps) => {
   const { signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Debug logging
+  console.log('🔍 StreamlinedHeader - userEmail:', userEmail, 'type:', typeof userEmail, 'isLoading:', isLoading);
 
   const handleSignOut = async () => {
     if (loading) return;
     try {
       await signOut();
+      // Redirect to auth page after successful sign out
+      window.location.href = '/auth';
     } catch (error) {
       console.error('Sign out error:', error);
     }
   };
+
+  // Show loading state while authentication is being determined
+  if (isLoading) {
+    return (
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <>
@@ -87,8 +111,8 @@ const StreamlinedHeader = ({
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </Button>
 
-              {/* User menu */}
-              {userEmail && (
+              {/* Authentication controls */}
+              {userEmail ? (
                 <div className="flex items-center space-x-2">
                   <Avatar className="w-8 h-8">
                     <AvatarFallback className="text-xs">
@@ -100,11 +124,21 @@ const StreamlinedHeader = ({
                     size="sm"
                     onClick={handleSignOut}
                     disabled={loading}
-                    className="hidden sm:inline-flex text-sm hover:bg-gray-100"
+                    className="text-sm hover:bg-gray-100 hidden md:inline-flex"
                   >
-                    Sign out
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign out'}
                   </Button>
                 </div>
+              ) : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => window.location.href = '/auth'}
+                  disabled={loading}
+                  className="text-sm hidden md:inline-flex"
+                >
+                  Sign In
+                </Button>
               )}
             </div>
           </div>
@@ -114,11 +148,40 @@ const StreamlinedHeader = ({
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-40 bg-black bg-opacity-50" onClick={() => setMobileMenuOpen(false)}>
-          <div className="fixed top-16 left-0 right-0 bg-white border-b shadow-lg p-4">
+          <div className="fixed top-16 left-0 right-0 bg-white border-b shadow-lg p-4" onClick={(e) => e.stopPropagation()}>
             <div className="space-y-2">
-              <Button variant="ghost" className="w-full justify-start" onClick={handleSignOut} disabled={loading}>
-                Sign out
-              </Button>
+              {userEmail ? (
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start" 
+                  onClick={() => {
+                    handleSignOut();
+                    setMobileMenuOpen(false);
+                  }} 
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Signing out...
+                    </>
+                  ) : (
+                    'Sign out'
+                  )}
+                </Button>
+              ) : (
+                <Button 
+                  variant="default" 
+                  className="w-full justify-start" 
+                  onClick={() => {
+                    window.location.href = '/auth';
+                    setMobileMenuOpen(false);
+                  }} 
+                  disabled={loading}
+                >
+                  Sign In
+                </Button>
+              )}
             </div>
           </div>
         </div>

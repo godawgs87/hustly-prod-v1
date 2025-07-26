@@ -63,12 +63,16 @@ const EbayCallback = () => {
 
         console.log('✅ User authenticated, proceeding with token exchange');
 
-        // Exchange code for token
+        // Exchange code for token with explicit session token
         const { data: responseData, error: functionError } = await supabase.functions.invoke('ebay-oauth-modern', {
           body: {
             action: 'exchange_code',
             code: code,
-            state: state
+            state: state,
+            origin: window.location.origin
+          },
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
           }
         });
 

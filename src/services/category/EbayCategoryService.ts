@@ -12,93 +12,33 @@ interface EbayCategory {
 
 export class EbayCategoryService implements CategoryService {
   async getRootCategories(): Promise<UniversalCategory[]> {
-    try {
-      const { data, error } = await supabase.rpc('get_root_categories');
-      
-      if (error) throw error;
-      
-      return (data || []).map((cat: any) => this.mapToUniversalFormat(cat));
-    } catch (error) {
-      console.error('EbayCategoryService: Error loading root categories:', error);
-      return [];
-    }
+    // Deprecated: Use AI-driven mapping instead of DB fetch
+    return [];
   }
 
   async getChildCategories(parentId: string): Promise<UniversalCategory[]> {
-    try {
-      const { data, error } = await supabase.rpc('get_child_categories', {
-        parent_id: parentId
-      });
-      
-      if (error) throw error;
-      
-      return (data || []).map((cat: any) => this.mapToUniversalFormat(cat));
-    } catch (error) {
-      console.error('EbayCategoryService: Error loading child categories:', error);
-      return [];
-    }
+    // Deprecated: Use AI-driven mapping instead of DB fetch
+    return [];
   }
 
   async searchCategories(query: string, limit = 50): Promise<UniversalCategory[]> {
-    try {
-      const { data, error } = await supabase.rpc('search_categories', {
-        search_term: query,
-        limit_count: limit
-      });
-      
-      if (error) throw error;
-      
-      return (data || []).map((cat: any) => this.mapToUniversalFormat({
-        ...cat,
-        full_path: cat.full_path
-      }));
-    } catch (error) {
-      console.error('EbayCategoryService: Error searching categories:', error);
-      return [];
-    }
+    // Deprecated: Use AI-driven mapping instead of DB fetch
+    return [];
   }
 
   async getCategoryPath(categoryId: string): Promise<string[]> {
-    try {
-      const { data, error } = await supabase.rpc('get_category_path', {
-        category_id: categoryId
-      });
-      
-      if (error) throw error;
-      
-      if (data && data.length > 0) {
-        return [data[0].full_path];
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('EbayCategoryService: Error getting category path:', error);
-      return [];
-    }
+    // Deprecated: Use AI-driven mapping instead of DB fetch
+    return [];
   }
 
   async getCategoryById(categoryId: string): Promise<UniversalCategory | null> {
-    try {
-      const { data, error } = await supabase
-        .from('ebay_categories')
-        .select('*')
-        .eq('ebay_category_id', categoryId)
-        .eq('is_active', true)
-        .single();
-      
-      if (error || !data) return null;
-      
-      return this.mapToUniversalFormat(data);
-    } catch (error) {
-      console.error('EbayCategoryService: Error getting category by ID:', error);
-      return null;
-    }
+    // Deprecated: Use AI-driven mapping instead of DB fetch
+    return null;
   }
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const { data, error } = await supabase
-        .from('ebay_categories')
+    // Deprecated: Use AI-driven mapping instead of DB fetch
+    return true;
         .select('id')
         .limit(1);
       

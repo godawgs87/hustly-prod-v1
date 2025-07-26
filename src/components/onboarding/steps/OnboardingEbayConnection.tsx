@@ -17,10 +17,20 @@ const OnboardingEbayConnection = ({ isConnected, onConnectionChange }: Onboardin
   const initiateEbayConnection = async () => {
     setConnecting(true);
     try {
+      // Get current session for auth header
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Authentication required. Please log in first.');
+      }
+
       const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
         body: { 
           action: 'get_auth_url',
-          state: 'onboarding_flow'
+          state: 'onboarding_flow',
+          origin: window.location.origin
+        },
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
         }
       });
 

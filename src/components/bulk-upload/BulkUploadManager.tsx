@@ -1,8 +1,8 @@
-
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import BulkUploadHeader from './components/BulkUploadHeader';
 import BulkUploadStepIndicator from './components/BulkUploadStepIndicator';
+import type { StepType } from './components/BulkUploadStepRenderer';
 import BulkUploadStepRenderer from './components/BulkUploadStepRenderer';
 import { useBulkUploadState } from './hooks/useBulkUploadState';
 import { useBulkUploadHandlers } from './hooks/useBulkUploadHandlers';
@@ -67,8 +67,6 @@ export interface PhotoGroup {
   listingId?: string;
 }
 
-type StepType = 'upload' | 'grouping' | 'review' | 'categories' | 'shipping';
-
 interface BulkUploadManagerProps {
   onComplete: (results: any[]) => void;
   onBack: () => void;
@@ -78,43 +76,26 @@ interface BulkUploadManagerProps {
 const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadManagerProps) => {
   const { toast } = useToast();
   const state = useBulkUploadState();
-  const handlers = useBulkUploadHandlers(
-    state.photos,
-    state.photoGroups,
-    state.setIsGrouping,
-    state.setCurrentStep,
-    state.setPhotoGroups,
-    onComplete
-  );
-
-  // Clear toasts only when step changes, not on every render
-  useEffect(() => {
-    const toastElements = document.querySelectorAll('[data-sonner-toast]');
-    toastElements.forEach(el => el.remove());
-  }, [state.currentStep]);
+  
+  // Preview dialog state
+  const [previewGroup, setPreviewGroup] = useState<PhotoGroup | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const handlePhotosUploaded = useCallback((uploadedPhotos: File[]) => {
-    // Photos uploaded for bulk processing
     state.setPhotos(uploadedPhotos);
   }, [state.setPhotos]);
 
   const handleCategoriesComplete = useCallback((groupsWithCategories: PhotoGroup[]) => {
     state.setPhotoGroups(groupsWithCategories);
     state.setCurrentStep('shipping');
-    
-    toast({
-      title: "Categories configured!",
-      description: "Proceeding to shipping configuration.",
-    });
-  }, [state.setPhotoGroups, state.setCurrentStep, toast]);
+  }, [state.setPhotoGroups, state.setCurrentStep]);
 
   const handleShippingComplete = useCallback((groupsWithShipping: PhotoGroup[]) => {
     state.setPhotoGroups(groupsWithShipping);
-    state.setCurrentStep('review');
-    
+    state.setCurrentStep('finalReview');
     toast({
       title: "Shipping configured!",
-      description: "Items are now ready for posting to marketplace.",
+      description: "Review your items before final submission.",
     });
   }, [state.setPhotoGroups, state.setCurrentStep, toast]);
 
@@ -124,9 +105,46 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     }
   }, [onViewInventory]);
 
-  // Memoize the step renderer props to prevent unnecessary re-renders
+  const handleProceedToShipping = useCallback(() => {
+    state.setCurrentStep('shipping');
+    toast({
+      title: "Proceeding to Shipping",
+      description: "Configure shipping options for your listings.",
+    });
+  }, [state.setCurrentStep, toast]);
+
+  const handlePreviewItem = useCallback((groupId: string) => {
+    const group = state.photoGroups.find(g => g.id === groupId);
+    if (group) {
+      setPreviewGroup(group);
+      setIsPreviewOpen(true);
+    }
+  }, [state.photoGroups]);
+
+  const handlePreviewSave = useCallback((updatedGroup: PhotoGroup) => {
+    state.setPhotoGroups(prev => prev.map(g => 
+      g.id === updatedGroup.id ? updatedGroup : g
+    ));
+    setIsPreviewOpen(false);
+  }, [state.setPhotoGroups]);
+
+  const handlers = useBulkUploadHandlers(
+    state.photos,
+    state.photoGroups,
+    state.setIsGrouping,
+    state.setCurrentStep,
+    state.setPhotoGroups,
+    onComplete,
+    handlePreviewItem
+  );
+
+  useEffect(() => {
+    const toastElements = document.querySelectorAll('[data-sonner-toast]');
+    toastElements.forEach(el => el.remove());
+  }, [state.currentStep]);
+
   const stepRendererProps = useMemo(() => ({
-    currentStep: state.currentStep,
+    currentStep: state.currentStep as any,
     photos: state.photos,
     photoGroups: state.photoGroups,
     isGrouping: state.isGrouping,
@@ -135,16 +153,20 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     onStartGrouping: handlers.handleStartGrouping,
     onGroupsConfirmed: handlers.handleGroupsConfirmed,
     onEditItem: handlers.handleEditItem,
-    onPreviewItem: handlers.handlePreviewItem,
+    onPreviewItem: handlePreviewItem,
     onPostItem: handlers.handlePostItem,
     onPostAll: handlers.handlePostAll,
     onUpdateGroup: handlers.handleUpdateGroup,
     onRetryAnalysis: handlers.handleRetryAnalysis,
+    onRunAI: handlers.handleRetryAnalysis,
+    onBack: handlers.handleBack,
     onCategoriesComplete: handleCategoriesComplete,
     onShippingComplete: handleShippingComplete,
     onViewInventory: handleViewInventory,
-    onBack,
-    onStepChange: (step: StepType) => state.setCurrentStep(step)
+    onStepChange: state.setCurrentStep,
+    onStartAnalysis: handlers.handleStartAnalysis,
+    onStartBulkAnalysis: handlers.handleStartAnalysis,
+    onProceedToShipping: handleProceedToShipping,
   }), [
     state.currentStep,
     state.photos,
@@ -155,16 +177,18 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     handlers.handleStartGrouping,
     handlers.handleGroupsConfirmed,
     handlers.handleEditItem,
-    handlers.handlePreviewItem,
+    handlePreviewItem,
     handlers.handlePostItem,
     handlers.handlePostAll,
     handlers.handleUpdateGroup,
     handlers.handleRetryAnalysis,
+    handlers.handleBack,
     handleCategoriesComplete,
     handleShippingComplete,
     handleViewInventory,
-    onBack,
-    (step: StepType) => state.setCurrentStep(step)
+    state.setCurrentStep,
+    handlers.handleStartAnalysis,
+    handleProceedToShipping,
   ]);
 
   return (

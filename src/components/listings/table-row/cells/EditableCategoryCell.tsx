@@ -31,12 +31,14 @@ const EditableCategoryCell = ({
       />
       {!ebayCategory && (
         <div className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200">
-          ⚠️ eBay category required for sync
+          ⚠️ Category required
         </div>
       )}
       {category && !ebayCategory && (
         <div className="text-xs text-muted-foreground">
-          Current: {category}
+          Current: {typeof category === 'object' && category && 'primary' in category 
+            ? (category as any).primary 
+            : category || 'Uncategorized'}
         </div>
       )}
     </div>

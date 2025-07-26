@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/components/AuthProvider';
-import { useCreateListingState } from '@/hooks/useCreateListingState';
-import { useCreateListingActions } from '@/hooks/useCreateListingActions';
+import { useUnifiedUploadFlow, UnifiedUploadStep } from '@/hooks/useUnifiedUploadFlow';
+import type { StepType } from '@/components/bulk-upload/components/BulkUploadStepRenderer';
 import StreamlinedHeader from '@/components/StreamlinedHeader';
 import UnifiedMobileNavigation from '@/components/UnifiedMobileNavigation';
 import CreateListingContent from '@/components/create-listing/CreateListingContent';
@@ -16,82 +16,88 @@ interface CreateListingProps {
   onViewListings: () => void;
 }
 
+// Map UnifiedUploadStep to StepType for compatibility
+const mapUnifiedStepToBulkStep = (step: UnifiedUploadStep): StepType => {
+  switch (step) {
+    case 'photos': return 'upload';
+    case 'grouping': return 'grouping';
+    case 'analysis': return 'analysis';
+    case 'price-research': return 'confirmation'; // Map price-research to confirmation for compatibility
+    case 'edit': return 'confirmation';
+    case 'confirmation': return 'confirmation';
+    case 'shipping': return 'shipping';
+    case 'finalReview': return 'finalReview';
+    default: return 'upload';
+  }
+};
+
 const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [uploadMode, setUploadMode] = useState<'single' | 'bulk' | null>(null);
   
-  const state = useCreateListingState();
-  const actions = useCreateListingActions({
-    photos: state.photos,
-    listingData: state.listingData,
-    shippingCost: state.shippingCost,
-    draftId: state.draftId,
-    isAutoSaving: state.isAutoSaving,
-    setListingData: state.setListingData,
-    setDraftId: state.setDraftId,
-    setIsAutoSaving: state.setIsAutoSaving,
-    setCurrentStep: state.setCurrentStep,
-    onViewListings: () => window.location.href = '/inventory'
+  // Debug logging for authentication state
+  console.log('🔍 CreateListing - user:', user);
+  console.log('🔍 CreateListing - user?.email:', user?.email);
+  
+  // Ensure handleBulkComplete is declared before use
+  const handleBulkComplete = (results: any[]) => {
+    console.log('Bulk upload completed with results:', results);
+    onViewListings();
+    // You can add logic here if needed after upload completes
+    setUploadMode(null);
+  };
+
+  // Use unified upload flow for single item mode
+  const singleUpload = useUnifiedUploadFlow({
+    mode: 'single',
+    onComplete: handleBulkComplete // Reuse bulk complete handler for now
   });
 
   const handleEdit = () => {
-    state.setCurrentStep('shipping');
+    console.log('🔧 handleEdit called - calling confirmEdit');
+    console.log('🔧 Current step before:', singleUpload.currentStep);
+    singleUpload.confirmEdit();
+    console.log('🔧 Current step after:', singleUpload.currentStep);
+  };
+
+  // Helper to provide a fully-populated ListingData object for single upload
+  const getSingleListingData = () => {
+    const base = singleUpload.photoGroups[0]?.listingData || {};
+    // Ensure measurements fields are strings
+    const measurements = {
+      length: base.measurements?.length !== undefined ? String(base.measurements.length ?? '') : '',
+      width: base.measurements?.width !== undefined ? String(base.measurements.width ?? '') : '',
+      height: base.measurements?.height !== undefined ? String(base.measurements.height ?? '') : '',
+      weight: base.measurements?.weight !== undefined ? String(base.measurements.weight ?? '') : ''
+    };
+    return {
+      title: base.title || '',
+      description: base.description || '',
+      price: base.price || 0,
+      category: base.category || '',
+      condition: base.condition || 'used',
+      ...base,
+      measurements: measurements,
+      photos: (singleUpload.photos || []).map(p => typeof p === 'string' ? p : (p.name || ''))
+    };
   };
 
   const handleBack = () => {
     if (uploadMode === null) {
       onBack();
-    } else if (uploadMode === 'single') {
-      if (state.currentStep === 'shipping') {
-        state.setCurrentStep('preview');
-      } else if (state.currentStep === 'preview') {
-        state.setCurrentStep('photos');
-      } else {
-        setUploadMode(null);
-      }
     } else {
       setUploadMode(null);
     }
   };
 
-  const handleBulkComplete = (results: any[]) => {
-    console.log('Bulk upload completed with results:', results);
-    onViewListings();
-  };
 
-  const getWeight = (): number => {
-    const weight = state.listingData?.measurements?.weight;
-    if (typeof weight === 'string') {
-      const parsed = parseFloat(weight);
-      return isNaN(parsed) ? 1 : parsed;
-    }
-    return typeof weight === 'number' ? weight : 1;
-  };
-
-  const getDimensions = (): { length: number; width: number; height: number } => {
-    const measurements = state.listingData?.measurements;
-    
-    const parseValue = (value: string | number | undefined, defaultValue: number): number => {
-      if (typeof value === 'string') {
-        const parsed = parseFloat(value);
-        return isNaN(parsed) ? defaultValue : parsed;
-      }
-      return typeof value === 'number' ? value : defaultValue;
-    };
-
-    return {
-      length: parseValue(measurements?.length, 12),
-      width: parseValue(measurements?.width, 12),
-      height: parseValue(measurements?.height, 6)
-    };
-  };
 
   const getBackButtonText = () => {
     if (uploadMode === null) return 'Back to Dashboard';
     if (uploadMode === 'bulk') return 'Back to Upload Mode';
-    if (state.currentStep === 'shipping') return 'Back to Preview';
-    if (state.currentStep === 'preview') return 'Back to Photos';
+    if (uploadMode === 'single' && singleUpload.currentStep === 'shipping') return 'Back to Preview';
+    if (uploadMode === 'single' && singleUpload.currentStep === 'confirmation') return 'Back to Photos';
     return 'Back to Upload Mode';
   };
 
@@ -101,10 +107,17 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
     return 'Create Single Listing';
   };
 
+  // TODO: Replace with real subscription logic
+  // Supabase user object: custom claims are usually in app_metadata or user_metadata
+  // We'll use app_metadata.plan for now (e.g., 'trial', 'side-hustler', 'serious', 'full-time', 'founders')
+  const plan = user?.app_metadata?.plan || 'trial';
+  const canUseBulkUpload = plan === 'serious' || plan === 'full-time' || plan === 'founders';
+
   return (
     <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
         title={getTitle()}
+        userEmail={user?.email}
         showBack
         onBack={handleBack}
       />
@@ -115,35 +128,60 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
         )}
 
         {uploadMode === 'single' && (
-          <>
-            {!isMobile && (
-              <CreateListingSteps 
-                currentStep={state.currentStep} 
-                photos={state.photos}
-                listingData={state.listingData}
-              />
-            )}
-            
-            <CreateListingContent
-              currentStep={state.currentStep}
-              photos={state.photos}
-              isAnalyzing={actions.isAnalyzing}
-              listingData={state.listingData}
-              shippingCost={state.shippingCost}
-              isSaving={actions.isSaving}
-              onPhotosChange={state.handlePhotosChange}
-              onAnalyze={actions.handleAnalyze}
-              onEdit={handleEdit}
-              onExport={actions.handleExport}
-              onShippingSelect={state.handleShippingSelect}
-              onListingDataChange={state.handleListingDataChange}
-              getWeight={getWeight}
-              getDimensions={getDimensions}
-              onBack={handleBack}
-              backButtonText={getBackButtonText()}
-            />
-          </>
-        )}
+  <>
+    {!isMobile && (
+      <CreateListingSteps 
+        currentStep={mapUnifiedStepToBulkStep(singleUpload.currentStep) as any} 
+        photos={singleUpload.photos}
+        listingData={getSingleListingData()}
+      />
+    )}
+    <CreateListingContent
+      currentStep={singleUpload.currentStep as any}
+      photos={singleUpload.photos}
+      isAnalyzing={singleUpload.isAnalyzing}
+      listingData={getSingleListingData()}
+      shippingCost={0} // TODO: wire if needed
+      isSaving={false} // TODO: wire if needed
+      onPhotosChange={files => {
+        singleUpload.setPhotos(files);
+        // Always reset to 'analysis' after photos are changed
+        singleUpload.groupPhotos(files);
+      }}
+      onAnalyze={singleUpload.analyzeGroups}
+      onEdit={() => {
+        console.log('🎯 onEdit wrapper called - about to call handleEdit');
+        handleEdit();
+        console.log('🎯 onEdit wrapper - handleEdit completed');
+      }}
+      onExport={singleUpload.postAll}
+      onShippingSelect={() => {}} // TODO: wire if needed
+      onListingDataChange={updates => {
+        if (singleUpload.photoGroups.length > 0) {
+          const group = { ...singleUpload.photoGroups[0], listingData: { ...singleUpload.photoGroups[0].listingData, ...updates } };
+          singleUpload.setPhotoGroups([group]);
+        }
+      }}
+      getWeight={() => {
+        const w = singleUpload.photoGroups[0]?.listingData?.measurements?.weight;
+        return typeof w === 'number' ? w : parseFloat(w || '1') || 1;
+      }}
+      getDimensions={() => {
+        const m = singleUpload.photoGroups[0]?.listingData?.measurements;
+        const parse = (v: string | number | undefined, d: number) => typeof v === 'number' ? v : parseFloat(v || d.toString()) || d;
+        return {
+          length: parse(m?.length, 12),
+          width: parse(m?.width, 12),
+          height: parse(m?.height, 6)
+        };
+      }}
+      onBack={handleBack}
+      backButtonText={getBackButtonText()}
+      onPriceResearchComplete={singleUpload.handlePriceResearchComplete}
+      onSkipPriceResearch={singleUpload.handleSkipPriceResearch}
+    />
+  </>
+)}
 
         {uploadMode === 'bulk' && (
           <BulkUploadManager
@@ -151,8 +189,15 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
             onBack={() => setUploadMode(null)}
           />
         )}
-      </div>
 
+        {uploadMode === 'bulk' && !canUseBulkUpload && (
+          <div className="p-8 text-center">
+            <h2 className="text-2xl font-bold mb-4">Upgrade Required</h2>
+            <p className="mb-4">Bulk upload is only available on Serious Seller and higher plans.</p>
+            <Button onClick={() => window.location.href = '/plans'}>See Plans</Button>
+          </div>
+        )}
+      </div>
       {isMobile && (
         <UnifiedMobileNavigation
           currentView="create"

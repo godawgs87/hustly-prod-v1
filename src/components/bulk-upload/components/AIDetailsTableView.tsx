@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,9 @@ interface AIDetailsTableViewProps {
   onPreviewItem: (groupId: string) => void;
   onPostItem: (groupId: string) => void;
   onRunAI: (groupId: string) => void;
+  onStartBulkAnalysis?: () => void;
+  onProceedToShipping?: () => void;
+  onUpdateGroup?: (group: PhotoGroup) => void;
   isAnalyzing?: boolean;
 }
 
@@ -22,6 +24,9 @@ const AIDetailsTableView = ({
   onPreviewItem,
   onPostItem,
   onRunAI,
+  onStartBulkAnalysis,
+  onProceedToShipping,
+  onUpdateGroup,
   isAnalyzing
 }: AIDetailsTableViewProps) => {
   const getStatusIcon = (group: PhotoGroup) => {
@@ -136,8 +141,24 @@ const AIDetailsTableView = ({
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span>📊 AI Analysis Details</span>
+          <CardTitle className="flex items-center justify-between">
+            <span className="flex items-center gap-2">📊 AI Analysis Details</span>
+            {!isAnalyzing && photoGroups.some(g => g.status === 'pending') && (
+              <Button 
+                onClick={() => {
+                  console.log('🚀 Start AI Analysis button clicked!');
+                  const pendingGroups = photoGroups.filter(g => g.status === 'pending');
+                  console.log('📋 Pending groups to analyze:', pendingGroups.length);
+                  pendingGroups.forEach(g => {
+                    console.log('🤖 Starting AI analysis for group:', g.id, g.name);
+                    onRunAI(g.id);
+                  });
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Start AI Analysis
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -212,8 +233,19 @@ const AIDetailsTableView = ({
                       <div className="text-sm">
                         {group.status === 'processing' ? (
                           <div className="text-blue-600 animate-pulse">...</div>
+                        ) : group.listingData?.category ? (
+                          typeof group.listingData.category === 'object' && group.listingData.category !== null ? (
+                            <div>
+                              <div className="font-medium">{(group.listingData.category as any)?.primary || ''}</div>
+                              {(group.listingData.category as any)?.subcategory && (
+                                <div className="text-xs text-gray-500">{(group.listingData.category as any).subcategory}</div>
+                              )}
+                            </div>
+                          ) : (
+                            String(group.listingData.category)
+                          )
                         ) : (
-                          group.listingData?.category || '-'
+                          '-'
                         )}
                       </div>
                     </TableCell>
@@ -233,20 +265,43 @@ const AIDetailsTableView = ({
                         {group.status === 'processing' ? (
                           <div className="text-blue-600 animate-pulse">...</div>
                         ) : group.listingData?.measurements ? (
-                          <>
-                            {group.listingData.measurements.length && (
-                              <div>L: {group.listingData.measurements.length}</div>
-                            )}
-                            {group.listingData.measurements.width && (
-                              <div>W: {group.listingData.measurements.width}</div>
-                            )}
-                            {group.listingData.measurements.height && (
-                              <div>H: {group.listingData.measurements.height}</div>
-                            )}
-                            {group.listingData.measurements.weight && (
-                              <div>Wt: {group.listingData.measurements.weight}</div>
-                            )}
-                          </>
+                          (() => {
+                            const measurements = group.listingData.measurements;
+                            console.log('🔍 UI: Raw measurements for', group.name, ':', measurements);
+                            console.log('🔍 UI: Measurements type:', typeof measurements);
+                            console.log('🔍 UI: Measurements keys:', Object.keys(measurements || {}));
+                            
+                            const validMeasurements = Object.entries(measurements)
+                              .filter(([key, value]) => value !== null && value !== undefined && value !== '')
+                              .slice(0, 4); // Show max 4 measurements to avoid overflow
+                            
+                            console.log('🔍 UI: Valid measurements after filtering:', validMeasurements);
+                            
+                            if (validMeasurements.length === 0) {
+                              console.log('🔍 UI: No valid measurements found, showing dash');
+                              return <span className="text-gray-400">-</span>;
+                            }
+                            
+                            return validMeasurements.map(([key, value]) => {
+                              const shortKey = {
+                                'chest': 'C',
+                                'length': 'L', 
+                                'sleeve': 'S',
+                                'width': 'W',
+                                'height': 'H',
+                                'weight': 'Wt',
+                                'shoulder': 'Sh',
+                                'waist': 'Wa',
+                                'diameter': 'D'
+                              }[key] || key.charAt(0).toUpperCase();
+                              
+                              return (
+                                <div key={key} title={`${key}: ${value}`}>
+                                  {shortKey}: {value}
+                                </div>
+                              );
+                            });
+                          })()
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
@@ -380,6 +435,20 @@ const AIDetailsTableView = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Show completion status when all items are analyzed */}
+      {completedCount > 0 && completedCount === photoGroups.length && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-center">
+              <div>
+                <p className="font-medium text-green-900">AI Analysis Complete</p>
+                <p className="text-sm text-green-700">{completedCount} items ready for shipping</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

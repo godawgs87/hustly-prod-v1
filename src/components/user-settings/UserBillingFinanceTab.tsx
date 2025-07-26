@@ -255,12 +255,12 @@ const UserBillingFinanceTab = () => {
             
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Photos Analyzed This Month</span>
-                <span>{userProfile?.photos_used_this_month || 0} / {userProfile?.monthly_photo_limit || 50}</span>
+                <span>Listings Created This Month</span>
+                <span>{userProfile?.listings_used_this_month || 0} / {currentLimits.listings === -1 ? '∞' : currentLimits.listings}</span>
               </div>
-              {(userProfile?.monthly_photo_limit || 50) !== -1 && (
+              {currentLimits.listings !== -1 && (
                 <Progress 
-                  value={Math.min(((userProfile?.photos_used_this_month || 0) / (userProfile?.monthly_photo_limit || 50)) * 100, 100)} 
+                  value={Math.min(((userProfile?.listings_used_this_month || 0) / currentLimits.listings) * 100, 100)} 
                   className="h-2" 
                 />
               )}
@@ -282,7 +282,7 @@ const UserBillingFinanceTab = () => {
                 Boost your current plan without upgrading
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="border rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-2">
                   <Plus className="h-4 w-4 text-blue-500" />
@@ -320,6 +320,42 @@ const UserBillingFinanceTab = () => {
                   </Button>
                 </div>
               </div>
+              
+              {/* Bulk Upload add-on - only for Side Hustler users */}
+              {currentLimits.tier === 'side_hustler' ? (
+                <div className="border rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2">
+                    <Crown className="h-4 w-4 text-purple-500" />
+                    <h5 className="font-medium">Bulk Upload</h5>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Upload and process multiple items at once with advanced batch tools
+                  </p>
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-lg">{formatAmount(15.00)}<span className="text-sm text-muted-foreground">/mo</span></span>
+                    <Button 
+                      size="sm"
+                      onClick={() => handlePurchaseAddon('bulk_upload', 1, 15.00)}
+                    >
+                      Purchase
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="border rounded-lg p-4 space-y-3 opacity-60">
+                  <div className="flex items-center gap-2">
+                    <Crown className="h-4 w-4 text-purple-500" />
+                    <h5 className="font-medium">Bulk Upload</h5>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Upload and process multiple items at once with advanced batch tools
+                  </p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Included in your plan</span>
+                    <Badge variant="secondary">Included</Badge>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

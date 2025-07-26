@@ -42,6 +42,7 @@ interface BusinessProfile {
   preferred_shipping_service: string;
   shipping_cost_domestic: number;
   shipping_cost_additional: number;
+  offers_free_shipping: boolean;
 }
 
 const UserBusinessTab = () => {
@@ -74,7 +75,8 @@ const UserBusinessTab = () => {
     default_markup_percentage: 100,
     preferred_shipping_service: 'usps_priority',
     shipping_cost_domestic: 9.95,
-    shipping_cost_additional: 2.00
+    shipping_cost_additional: 2.00,
+    offers_free_shipping: false
   });
 
   const [ebayAccountType, setEbayAccountType] = useState<string>('individual');
@@ -127,7 +129,8 @@ const UserBusinessTab = () => {
           default_markup_percentage: data.default_markup_percentage || 100,
           preferred_shipping_service: data.preferred_shipping_service || 'usps_priority',
           shipping_cost_domestic: data.shipping_cost_domestic || 9.95,
-          shipping_cost_additional: data.shipping_cost_additional || 2.00
+          shipping_cost_additional: data.shipping_cost_additional || 2.00,
+          offers_free_shipping: data.offers_free_shipping || false
         });
 
         // Load eBay account type
@@ -538,6 +541,19 @@ const UserBusinessTab = () => {
             <Switch
               checked={profile.international_shipping_enabled}
               onCheckedChange={(checked) => updateProfile('international_shipping_enabled', checked)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Offer Free Shipping</Label>
+              <p className="text-sm text-muted-foreground">
+                Enable free shipping as a default option for bulk uploads
+              </p>
+            </div>
+            <Switch
+              checked={profile.offers_free_shipping || false}
+              onCheckedChange={(checked) => updateProfile('offers_free_shipping', checked)}
             />
           </div>
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useInventoryStore } from '@/stores/inventoryStore';
 import { ListingService } from '@/services/ListingService';
@@ -266,7 +265,13 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
                             <span className="text-lg font-bold text-green-600">
                               ${listing.price?.toFixed(2)}
                             </span>
-                            <Badge variant="secondary">{listing.category}</Badge>
+                            <Badge variant="secondary">{(() => {
+                              const category = listing.category;
+                              if (category && typeof category === 'object' && 'primary' in category) {
+                                return String((category as any).primary || 'Uncategorized');
+                              }
+                              return String(category || 'Uncategorized');
+                            })()}</Badge>
                           </div>
                           <p className="text-xs text-gray-500">
                             Listed: {listing.listed_date 

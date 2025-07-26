@@ -1,127 +1,195 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { logger } from '@/utils/logger';
-import { useStandardToast } from './useStandardToast';
+import { useAsyncOperation } from './useAsyncOperation';
 
 interface UseSupabaseQueryOptions {
+  autoFetch?: boolean;
   dependencies?: any[];
-  enabled?: boolean;
-  onError?: (error: Error) => void;
-  showErrorToast?: boolean;
+  successMessage?: string;
+  errorMessage?: string;
+  showToasts?: boolean;
 }
 
-/**
- * Reusable hook for Supabase queries with loading states and error handling
- */
-export function useSupabaseQuery<T>(
-  queryFn: () => Promise<{ data: T | null; error: any }>,
-  options: UseSupabaseQueryOptions = {}
-) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const { error: showError } = useStandardToast();
+interface QueryFilter {
+  column: string;
+  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'in' | 'is';
+  value: any;
+}
 
-  const { 
-    dependencies = [], 
-    enabled = true, 
-    onError, 
-    showErrorToast = true 
+export const useSupabaseQuery = <T = any>(
+  table: string,
+  select: string = '*',
+  options: UseSupabaseQueryOptions = {}
+) => {
+  const [data, setData] = useState<T[] | null>(null);
+  const [filters, setFilters] = useState<QueryFilter[]>([]);
+  const [orderBy, setOrderBy] = useState<{ column: string; ascending?: boolean } | null>(null);
+  const [limit, setLimit] = useState<number | null>(null);
+
+  const {
+    autoFetch = true,
+    dependencies = [],
+    successMessage,
+    errorMessage = 'Failed to fetch data',
+    showToasts = false
   } = options;
 
-  const executeQuery = async () => {
-    if (!enabled) return;
+  const { loading, error, execute } = useAsyncOperation({
+    successMessage,
+    errorMessage,
+    showSuccessToast: showToasts,
+    showErrorToast: showToasts
+  });
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const result = await queryFn();
-      
-      if (result.error) {
-        throw new Error(result.error.message || 'Query failed');
+  const buildQuery = useCallback(() => {
+    let query = supabase.from(table).select(select);
+
+    // Apply filters
+    filters.forEach(filter => {
+      switch (filter.operator) {
+        case 'eq':
+          query = query.eq(filter.column, filter.value);
+          break;
+        case 'neq':
+          query = query.neq(filter.column, filter.value);
+          break;
+        case 'gt':
+          query = query.gt(filter.column, filter.value);
+          break;
+        case 'gte':
+          query = query.gte(filter.column, filter.value);
+          break;
+        case 'lt':
+          query = query.lt(filter.column, filter.value);
+          break;
+        case 'lte':
+          query = query.lte(filter.column, filter.value);
+          break;
+        case 'like':
+          query = query.like(filter.column, filter.value);
+          break;
+        case 'ilike':
+          query = query.ilike(filter.column, filter.value);
+          break;
+        case 'in':
+          query = query.in(filter.column, filter.value);
+          break;
+        case 'is':
+          query = query.is(filter.column, filter.value);
+          break;
       }
-      
-      setData(result.data);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Unknown error');
-      setError(error);
-      
-      logger.error('Supabase query failed', error);
-      
-      if (onError) {
-        onError(error);
-      } else if (showErrorToast) {
-        showError('Query Failed', error.message);
-      }
-    } finally {
-      setLoading(false);
+    });
+
+    // Apply ordering
+    if (orderBy) {
+      query = query.order(orderBy.column, { ascending: orderBy.ascending ?? true });
     }
-  };
 
+    // Apply limit
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    return query;
+  }, [table, select, filters, orderBy, limit]);
+
+  const fetchData = useCallback(async () => {
+    const result = await execute(async () => {
+      const query = buildQuery();
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      return data;
+    });
+
+    if (result !== null) {
+      setData(result);
+    }
+
+    return result;
+  }, [execute, buildQuery]);
+
+  const refetch = useCallback(() => {
+    return fetchData();
+  }, [fetchData]);
+
+  const addFilter = useCallback((column: string, operator: QueryFilter['operator'], value: any) => {
+    setFilters(prev => [...prev.filter(f => f.column !== column), { column, operator, value }]);
+  }, []);
+
+  const removeFilter = useCallback((column: string) => {
+    setFilters(prev => prev.filter(f => f.column !== column));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters([]);
+  }, []);
+
+  const setOrder = useCallback((column: string, ascending: boolean = true) => {
+    setOrderBy({ column, ascending });
+  }, []);
+
+  const setQueryLimit = useCallback((newLimit: number | null) => {
+    setLimit(newLimit);
+  }, []);
+
+  // Auto-fetch on mount and dependency changes
   useEffect(() => {
-    executeQuery();
-  }, dependencies);
-
-  const refetch = () => {
-    executeQuery();
-  };
+    if (autoFetch) {
+      fetchData();
+    }
+  }, [autoFetch, fetchData, ...dependencies]);
 
   return {
     data,
     loading,
     error,
-    refetch
+    refetch,
+    fetchData,
+    addFilter,
+    removeFilter,
+    clearFilters,
+    setOrder,
+    setLimit: setQueryLimit,
+    filters,
+    orderBy,
+    limit
   };
-}
+};
 
-/**
- * Specialized hook for getting current user session
- */
-export function useCurrentUser() {
-  return useSupabaseQuery(
-    () => supabase.auth.getUser(),
-    { dependencies: [] }
-  );
-}
+// Specialized hook for single record queries
+export const useSupabaseRecord = <T = any>(
+  table: string,
+  id: string | number | null,
+  select: string = '*',
+  options: Omit<UseSupabaseQueryOptions, 'autoFetch'> & { autoFetch?: boolean } = {}
+) => {
+  const { autoFetch = !!id, ...restOptions } = options;
+  
+  const query = useSupabaseQuery<T>(table, select, {
+    ...restOptions,
+    autoFetch: false,
+    dependencies: [id]
+  });
 
-/**
- * Specialized hook for getting user's marketplace accounts
- */
-export function useMarketplaceAccounts(userId?: string) {
-  return useSupabaseQuery(
-    async () => {
-      if (!userId) return { data: null, error: null };
-      
-      return await supabase
-        .from('marketplace_accounts')
-        .select('*')
-        .eq('user_id', userId);
-    },
-    { 
-      dependencies: [userId],
-      enabled: !!userId 
+  const fetchRecord = useCallback(async () => {
+    if (!id) return null;
+    
+    query.clearFilters();
+    query.addFilter('id', 'eq', id);
+    const result = await query.fetchData();
+    return result?.[0] || null;
+  }, [id, query]);
+
+  useEffect(() => {
+    if (autoFetch && id) {
+      fetchRecord();
     }
-  );
-}
+  }, [autoFetch, id, fetchRecord]);
 
-/**
- * Specialized hook for getting user's listings
- */
-export function useUserListings(userId?: string) {
-  return useSupabaseQuery(
-    async () => {
-      if (!userId) return { data: null, error: null };
-      
-      return await supabase
-        .from('listings')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-    },
-    { 
-      dependencies: [userId],
-      enabled: !!userId 
-    }
-  );
-}
+  return {
+    ...query,
+    data: query.data?.[0] || null,
+    fetchRecord
+  };
+};

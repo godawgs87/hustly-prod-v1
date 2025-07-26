@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Check } from 'lucide-react';
 import { Step } from '@/types/CreateListing';
@@ -13,7 +12,8 @@ const CreateListingSteps = ({ currentStep, photos, listingData }: CreateListingS
   const steps = [
     { id: 'photos', title: 'Photos', completed: photos.length > 0 },
     { id: 'analysis', title: 'Analysis', completed: listingData !== null },
-    { id: 'preview', title: 'Preview', completed: currentStep === 'shipping' },
+    { id: 'price-research', title: 'Pricing', completed: currentStep === 'edit' || currentStep === 'shipping' },
+    { id: 'edit', title: 'Edit', completed: currentStep === 'shipping' },
     { id: 'shipping', title: 'Ship', completed: false }
   ];
 

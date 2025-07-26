@@ -1,6 +1,15 @@
 export function parseOpenAIResponse(content: string) {
   console.log('Raw OpenAI content:', content);
 
+  // Check for OpenAI content filtering or error responses
+  if (content.includes("I'm sorry, I can't assist") || 
+      content.includes("I cannot") || 
+      content.includes("I'm unable to") ||
+      content.length < 50) {
+    console.log('OpenAI content filtering detected, using fallback');
+    return createFallbackListing();
+  }
+
   // Clean and parse JSON
   try {
     // Remove any markdown formatting or extra text
@@ -15,7 +24,8 @@ export function parseOpenAIResponse(content: string) {
     const jsonEnd = cleanContent.lastIndexOf('}');
     
     if (jsonStart === -1 || jsonEnd === -1) {
-      throw new Error('No JSON object found in response');
+      console.log('No JSON found in response, using fallback');
+      return createFallbackListing();
     }
     
     const jsonString = cleanContent.substring(jsonStart, jsonEnd + 1);
@@ -25,12 +35,30 @@ export function parseOpenAIResponse(content: string) {
     
     // Validate required fields
     if (!listingData.title || !listingData.description) {
-      throw new Error('Missing required fields in response');
+      console.log('Missing required fields, using fallback');
+      return createFallbackListing();
     }
     
     // Ensure price is a number
     if (typeof listingData.price === 'string') {
-      listingData.price = parseFloat(listingData.price.replace(/[^0-9.]/g, '')) || 85;
+      listingData.price = parseFloat(listingData.price.replace(/[^0-9.]/g, '')) || 25.00;
+    } else if (typeof listingData.price !== 'number' || listingData.price <= 0) {
+      listingData.price = 25.00;
+    }
+    
+    // Map condition values from AI to UI-expected values
+    if (listingData.condition) {
+      const conditionMapping: { [key: string]: string } = {
+        'Excellent': 'Like New',
+        'Very Good': 'Like New', 
+        'Good': 'Used',
+        'Fair': 'Fair',
+        'Poor': 'Poor',
+        'New': 'New',
+        'Like New': 'Like New',
+        'Used': 'Used'
+      };
+      listingData.condition = conditionMapping[listingData.condition] || listingData.condition;
     }
     
     // Ensure arrays exist
@@ -67,27 +95,68 @@ export function parseOpenAIResponse(content: string) {
   } catch (parseError) {
     console.error('JSON parsing failed:', parseError);
     console.error('Failed content:', content);
-    
-    // Return enhanced fallback response
-    return {
-      title: "Professional Tool - Needs Review",
-      description: "Professional grade tool in working condition. Please review photos carefully and update this listing with accurate details based on the specific item shown.",
-      price: 85,
-      category: "Tools & Hardware",
-      condition: "Used",
-      measurements: {
-        length: "10 inches",
-        width: "8 inches",
-        height: "6 inches",
-        weight: "2 lbs"
-      },
-      keywords: ["tool", "professional", "equipment"],
-      priceResearch: "Estimated based on typical tool pricing - please verify current market value",
-      brand: "Unknown",
-      model: "Please identify from photos",
-      features: ["Professional grade", "Working condition"],
-      defects: ["Please inspect photos for wear"],
-      includes: ["Item as shown in photos"]
-    };
+    console.log('Using fallback due to JSON parsing error');
+    return createFallbackListing();
   }
+}
+
+function createFallbackListing() {
+  return {
+    title: "Needs Review - Listing Not Fully Generated",
+    description: "AI listing generation failed. Please review and complete all required fields.",
+    price: 25.00,
+    condition: "N/A",
+    category: {
+      primary: "Uncategorized",
+      subcategory: null
+    },
+    pricing: {
+      suggested_price: null,
+      price_reasoning: null,
+      markup_percentage: null,
+      price_range: {
+        minimum: null,
+        maximum: null
+      }
+    },
+    measurements: {
+      chest: null,
+      length: null,
+      sleeve: null
+    },
+    shipping: {
+      weight_oz: null,
+      recommended_service: null,
+      estimated_cost: null
+    },
+    platform_optimization: {
+      ebay: {
+        category_id: null,
+        item_specifics: {}
+      },
+      poshmark: {
+        size_category: null,
+        hashtags: []
+      },
+      mercari: {
+        condition: null,
+        shipping_weight: null
+      },
+      depop: {
+        tags: [],
+        trending_hashtags: []
+      }
+    },
+    seo_keywords: [],
+    cross_sell_suggestions: [],
+    seasonal_timing: {
+      best_months: [],
+      urgency_factor: null
+    },
+    authenticity_confidence: null,
+    comparable_sales: [],
+    confidence_score: 0,
+    suggestions: ["AI listing generation failed. Please complete all required fields manually."],
+    needs_review: true
+  };
 }

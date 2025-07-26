@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -12,45 +11,50 @@ interface SizeInformationSectionProps {
 
 const SizeInformationSection = ({ listingData, onUpdate }: SizeInformationSectionProps) => {
   // Check if this category requires size information based on eBay category or fallback text
-  const requiresSizeInfo = () => {
-    // Check eBay category path first
+  const isClothingCategory = (): boolean => {
+    // First check eBay category path if available
     if (listingData.ebay_category_path) {
-      const pathLower = listingData.ebay_category_path.toLowerCase();
+      const pathLower = String(listingData.ebay_category_path || '').toLowerCase();
       return pathLower.includes('clothing') || 
              pathLower.includes('apparel') ||
-             pathLower.includes('fashion') ||
-             pathLower.includes('shoe') || 
-             pathLower.includes('footwear') ||
-             pathLower.includes('sandal') ||
-             pathLower.includes('boot');
+             pathLower.includes('men') ||
+             pathLower.includes('women') ||
+             pathLower.includes('kids');
     }
     
-    // Fallback to old text-based category check
-    const categoryText = listingData.category?.toLowerCase() || '';
-    return categoryText.includes('clothing') || 
-           categoryText.includes('apparel') ||
-           categoryText.includes('fashion') ||
-           categoryText.includes('shoe') || 
-           categoryText.includes('footwear') ||
-           categoryText.includes('sandal') ||
-           categoryText.includes('boot');
+    // Fallback to old text-based category check - safely handle category objects
+    const categoryText = typeof listingData.category === 'object' && listingData.category
+      ? String((listingData.category as any).primary || '')
+      : String(listingData.category || '');
+    
+    const categoryLower = categoryText.toLowerCase();
+    return categoryLower.includes('clothing') || 
+           categoryLower.includes('apparel') ||
+           categoryLower.includes('men') ||
+           categoryLower.includes('women') ||
+           categoryLower.includes('kids');
   };
 
-  const isShoeCategory = () => {
-    // Check eBay category path first
+  const isShoeCategory = (): boolean => {
+    // First check eBay category path if available
     if (listingData.ebay_category_path) {
-      const pathLower = listingData.ebay_category_path.toLowerCase();
-      return pathLower.includes('shoe') ||
+      const pathLower = String(listingData.ebay_category_path || '').toLowerCase();
+      return pathLower.includes('shoe') || 
              pathLower.includes('footwear') ||
-             pathLower.includes('sandal') ||
+             pathLower.includes('sneaker') ||
              pathLower.includes('boot');
     }
     
-    const categoryText = listingData.category?.toLowerCase() || '';
-    return categoryText.includes('shoe') || 
-           categoryText.includes('footwear') ||
-           categoryText.includes('sandal') ||
-           categoryText.includes('boot');
+    // Fallback to old text-based category check - safely handle category objects
+    const categoryText = typeof listingData.category === 'object' && listingData.category
+      ? String((listingData.category as any).primary || '')
+      : String(listingData.category || '');
+    
+    const categoryLower = categoryText.toLowerCase();
+    return categoryLower.includes('shoe') || 
+           categoryLower.includes('footwear') ||
+           categoryLower.includes('sneaker') ||
+           categoryLower.includes('boot');
   };
 
   const clothingSizes = {
@@ -67,7 +71,7 @@ const SizeInformationSection = ({ listingData, onUpdate }: SizeInformationSectio
     'Unisex': ['5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '12.5', '13']
   };
 
-  if (!requiresSizeInfo()) {
+  if (!isClothingCategory()) {
     return null;
   }
 

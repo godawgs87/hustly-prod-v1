@@ -1,4 +1,3 @@
-
 import { useListingSave } from '@/hooks/useListingSave';
 import { useToast } from '@/hooks/use-toast';
 import type { PhotoGroup } from '../../BulkUploadManager';
@@ -20,44 +19,22 @@ export const useBulkOperations = () => {
       description: group.listingData.description?.substring(0, 100) + '...',
       price: group.listingData.price,
       category: group.listingData.category,
-      condition: group.listingData.condition,
-      measurements: group.listingData.measurements,
-      keywords: group.listingData.keywords,
-      features: group.listingData.features,
-      includes: group.listingData.includes,
-      defects: group.listingData.defects,
-      priceResearch: group.listingData.priceResearch
+      photoCount: group.photos.length
     });
 
-    // Ensure measurements are properly converted to strings
-    const convertedMeasurements: { length?: string; width?: string; height?: string; weight?: string } = {};
-    
-    if (group.listingData.measurements) {
-      const measurements = group.listingData.measurements;
-      if (measurements.length !== undefined) {
-        convertedMeasurements.length = String(measurements.length);
-      }
-      if (measurements.width !== undefined) {
-        convertedMeasurements.width = String(measurements.width);
-      }
-      if (measurements.height !== undefined) {
-        convertedMeasurements.height = String(measurements.height);
-      }
-      if (measurements.weight !== undefined) {
-        convertedMeasurements.weight = String(measurements.weight);
-      }
-    }
-
-    // Convert PhotoGroup.listingData to ListingData format - ensuring ALL AI data is preserved
+    // Convert PhotoGroup to ListingData format
     const listingData: ListingData = {
-      title: group.listingData.title || `${group.name} - Quality Item`,
-      description: group.listingData.description || 'Quality item in good condition. Please see photos for detailed condition assessment.',
-      price: group.listingData.price || 25,
-      category: group.listingData.category || 'Miscellaneous',
-      condition: group.listingData.condition || 'Good',
-      measurements: convertedMeasurements,
-      keywords: Array.isArray(group.listingData.keywords) ? group.listingData.keywords : ['quality', 'authentic'],
-      photos: Array.isArray(group.listingData.photos) ? group.listingData.photos : [],
+      title: group.listingData.title || '',
+      description: group.listingData.description || '',
+      price: group.listingData.price || 0,
+      category: group.listingData.category || '',
+      category_id: group.listingData.category_id || null,
+      condition: group.listingData.condition || 'used',
+      measurements: group.listingData.measurements || {},
+      keywords: group.listingData.keywords || [],
+      // Use actual File objects instead of blob URLs
+      photos: group.photos, // Pass the actual File objects
+      priceResearch: group.listingData.priceResearch || '',
       purchase_price: group.listingData.purchase_price,
       purchase_date: group.listingData.purchase_date,
       source_location: group.listingData.source_location,
@@ -70,11 +47,14 @@ export const useBulkOperations = () => {
       shoe_size: group.listingData.shoe_size,
       gender: group.listingData.gender,
       age_group: group.listingData.age_group,
-      // CRITICAL: Preserve all AI-generated enhanced fields
-      priceResearch: group.listingData.priceResearch || 'Market research indicates competitive pricing for similar items.',
-      features: group.listingData.features || ['Quality construction', 'Well-maintained'],
-      includes: group.listingData.includes || ['Item as shown in photos'],
-      defects: group.listingData.defects || []
+      features: group.listingData.features || [],
+      includes: group.listingData.includes || [],
+      defects: group.listingData.defects || [],
+      ebay_category_id: group.listingData.ebay_category_id,
+      ebay_category_path: group.listingData.ebay_category_path,
+      mercari_category_id: group.listingData.mercari_category_id,
+      poshmark_category_id: group.listingData.poshmark_category_id,
+      depop_category_id: group.listingData.depop_category_id
     };
 
     console.log('Final converted listing data:', {
@@ -88,7 +68,8 @@ export const useBulkOperations = () => {
       features: listingData.features,
       includes: listingData.includes,
       defects: listingData.defects,
-      priceResearch: listingData.priceResearch?.substring(0, 50) + '...'
+      priceResearch: listingData.priceResearch?.substring(0, 50) + '...',
+      photoCount: listingData.photos?.length || 0
     });
 
     return listingData;
@@ -232,10 +213,6 @@ export const useBulkOperations = () => {
     return { successes, failures };
   };
 
-  const handlePostAll = async (groups: PhotoGroup[]) => {
-    return await postAllItems(groups);
-  };
-
   const handleSaveDraft = async (group: PhotoGroup) => {
     return await saveSingleDraft(group);
   };
@@ -244,7 +221,6 @@ export const useBulkOperations = () => {
     postSingleItem,
     saveSingleDraft,
     postAllItems,
-    handlePostAll,
     handleSaveDraft
   };
 };

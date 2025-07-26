@@ -161,7 +161,13 @@ const SimpleListingModal = ({ listing, onClose, onSave }: SimpleListingModalProp
               <Badge variant={listing.status === 'active' ? 'default' : 'secondary'}>
                 {listing.status}
               </Badge>
-              <Badge variant="outline">{listing.category || 'No category'}</Badge>
+              <Badge variant="outline">{(() => {
+                const category = listing.category;
+                if (category && typeof category === 'object' && 'primary' in category) {
+                  return String((category as any).primary || 'No category');
+                }
+                return String(category || 'No category');
+              })()}</Badge>
               <Badge variant="outline">{listing.condition || 'No condition'}</Badge>
             </div>
           </div>
@@ -203,11 +209,19 @@ const SimpleListingModal = ({ listing, onClose, onSave }: SimpleListingModalProp
                       </div>
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Shipping</p>
-                        <p className="text-lg font-medium">${listing.shipping_cost || 9.95}</p>
+                        <p className="text-lg font-medium">
+                          {listing.shipping_cost === 0 ? (
+                            <span className="text-green-600">Free</span>
+                          ) : (
+                            `$${listing.shipping_cost ?? 9.95}`
+                          )}
+                        </p>
                       </div>
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Total</p>
-                        <p className="text-lg font-semibold">${(listing.price + (listing.shipping_cost || 9.95)).toFixed(2)}</p>
+                        <p className="text-lg font-semibold">
+                          ${(listing.price + (listing.shipping_cost ?? 9.95)).toFixed(2)}
+                        </p>
                       </div>
                     </div>
                   </CardContent>

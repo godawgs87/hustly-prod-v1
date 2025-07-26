@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/components/AuthProvider';
 import StreamlinedHeader from '@/components/StreamlinedHeader';
 import UnifiedMobileNavigation from '@/components/UnifiedMobileNavigation';
 import { useInventoryStore } from '@/stores/inventoryStore';
@@ -23,6 +24,7 @@ interface InventoryManagerProps {
 
 const InventoryManager = ({ onCreateListing, onBack }: InventoryManagerProps) => {
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   const [previewListing, setPreviewListing] = useState<Listing | null>(null);
 
   // Use inventory store
@@ -112,6 +114,7 @@ const InventoryManager = ({ onCreateListing, onBack }: InventoryManagerProps) =>
     <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
         title="Inventory Manager"
+        userEmail={user?.email}
         showBack
         onBack={onBack}
       />

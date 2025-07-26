@@ -2,14 +2,30 @@ import { supabase } from '@/integrations/supabase/client';
 
 export class EbayService {
   private static async makeApiCall(action: string, params: any = {}) {
+    console.log('🚀 [Frontend] Making eBay API call:', {
+      action,
+      params,
+      timestamp: new Date().toISOString()
+    });
+    
     const { data, error } = await supabase.functions.invoke('ebay-api-client', {
       body: { action, ...params }
     });
 
+    console.log('📡 [Frontend] eBay API response:', {
+      hasData: !!data,
+      hasError: !!error,
+      data: data,
+      error: error,
+      action: action
+    });
+
     if (error) {
+      console.error('❌ [Frontend] eBay API Error:', error);
       throw new Error(`eBay API Error: ${error.message}`);
     }
 
+    console.log('✅ [Frontend] eBay API success for action:', action, data);
     return data;
   }
 
@@ -96,6 +112,95 @@ export class EbayService {
       totalProcessed: results.length,
       successCount: results.filter(r => r.status === 'success').length,
       errorCount: results.filter(r => r.status === 'error').length
+    };
+  }
+
+  // Price Research Methods
+  static async searchCompletedListings(params: {
+    query: string;
+    category?: string;
+    brand?: string;
+    condition?: string;
+    limit?: number;
+  }) {
+    console.log('🔍 [EbayService] Searching completed listings:', params);
+    return await this.makeApiCall('search_completed_listings', params);
+  }
+
+  static async getPriceSuggestion(searchResults: any) {
+    console.log('💰 [EbayService] Getting price suggestion from search results');
+    return await this.makeApiCall('get_price_suggestion', { searchResults });
+  }
+
+  static async researchItemPrice(params: {
+    query: string;
+    category?: string;
+    brand?: string;
+    condition?: string;
+    limit?: number;
+  }) {
+    console.log('🔬 [EbayService] Researching item price:', params);
+    try {
+      const result = await this.makeApiCall('research_item_price', params);
+      console.log('✅ [EbayService] Price research complete:', {
+        totalComps: result.data?.searchResults?.total || 0,
+        suggestedPrice: result.data?.priceAnalysis?.suggestedPrice || 0,
+        confidence: result.data?.priceAnalysis?.confidence || 'unknown'
+      });
+      return result;
+    } catch (error) {
+      console.error('❌ [EbayService] Price research failed:', error);
+      throw error;
+    }
+  }
+
+  private static extractPriceResearchParams(listingData: any) {
+    const title = listingData.title || '';
+    const description = listingData.description || '';
+    const brand = listingData.brand || '';
+    const category = listingData.category?.name || '';
+    
+    // Create a more focused search query
+    let searchTerms = [];
+    
+    // Add brand if available
+    if (brand && brand.toLowerCase() !== 'unknown') {
+      searchTerms.push(brand);
+    }
+    
+    // Extract key model/part numbers from title
+    const modelMatch = title.match(/([A-Z0-9]{3,}-[A-Z0-9]{3,}|[A-Z0-9]{6,})/i);
+    if (modelMatch) {
+      searchTerms.push(modelMatch[0]);
+    }
+    
+    // Add key product type words
+    const productTypes = ['key fob', 'remote', 'keyless', 'entry', 'transmitter'];
+    const titleLower = title.toLowerCase();
+    productTypes.forEach(type => {
+      if (titleLower.includes(type)) {
+        searchTerms.push(type);
+      }
+    });
+    
+    // Add category context if relevant
+    if (category && category.toLowerCase() !== 'other') {
+      searchTerms.push(category.toLowerCase());
+    }
+    
+    // Create focused query (limit to most relevant terms)
+    const query = searchTerms.slice(0, 4).join(' ');
+    
+    console.log('🏷️ [EbayService] Extracted price research params:', {
+      query,
+      brand: brand || undefined,
+      condition: listingData.condition || undefined
+    });
+    
+    return {
+      query,
+      brand: brand || undefined,
+      condition: listingData.condition || undefined
     };
   }
 }

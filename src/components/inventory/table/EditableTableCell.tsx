@@ -127,7 +127,13 @@ const EditableTableCell = ({ field, value, isEditing, onUpdate, className }: Edi
           />
         ) : (
           <span className="text-sm">
-            {value ? `$${value.toFixed(2)}` : '-'}
+            {value === 0 ? (
+              <span className="text-green-600 font-medium">Free</span>
+            ) : value ? (
+              `$${value.toFixed(2)}`
+            ) : (
+              '-'
+            )}
           </span>
         );
 

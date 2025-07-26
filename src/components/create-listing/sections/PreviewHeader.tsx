@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import InlineEditableField from './InlineEditableField';
@@ -41,8 +40,14 @@ const PreviewHeader = ({ listingData, onUpdate }: PreviewHeaderProps) => {
         
         <div>
           <div className="text-sm text-gray-500 mb-1">Category</div>
-          <Badge variant="secondary" className="text-sm">
-            {listingData.category}
+          <Badge variant="secondary" className="text-xs">
+            {(() => {
+              const category = listingData.category;
+              if (category && typeof category === 'object' && 'primary' in category) {
+                return String((category as any).primary || 'Uncategorized');
+              }
+              return String(category || 'Uncategorized');
+            })()}
           </Badge>
         </div>
       </div>

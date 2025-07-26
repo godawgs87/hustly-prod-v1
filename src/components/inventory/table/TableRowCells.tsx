@@ -107,11 +107,7 @@ const TableRowCells = ({
                   return listing.category || '-';
                 })()}
               </span>
-              {!listing.ebay_category_id && listing.category && (
-                <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded border">
-                  eBay category needed
-                </span>
-              )}
+
             </div>
           )}
         </TableCell>

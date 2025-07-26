@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import EnhancedPreviewDialog from './components/EnhancedPreviewDialog';
@@ -8,26 +7,34 @@ import type { PhotoGroup } from './BulkUploadManager';
 interface BulkReviewDashboardProps {
   photoGroups: PhotoGroup[];
   onEditItem: (groupId: string) => void;
-  onPreviewItem: (groupId: string) => void;
   onPostItem: (groupId: string) => void;
+  onRunAI: (groupId: string) => void;
+  onStartBulkAnalysis?: () => void;
+  onProceedToShipping?: () => void;
+  onPreviewItem: (groupId: string) => void;
   onPostAll: () => void;
-  onUpdateGroup?: (updatedGroup: PhotoGroup) => void;
-  onRetryAnalysis?: (groupId: string) => void;
+  onUpdateGroup: (group: PhotoGroup) => void;
+  onRetryAnalysis: (groupId: string) => void;
   onProceedToCategories?: () => void;
   onViewInventory?: () => void;
+  onBackToGrouping?: () => void;
   isAnalyzing?: boolean;
 }
 
 const BulkReviewDashboard = ({
   photoGroups,
   onEditItem,
-  onPreviewItem,
   onPostItem,
+  onRunAI,
+  onStartBulkAnalysis,
+  onProceedToShipping,
+  onPreviewItem,
   onPostAll,
   onUpdateGroup,
   onRetryAnalysis,
   onProceedToCategories,
   onViewInventory,
+  onBackToGrouping,
   isAnalyzing
 }: BulkReviewDashboardProps) => {
   const [previewGroup, setPreviewGroup] = useState<PhotoGroup | null>(null);
@@ -49,8 +56,16 @@ const BulkReviewDashboard = ({
   };
 
   const handleRunAI = (groupId: string) => {
-    if (onRetryAnalysis) {
-      onRetryAnalysis(groupId);
+    console.log('🔥 BulkReviewDashboard.handleRunAI called for groupId:', groupId);
+    console.log('🔥 onRunAI function exists:', !!onRunAI);
+    console.log('🔥 onRunAI function type:', typeof onRunAI);
+    
+    if (onRunAI) {
+      console.log('🔥 Calling onRunAI with groupId:', groupId);
+      onRunAI(groupId);
+      console.log('🔥 onRunAI call completed');
+    } else {
+      console.error('🔥 onRunAI is not defined!');
     }
   };
 
@@ -59,10 +74,23 @@ const BulkReviewDashboard = ({
   const readyToPost = photoGroups.filter(g => g.status === 'completed' && g.selectedShipping && !g.isPosted).length;
   const postedItems = photoGroups.filter(g => g.isPosted).length;
 
+  const hasAnyAnalysisStarted = photoGroups.some(g => g.status === 'processing' || g.status === 'completed');
+
   return (
     <div className="w-full max-w-7xl mx-auto p-4 space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h2 className="text-xl sm:text-2xl font-bold">🤖 AI Analysis Queue ({photoGroups.length} items)</h2>
+        <div className="flex items-center gap-4">
+          {/* Back to Grouping button - only show before analysis starts */}
+          {!hasAnyAnalysisStarted && onBackToGrouping && (
+            <button
+              onClick={onBackToGrouping}
+              className="bg-gray-500 text-white px-4 py-2 rounded shadow hover:bg-gray-600 font-medium"
+            >
+              ← Back to Grouping
+            </button>
+          )}
+          <h2 className="text-xl sm:text-2xl font-bold">🤖 AI Analysis Queue ({photoGroups.length} items)</h2>
+        </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
           {isAnalyzing && (
             <div className="text-blue-600 font-medium text-sm sm:text-base">
@@ -78,6 +106,17 @@ const BulkReviewDashboard = ({
               size="lg"
             >
               🏷️ Configure Categories ({completedItems} items)
+            </Button>
+          )}
+
+          {/* Show Proceed to Shipping button when items are ready for shipping */}
+          {readyForShipping > 0 && onProceedToShipping && (
+            <Button 
+              onClick={onProceedToShipping}
+              className="bg-orange-600 hover:bg-orange-700 w-full sm:w-auto text-sm sm:text-base"
+              size="lg"
+            >
+              🚚 Proceed to Shipping ({readyForShipping} items)
             </Button>
           )}
 
@@ -137,6 +176,7 @@ const BulkReviewDashboard = ({
         onPreviewItem={handlePreviewClick}
         onPostItem={onPostItem}
         onRunAI={handleRunAI}
+        onStartBulkAnalysis={onStartBulkAnalysis}
         isAnalyzing={isAnalyzing}
       />
 

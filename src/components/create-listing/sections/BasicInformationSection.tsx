@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,6 +16,24 @@ interface BasicInformationSectionProps {
 }
 
 const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSectionProps) => {
+  // Map AI condition values to UI dropdown values
+  const mapConditionValue = (condition: string | null | undefined): string => {
+    if (!condition) return '';
+    
+    const conditionMapping: { [key: string]: string } = {
+      'Excellent': 'Like New',
+      'Very Good': 'Like New',
+      'Good': 'Used',
+      'Fair': 'Fair',
+      'Poor': 'Poor',
+      'New': 'New',
+      'Like New': 'Like New',
+      'Used': 'Used',
+      'For Parts': 'For Parts'
+    };
+    
+    return conditionMapping[condition] || condition;
+  };
   // Auto-apply category suggestions when internal category changes
   useEffect(() => {
     if (listingData.category && (!listingData.ebay_category_id)) {
@@ -91,7 +108,9 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
                 Internal Category
               </label>
               <Select 
-                value={listingData.category || ''} 
+                value={typeof listingData.category === 'object' && listingData.category
+                  ? (listingData.category as any).primary || ''
+                  : listingData.category || ''} 
                 onValueChange={(value) => onUpdate({ category: value })}
               >
                 <SelectTrigger>
@@ -104,9 +123,18 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
                   <SelectItem value="Electronics">Electronics</SelectItem>
                   <SelectItem value="Home & Garden">Home & Garden</SelectItem>
                   <SelectItem value="Sports & Outdoors">Sports & Outdoors</SelectItem>
+                  <SelectItem value="Automotive">Automotive</SelectItem>
+                  <SelectItem value="Tools & Hardware">Tools & Hardware</SelectItem>
                   <SelectItem value="Books">Books</SelectItem>
                   <SelectItem value="Toys & Games">Toys & Games</SelectItem>
                   <SelectItem value="Health & Beauty">Health & Beauty</SelectItem>
+                  <SelectItem value="Music & Instruments">Music & Instruments</SelectItem>
+                  <SelectItem value="Art & Collectibles">Art & Collectibles</SelectItem>
+                  <SelectItem value="Jewelry & Watches">Jewelry & Watches</SelectItem>
+                  <SelectItem value="Pet Supplies">Pet Supplies</SelectItem>
+                  <SelectItem value="Baby & Kids">Baby & Kids</SelectItem>
+                  <SelectItem value="Office & Industrial">Office & Industrial</SelectItem>
+                  <SelectItem value="Crafts & Hobbies">Crafts & Hobbies</SelectItem>
                   <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -117,7 +145,7 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
                 Condition
               </label>
               <Select 
-                value={listingData.condition || ''} 
+                value={mapConditionValue(listingData.condition)} 
                 onValueChange={(value) => onUpdate({ condition: value })}
               >
                 <SelectTrigger>
@@ -156,7 +184,9 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
         <PlatformCategorySection
           platform="ebay"
           platformName="eBay"
-          internalCategory={listingData.category}
+          internalCategory={typeof listingData.category === 'object' && listingData.category
+            ? (listingData.category as any).primary || ''
+            : listingData.category || ''}
           currentCategoryId={listingData.ebay_category_id}
           currentCategoryPath={listingData.ebay_category_path}
           title={listingData.title}
@@ -173,7 +203,9 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
         <PlatformCategorySection
           platform="mercari"
           platformName="Mercari"
-          internalCategory={listingData.category}
+          internalCategory={typeof listingData.category === 'object' && listingData.category
+            ? (listingData.category as any).primary || ''
+            : listingData.category || ''}
           currentCategoryId={listingData.mercari_category_id}
           currentCategoryPath={listingData.mercari_category_path}
           title={listingData.title}
@@ -189,7 +221,9 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
         <PlatformCategorySection
           platform="poshmark"
           platformName="Poshmark"
-          internalCategory={listingData.category}
+          internalCategory={typeof listingData.category === 'object' && listingData.category
+            ? (listingData.category as any).primary || ''
+            : listingData.category || ''}
           currentCategoryId={listingData.poshmark_category_id}
           currentCategoryPath={listingData.poshmark_category_path}
           title={listingData.title}
@@ -205,7 +239,9 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
         <PlatformCategorySection
           platform="depop"
           platformName="Depop"
-          internalCategory={listingData.category}
+          internalCategory={typeof listingData.category === 'object' && listingData.category
+            ? (listingData.category as any).primary || ''
+            : listingData.category || ''}
           currentCategoryId={listingData.depop_category_id}
           currentCategoryPath={listingData.depop_category_path}
           title={listingData.title}
@@ -221,7 +257,9 @@ const BasicInformationSection = ({ listingData, onUpdate }: BasicInformationSect
         <PlatformCategorySection
           platform="facebook"
           platformName="Facebook Marketplace"
-          internalCategory={listingData.category}
+          internalCategory={typeof listingData.category === 'object' && listingData.category
+            ? (listingData.category as any).primary || ''
+            : listingData.category || ''}
           currentCategoryId={listingData.facebook_category_id}
           currentCategoryPath={listingData.facebook_category_path}
           title={listingData.title}

@@ -17,11 +17,21 @@ const EBAY_CONFIG = {
   clientId: Deno.env.get('EBAY_CLIENT_ID') || '',
   clientSecret: Deno.env.get('EBAY_CLIENT_SECRET') || '',
   sandbox: Deno.env.get('EBAY_SANDBOX') === 'true',
-  get redirectUri() {
-    const host = Deno.env.get('SUPABASE_URL')?.includes('localhost') 
-      ? 'http://localhost:3000' 
-      : 'https://preview--hustly-mvp3.lovable.app';
-    return `${host}/ebay/callback`;
+  getRedirectUri(frontendOrigin?: string) {
+    // Fully automatic redirect URI - frontend passes its current origin
+    if (frontendOrigin) {
+      return `${frontendOrigin}/ebay/callback`;
+    }
+    
+    // Fallback to environment variable
+    const customRedirectUri = Deno.env.get('EBAY_REDIRECT_URI');
+    if (customRedirectUri) {
+      return customRedirectUri;
+    }
+    
+    // Final fallback to localhost with dynamic port detection
+    const port = Deno.env.get('PORT') || '8086';
+    return `http://localhost:${port}/ebay/callback`;
   },
   get baseUrl() {
     return this.sandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
@@ -83,7 +93,8 @@ serve(async (req) => {
       });
     }
 
-    const { action, code, state } = requestData;
+    const { action, code, state, origin, redirect_origin } = requestData;
+    const frontendOrigin = origin || redirect_origin;
     console.log('Action:', action, 'Code present:', !!code, 'State:', state);
 
     // Add comprehensive debug action
@@ -138,7 +149,7 @@ serve(async (req) => {
       const authUrl = `${EBAY_CONFIG.authUrl}/oauth2/authorize?` + 
         `client_id=${EBAY_CONFIG.clientId}&` +
         `response_type=code&` +
-        `redirect_uri=${encodeURIComponent(EBAY_CONFIG.redirectUri)}&` +
+        `redirect_uri=${encodeURIComponent(EBAY_CONFIG.getRedirectUri(frontendOrigin))}&` +
         `scope=${encodeURIComponent(REQUIRED_SCOPES)}&` +
         `state=${state || 'ebay_oauth'}`;
 
@@ -185,7 +196,7 @@ serve(async (req) => {
           body: new URLSearchParams({
             grant_type: 'authorization_code',
             code: code,
-            redirect_uri: EBAY_CONFIG.redirectUri
+            redirect_uri: EBAY_CONFIG.getRedirectUri(frontendOrigin)
           })
         });
 

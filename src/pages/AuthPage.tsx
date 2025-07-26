@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
-import { Card } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/components/AuthProvider';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Check, Zap, Crown, Star } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Eye, EyeOff, Mail, Lock, User, Zap, Star, Crown, Rocket, Check } from 'lucide-react';
+import { SUBSCRIPTION_TIERS } from '@/utils/constants';
+import { useAsyncOperation } from '@/hooks/useAsyncOperation';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscriptionManagement } from '@/hooks/useSubscriptionManagement';
 
@@ -15,40 +20,54 @@ interface AuthPageProps {
 }
 
 const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState('signin');
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    fullName: ''
+  });
+
   const { toast } = useToast();
   const { createCheckout } = useSubscriptionManagement();
 
+  // Authentication operation
+  const { loading, execute: authenticate } = useAsyncOperation({
+    successMessage: 'Authentication successful',
+    errorMessage: 'Authentication failed',
+    showSuccessToast: false // We'll handle navigation instead
+  });
+
+  // Plan upgrade operation
+  const { loading: upgrading, execute: upgradePlan } = useAsyncOperation({
+    successMessage: 'Plan upgraded successfully',
+    errorMessage: 'Failed to upgrade plan'
+  });
+
   const handleAuth = async () => {
-    if (!email || !password) {
-      toast({
-        title: "Error",
-        description: "Please enter both email and password",
-        variant: "destructive"
-      });
-      return;
-    }
+    await authenticate(async () => {
+      if (!formData.email || !formData.password) {
+        throw new Error('Please enter both email and password');
+      }
 
-    setLoading(true);
-
-    try {
       let result;
       
-      if (mode === 'signup') {
+      if (activeTab === 'signup') {
         result = await supabase.auth.signUp({
-          email,
-          password,
+          email: formData.email,
+          password: formData.password,
           options: {
             emailRedirectTo: `${window.location.origin}/`
           }
         });
       } else {
         result = await supabase.auth.signInWithPassword({
-          email,
-          password
+          email: formData.email,
+          password: formData.password
         });
       }
 
@@ -56,23 +75,8 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
         throw result.error;
       }
 
-      toast({
-        title: mode === 'signup' ? "Account Created" : "Welcome Back",
-        description: mode === 'signup' 
-          ? "Please check your email to verify your account"
-          : "Successfully signed in to your account"
-      });
-
       onAuthSuccess?.();
-    } catch (error: any) {
-      toast({
-        title: "Authentication Error",
-        description: error.message || 'An error occurred during authentication',
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const handlePlanSelect = async (plan: 'starter' | 'professional' | 'enterprise' | 'founders') => {
@@ -266,7 +270,7 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
                   variant={plan.buttonVariant}
                   onClick={() => {
                     if (plan.id === 'free') {
-                      setMode('signup');
+                      setActiveTab('signup');
                       document.getElementById('auth-form')?.scrollIntoView({ behavior: 'smooth' });
                     } else {
                       handlePlanSelect(plan.id as any);
@@ -294,7 +298,7 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
               <p className="text-gray-600">Sign in to your account or create a new one</p>
             </div>
 
-            <Tabs value={mode} onValueChange={(value) => setMode(value as 'signin' | 'signup')}>
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'signin' | 'signup')}>
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -307,8 +311,8 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
                     id="email"
                     type="email"
                     placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   />
                 </div>
                 <div>
@@ -317,8 +321,8 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
                     id="password"
                     type="password"
                     placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={formData.password}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                   />
                 </div>
                 <Button 
@@ -337,8 +341,8 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
                     id="signup-email"
                     type="email"
                     placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   />
                 </div>
                 <div>
@@ -347,8 +351,8 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
                     id="signup-password"
                     type="password"
                     placeholder="Create a password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={formData.password}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                   />
                 </div>
                 <Button 

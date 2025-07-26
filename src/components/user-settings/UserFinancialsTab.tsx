@@ -1,107 +1,110 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
+import React, { useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { DollarSign, Download, FileText, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { DollarSign, Download, FileText, Loader2, TrendingUp, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/components/AuthProvider';
+import { useFormManager } from '@/hooks/useFormManager';
+import { useSupabaseRecord } from '@/hooks/useSupabaseQuery';
+import { useAsyncOperation } from '@/hooks/useAsyncOperation';
+
+interface FinancialData {
+  account_type: string;
+  tax_id: string;
+  business_name: string;
+  business_address: string;
+  default_currency: string;
+  fiscal_year_end: string;
+}
 
 const UserFinancialsTab = () => {
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
-  
-  const [financialData, setFinancialData] = useState({
-    account_type: 'individual',
-    tax_id: '',
-    business_name: ''
-  });
+  const { user } = useAuth();
 
-  useEffect(() => {
-    loadFinancialData();
-  }, []);
+  // Load financial data
+  const { data: financialData, loading: loadingFinancials } = useSupabaseRecord<FinancialData>(
+    'user_profiles',
+    user?.id || null,
+    'account_type, tax_id, business_name, business_address, default_currency, fiscal_year_end',
+    { showToasts: false }
+  );
 
-  const loadFinancialData = async () => {
-    try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('account_type')
-        .eq('id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading financial data:', error);
-        return;
-      }
-
-      if (data) {
-        setFinancialData(prev => ({
-          ...prev,
-          account_type: data.account_type || 'individual'
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading financial data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Error",
-          description: "Please sign in to save financial settings",
-          variant: "destructive"
-        });
-        return;
-      }
-
+  // Form management for financial updates
+  const form = useFormManager({
+    initialData: {
+      account_type: financialData?.account_type || 'individual',
+      tax_id: financialData?.tax_id || '',
+      business_name: financialData?.business_name || '',
+      business_address: financialData?.business_address || '',
+      default_currency: financialData?.default_currency || 'USD',
+      fiscal_year_end: financialData?.fiscal_year_end || '12-31'
+    },
+    saveFunction: async (data: FinancialData) => {
       const { error } = await supabase
         .from('user_profiles')
-        .update({
-          account_type: financialData.account_type
-        })
-        .eq('id', user.id);
+        .upsert({
+          id: user?.id,
+          ...data,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+    },
+    successMessage: 'Financial information updated successfully',
+    errorMessage: 'Failed to update financial information'
+  });
 
-      if (error) {
-        throw error;
-      }
+  // Export operation
+  const { loading: exporting, execute: exportData } = useAsyncOperation({
+    successMessage: 'Export completed successfully',
+    errorMessage: 'Failed to export data'
+  });
 
-      toast({
-        title: "Success",
-        description: "Financial settings saved successfully"
+  // Update form data when financial data loads
+  useEffect(() => {
+    if (financialData) {
+      form.updateMultipleFields({
+        account_type: financialData.account_type || 'individual',
+        tax_id: financialData.tax_id || '',
+        business_name: financialData.business_name || '',
+        business_address: financialData.business_address || '',
+        default_currency: financialData.default_currency || 'USD',
+        fiscal_year_end: financialData.fiscal_year_end || '12-31'
       });
-    } catch (error: any) {
-      console.error('Error saving financial data:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save financial settings",
-        variant: "destructive"
-      });
-    } finally {
-      setSaving(false);
     }
+  }, [financialData]);
+
+  const handleExportFinancials = async () => {
+    await exportData(async () => {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('account_type, tax_id, business_name, business_address, default_currency, fiscal_year_end')
+        .eq('id', user?.id)
+        .single();
+      
+      if (error) throw error;
+      
+      // Create and download CSV
+      const csvContent = Object.entries(data || {})
+        .map(([key, value]) => `${key},${value}`)
+        .join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'financial-data.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    });
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFinancialData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  if (loading) {
+  if (loadingFinancials) {
     return (
       <Card className="p-6">
         <div className="flex items-center justify-center py-8">
@@ -129,8 +132,8 @@ const UserFinancialsTab = () => {
                 id="individual"
                 name="account_type"
                 value="individual"
-                checked={financialData.account_type === 'individual'}
-                onChange={(e) => handleInputChange('account_type', e.target.value)}
+                checked={form.formData.account_type === 'individual'}
+                onChange={(e) => form.updateField('account_type', e.target.value)}
                 className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300"
               />
               <Label htmlFor="individual" className="text-sm font-medium">
@@ -147,8 +150,8 @@ const UserFinancialsTab = () => {
                 id="business"
                 name="account_type"
                 value="business"
-                checked={financialData.account_type === 'business'}
-                onChange={(e) => handleInputChange('account_type', e.target.value)}
+                checked={form.formData.account_type === 'business'}
+                onChange={(e) => form.updateField('account_type', e.target.value)}
                 className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300"
               />
               <Label htmlFor="business" className="text-sm font-medium">
@@ -162,12 +165,12 @@ const UserFinancialsTab = () => {
           
           <div className="mt-4">
             <Button 
-              onClick={handleSave}
-              disabled={saving}
+              onClick={form.save}
+              disabled={!form.canSave}
               size="sm"
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {saving ? (
+              {form.saving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...

@@ -12,6 +12,8 @@ interface RequestBody {
   action: 'get_auth_url' | 'exchange_code';
   code?: string;
   state?: string;
+  origin?: string;
+  redirect_origin?: string;
 }
 
 serve(async (req) => {
@@ -25,7 +27,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { action, code, state }: RequestBody = await req.json();
+    const body: RequestBody = await req.json();
+    const { action, code, state } = body;
     console.log(`🚀 eBay OAuth Modern - Action: ${action}`);
 
     // Get eBay credentials
@@ -41,8 +44,24 @@ serve(async (req) => {
     }
 
     if (action === 'get_auth_url') {
-      // Generate OAuth URL
-      const redirectUri = `https://preview--hustly-mvp3.lovable.app/ebay/callback`;
+      // Fully automatic redirect URI - frontend passes its current origin
+      const frontendOrigin = body.origin || body.redirect_origin;
+      const customRedirectUri = Deno.env.get('EBAY_REDIRECT_URI');
+      
+      // eBay requires HTTPS for production - use fallback for localhost
+      let redirectUri;
+      if (frontendOrigin && frontendOrigin.startsWith('http://localhost')) {
+        // For localhost development, use hustly.app production domain
+        const fallbackDomain = Deno.env.get('EBAY_FALLBACK_DOMAIN') || 'https://hustly.app';
+        redirectUri = `${fallbackDomain}/ebay/callback`;
+        console.log('🔄 Using HTTPS fallback for localhost:', redirectUri);
+      } else {
+        redirectUri = frontendOrigin 
+          ? `${frontendOrigin}/ebay/callback`
+          : customRedirectUri || `http://localhost:${Deno.env.get('PORT') || '8086'}/ebay/callback`;
+      }
+      
+      console.log('🔗 Using redirect URI:', redirectUri);
       const scopes = 'https://api.ebay.com/oauth/api_scope https://api.ebay.com/oauth/api_scope/sell.marketing.readonly https://api.ebay.com/oauth/api_scope/sell.marketing https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment https://api.ebay.com/oauth/api_scope/sell.analytics.readonly';
       
       const authUrl = `https://auth.ebay.com/oauth2/authorize?` +
@@ -53,6 +72,10 @@ serve(async (req) => {
         `state=${state || 'default'}`;
 
       console.log('✅ Generated eBay OAuth URL');
+      console.log('🔗 Full OAuth URL:', authUrl);
+      console.log('🆔 Client ID:', ebayClientId);
+      console.log('🔄 Redirect URI:', redirectUri);
+      console.log('🎯 Encoded Redirect URI:', encodeURIComponent(redirectUri));
       return new Response(
         JSON.stringify({ 
           status: 'success',
@@ -70,8 +93,14 @@ serve(async (req) => {
         );
       }
 
-      // Exchange code for token
-      const redirectUri = `https://preview--hustly-mvp3.lovable.app/ebay/callback`;
+      // Fully automatic redirect URI - frontend passes its current origin
+      const frontendOrigin = body.origin || body.redirect_origin;
+      const customRedirectUri = Deno.env.get('EBAY_REDIRECT_URI');
+      const redirectUri = frontendOrigin 
+        ? `${frontendOrigin}/ebay/callback`
+        : customRedirectUri || `http://localhost:${Deno.env.get('PORT') || '8086'}/ebay/callback`;
+      
+      console.log('🔗 Using redirect URI for token exchange:', redirectUri);
       const tokenUrl = 'https://api.ebay.com/identity/v1/oauth2/token';
       
       const credentials = btoa(`${ebayClientId}:${ebayClientSecret}`);

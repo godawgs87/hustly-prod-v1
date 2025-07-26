@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useEbayStore } from '@/stores/ebayStore';
 
 export const useEbayConnection = () => {
   const { toast } = useToast();
@@ -55,7 +56,11 @@ export const useEbayConnection = () => {
           body: {
             action: 'exchange_code',
             code: code,
-            state: state
+            state: state,
+            origin: window.location.origin
+          },
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
           }
         });
 
@@ -65,6 +70,15 @@ export const useEbayConnection = () => {
 
           if (data.success) {
             localStorage.removeItem('ebay_oauth_pending');
+            
+            // Update eBay store with connection status
+            const { setAccount } = useEbayStore.getState();
+            setAccount({
+              id: data.username || 'ebay_user',
+              username: data.username || 'eBay User',
+              isConnected: true,
+              oauthToken: 'connected' // We don't store the actual token in the frontend
+            });
             
             toast({
               title: "eBay Connected Successfully",
@@ -102,7 +116,11 @@ export const useEbayConnection = () => {
       const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
         body: {
           action: 'get_auth_url',
-          state: crypto.randomUUID()
+          state: crypto.randomUUID(),
+          origin: window.location.origin
+        },
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
         }
       });
 

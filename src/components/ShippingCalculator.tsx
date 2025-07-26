@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -25,12 +25,33 @@ const ShippingCalculator = ({
   const [weight, setWeight] = useState(itemWeight);
   const [dimensions, setDimensions] = useState(itemDimensions);
   const [isLocalPickup, setIsLocalPickup] = useState(false);
+  const [isFreeShipping, setIsFreeShipping] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+
+  // Automatically call onShippingSelect when Free Shipping is toggled
+  useEffect(() => {
+    if (isFreeShipping) {
+      const freeShippingOption = {
+        service: 'Free Shipping',
+        cost: 0,
+        days: '3-5',
+        description: 'Free shipping to buyer'
+      };
+      onShippingSelect(freeShippingOption);
+      console.log('🚚 Free Shipping selected, cost set to 0');
+    }
+  }, [isFreeShipping, onShippingSelect]);
 
   const calculateShipping = () => {
     if (isLocalPickup) {
       return [
         { service: 'Local Pickup', cost: 0, days: '0-1', description: 'Free local pickup' }
+      ];
+    }
+
+    if (isFreeShipping) {
+      return [
+        { service: 'Free Shipping', cost: 0, days: '3-5', description: 'Free shipping to buyer' }
       ];
     }
 
@@ -89,7 +110,22 @@ const ShippingCalculator = ({
         </div>
       </div>
 
-      {!isLocalPickup && (
+      {/* Free Shipping Option */}
+      <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg border border-green-200">
+        <Checkbox 
+          id="free-shipping"
+          checked={isFreeShipping}
+          onCheckedChange={(checked) => setIsFreeShipping(checked as boolean)}
+        />
+        <div>
+          <Label htmlFor="free-shipping" className="text-sm font-medium">
+            Free Shipping
+          </Label>
+          <p className="text-xs text-gray-600">Offer free shipping to buyer</p>
+        </div>
+      </div>
+
+      {!isLocalPickup && !isFreeShipping && (
         <>
           <Separator />
           

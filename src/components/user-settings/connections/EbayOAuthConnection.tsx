@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -143,7 +142,10 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
 
       // Exchange code for access token via our edge function
       const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
-        body: { action: 'exchange_code', code, state }
+        body: { action: 'exchange_code', code, state, origin: window.location.origin },
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       });
 
       console.log('📡 Token exchange response:', { data, error });
@@ -193,6 +195,8 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
   const initiateOAuthFlow = async () => {
     setLoading(true);
     console.log('🚀 Initiating eBay OAuth flow...');
+    console.log('🌐 Current origin:', window.location.origin);
+    console.log('🔗 Expected redirect URI:', `${window.location.origin}/ebay/callback`);
     
     try {
       // Ensure user is authenticated
@@ -202,16 +206,29 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
       }
 
       console.log('✅ User session verified, calling edge function...');
+      console.log('🔑 Session token length:', session.access_token.length);
 
       // Clean up any pending OAuth data before starting new flow
       localStorage.removeItem('ebay_oauth_pending');
 
       // Get OAuth URL from our edge function with proper auth headers
+      const requestBody = { 
+        action: 'get_auth_url', 
+        state: 'ebay_oauth', 
+        origin: window.location.origin 
+      };
+      
+      console.log('📤 Sending request to ebay-oauth-modern:', requestBody);
+      
       const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
-        body: { action: 'get_auth_url', state: 'ebay_oauth' }
+        body: requestBody,
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       });
 
       console.log('📡 Edge function response:', { data, error });
+      console.log('📡 Full error details:', error);
 
       if (error) {
         console.error('❌ Edge function error:', error);

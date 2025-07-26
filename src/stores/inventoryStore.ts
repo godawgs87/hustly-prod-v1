@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import type { Listing } from '@/types/Listing';
+import { cleanupBrokenImageUrls, checkForBrokenImages } from '@/utils/cleanupBrokenImages';
 
 interface InventoryStats {
   totalItems: number;
@@ -76,16 +77,51 @@ export const useInventoryStore = create<InventoryState>()(
         set({ listings, stats, error: null });
       },
       
-      addListing: (listing) => set((state) => {
-        const newListings = [...state.listings, listing];
-        const stats = {
-          totalItems: newListings.length,
-          totalValue: newListings.reduce((sum, item) => sum + (item.price || 0), 0),
-          activeItems: newListings.filter(item => item.status === 'active').length,
-          draftItems: newListings.filter(item => item.status === 'draft').length
-        };
-        return { listings: newListings, stats };
-      }),
+      addListing: async (listing) => {
+        try {
+          // Get current user
+          const { data: { session }, error: authError } = await supabase.auth.getSession();
+          if (authError || !session?.user) {
+            console.error('❌ No authenticated user for adding listing');
+            return;
+          }
+
+          // Set user_id on the listing
+          const listingWithUser = {
+            ...listing,
+            user_id: session.user.id
+          };
+
+          // Save to Supabase
+          const { data, error } = await supabase
+            .from('listings')
+            .insert([listingWithUser])
+            .select()
+            .single();
+
+          if (error) {
+            console.error('❌ Failed to save listing to database:', error);
+            throw error;
+          }
+
+          console.log('✅ Listing saved to database:', data);
+
+          // Update local state with the saved listing
+          set((state) => {
+            const newListings = [...state.listings, data as Listing];
+            const stats = {
+              totalItems: newListings.length,
+              totalValue: newListings.reduce((sum, item) => sum + (item.price || 0), 0),
+              activeItems: newListings.filter(item => item.status === 'active').length,
+              draftItems: newListings.filter(item => item.status === 'draft').length
+            };
+            return { listings: newListings, stats };
+          });
+        } catch (error) {
+          console.error('❌ Error adding listing:', error);
+          set({ error: 'Failed to save listing. Please try again.' });
+        }
+      },
       
       updateListing: async (id, updates) => {
         try {
@@ -261,24 +297,94 @@ export const useInventoryStore = create<InventoryState>()(
 
       fetchListings: async () => {
         set({ isLoading: true, error: null });
-        
         try {
-          const { data: { user }, error: authError } = await supabase.auth.getUser();
-          if (authError || !user) {
-            throw new Error('Authentication required');
+          const { data: { session }, error: authError } = await supabase.auth.getSession();
+          
+          if (authError) {
+            console.error('❌ Supabase auth error:', authError);
+            throw new Error(`Authentication error: ${authError.message}`);
           }
+          
+          if (!session?.user) {
+            console.log('⚠️ No active session found. User needs to sign in.');
+            set({ 
+              error: null, 
+              isLoading: false, 
+              listings: [],
+              stats: {
+                totalItems: 0,
+                totalValue: 0,
+                activeItems: 0,
+                draftItems: 0
+              }
+            });
+            return;
+          }
+          
+          const user = session.user;
+          
+          // Clear any stale cached data first
+          const cacheKeys = Object.keys(localStorage).filter(key => 
+            key.startsWith('inventory_') || key.startsWith('listings_')
+          );
+          cacheKeys.forEach(key => {
+            try {
+              const cached = JSON.parse(localStorage.getItem(key) || '{}');
+              if (cached.timestamp && Date.now() - cached.timestamp > 300000) { // 5 minutes
+                localStorage.removeItem(key);
+              }
+            } catch {
+              localStorage.removeItem(key);
+            }
+          });
 
+          console.log('🔄 Fetching fresh inventory data from Supabase cloud for user:', user.id);
+          
           const { data, error } = await supabase
             .from('listings')
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
-          if (error) throw error;
+          if (error) {
+            console.error('❌ Supabase inventory fetch error:', error);
+            throw error;
+          }
 
-          get().setListings((data || []) as Listing[]);
+          console.log(`✅ Loaded ${data?.length || 0} listings from Supabase cloud`);
+          
+          // Check for and clean up any broken blob URLs
+          const brokenCheck = await checkForBrokenImages();
+          if (brokenCheck.hasBrokenImages) {
+            console.log(`🔧 Found ${brokenCheck.brokenCount} listings with broken images. Cleaning up...`);
+            const cleanup = await cleanupBrokenImageUrls();
+            if (cleanup.success && cleanup.fixed > 0) {
+              console.log(`✅ Fixed ${cleanup.fixed} listings with broken images`);
+              // Refetch the data after cleanup to get the updated listings
+              const { data: updatedData, error: refetchError } = await supabase
+                .from('listings')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+              
+              if (!refetchError && updatedData) {
+                get().setListings(updatedData as Listing[]);
+              } else {
+                get().setListings((data || []) as Listing[]);
+              }
+            } else {
+              get().setListings((data || []) as Listing[]);
+              if (cleanup.errors.length > 0) {
+                console.warn('⚠️ Some listings could not be cleaned up:', cleanup.errors);
+              }
+            }
+          } else {
+            get().setListings((data || []) as Listing[]);
+          }
+          
           set({ usingFallback: false });
         } catch (error: any) {
+          console.error('❌ Inventory fetch failed:', error);
           set({ error: error.message, usingFallback: true });
         } finally {
           set({ isLoading: false });

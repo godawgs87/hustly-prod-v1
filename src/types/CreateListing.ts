@@ -1,5 +1,5 @@
 
-export type Step = 'photos' | 'analysis' | 'preview' | 'shipping';
+export type Step = 'photos' | 'analysis' | 'price-research' | 'edit' | 'preview' | 'shipping';
 
 export interface ListingData {
   title: string;
@@ -24,7 +24,36 @@ export interface ListingData {
   };
   keywords?: string[];
   photos: string[];
-  priceResearch?: string;
+  priceResearch?: {
+    searchResults?: {
+      total: number;
+      items: Array<{
+        title: string;
+        price: number;
+        currency: string;
+        condition: string;
+        image?: string;
+        itemId: string;
+        seller?: string;
+        shippingCost?: number;
+        location?: string;
+        endDate?: string;
+      }>;
+    };
+    priceAnalysis?: {
+      suggestedPrice: number;
+      confidence: 'low' | 'medium' | 'high';
+      analysis: {
+        sampleSize: number;
+        priceRange: { min: number; max: number };
+        average: number;
+        median: number;
+        recommendation: string;
+      };
+    };
+    isResearching?: boolean;
+    error?: string;
+  };
   cost_basis?: number;
   fees_paid?: number;
   net_profit?: number;

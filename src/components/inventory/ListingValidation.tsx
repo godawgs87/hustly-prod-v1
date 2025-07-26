@@ -58,15 +58,7 @@ const EBAY_VALIDATION_RULES: ValidationRule[] = [
     label: 'Category',
     isRequired: true,
     validator: (listing) => !!listing.category,
-    errorMessage: 'Category is required for eBay listings',
-    category: 'listing'
-  },
-  {
-    field: 'ebay_category',
-    label: 'eBay Category',
-    isRequired: true,
-    validator: (listing) => !!listing.ebay_category_id,
-    errorMessage: 'eBay-specific category must be selected for eBay sync',
+    errorMessage: 'Category is required',
     category: 'listing'
   },
   {

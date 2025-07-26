@@ -91,10 +91,20 @@ export const usePhotoAnalysis = () => {
         setTimeout(() => reject(new Error('Analysis request timed out after 90 seconds')), 90000);
       });
       
-      const analysisPromise = supabase.functions.invoke('analyze-photos', {
-        body: requestPayload
-      });
-      
+      const analysisPromise = fetch('https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/analyze-photos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload),
+      }).then(async (response) => {
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        return response.json();
+      }).then((data) => ({ data, error: null })).catch((error) => ({ data: null, error }));
+
       const { data, error } = await Promise.race([analysisPromise, timeoutPromise]) as any;
 
       console.log('Function response received');

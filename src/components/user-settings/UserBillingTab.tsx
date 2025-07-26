@@ -1,14 +1,20 @@
-
 import React, { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { CreditCard, Download, Calendar, ExternalLink, Loader2 } from 'lucide-react';
+import { CreditCard, Download, Calendar, DollarSign, Zap, ExternalLink, Loader2 } from 'lucide-react';
 import { useSubscriptionManagement } from '@/hooks/useSubscriptionManagement';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { TIER_LIMITS, SUBSCRIPTION_TIERS } from '@/utils/constants';
 import { AddonPurchase } from '@/components/addons/AddonPurchase';
+
+interface BillingData {
+  subscription_tier: string;
+  billing_cycle_start: string | null;
+  billing_cycle_end: string | null;
+  payment_method: string | null;
+}
 
 const UserBillingTab = () => {
   const { subscriptionStatus, createCheckout, openCustomerPortal, getPaymentMethods, getBillingHistory, checking, creating } = useSubscriptionManagement();

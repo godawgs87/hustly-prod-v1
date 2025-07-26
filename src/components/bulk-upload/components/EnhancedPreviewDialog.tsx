@@ -220,7 +220,13 @@ const EnhancedPreviewDialog = ({ group, isOpen, onClose, onSave }: EnhancedPrevi
               {group.status}
             </Badge>
             <span className="text-sm text-gray-600">
-              Category: {group.listingData?.category || 'Not set'}
+              Category: {group.listingData?.category ? (
+                typeof group.listingData.category === 'object' && group.listingData.category !== null ? (
+                  `${(group.listingData.category as any)?.primary || ''} ${(group.listingData.category as any)?.subcategory ? `> ${(group.listingData.category as any).subcategory}` : ''}`
+                ) : (
+                  String(group.listingData.category)
+                )
+              ) : 'Not set'}
             </span>
           </div>
 

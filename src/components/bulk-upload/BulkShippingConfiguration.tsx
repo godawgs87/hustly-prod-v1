@@ -16,13 +16,15 @@ interface BulkShippingConfigurationProps {
   onComplete: (groupsWithShipping: PhotoGroup[]) => void;
   onBack: () => void;
   onUpdateGroup: (group: PhotoGroup) => void;
+  children?: React.ReactNode;
 }
 
 const BulkShippingConfiguration = ({ 
   photoGroups, 
   onComplete, 
   onBack, 
-  onUpdateGroup 
+  onUpdateGroup,
+  children 
 }: BulkShippingConfigurationProps) => {
   const { toast } = useToast();
   const [groups, setGroups] = useState<PhotoGroup[]>([]);
@@ -54,20 +56,23 @@ const BulkShippingConfiguration = ({
   }, [photoGroups]);
 
   const estimateItemWeight = (group: PhotoGroup): number => {
-    const category = group.listingData?.category?.toLowerCase() || '';
+    // Handle category as either string or object
+    const categoryStr = typeof group.listingData?.category === 'object' && group.listingData?.category !== null
+      ? `${(group.listingData.category as any)?.primary || ''} ${(group.listingData.category as any)?.subcategory || ''}`.toLowerCase()
+      : (group.listingData?.category as string)?.toLowerCase() || '';
     const title = group.listingData?.title?.toLowerCase() || '';
     
     // Weight estimation based on item type
-    if (category.includes('clothing') || title.includes('shirt') || title.includes('dress')) {
+    if (categoryStr.includes('clothing') || title.includes('shirt') || title.includes('dress')) {
       return 0.5; // 0.5 lbs for clothing
     }
-    if (category.includes('shoes') || title.includes('shoe')) {
+    if (categoryStr.includes('shoes') || title.includes('shoe')) {
       return 2; // 2 lbs for shoes
     }
-    if (category.includes('electronics')) {
+    if (categoryStr.includes('electronics')) {
       return 3; // 3 lbs for electronics
     }
-    if (category.includes('books')) {
+    if (categoryStr.includes('books')) {
       return 1; // 1 lb for books
     }
     
@@ -196,6 +201,9 @@ const BulkShippingConfiguration = ({
             </div>
           </div>
 
+          {/* Render additional quick apply buttons from children */}
+          {children}
+
           <Separator />
 
           {/* Individual Item Configuration */}
@@ -257,9 +265,28 @@ const BulkShippingConfiguration = ({
                                   <span className="text-sm sm:text-base">{option.name}</span>
                                   <span className="text-xs sm:text-sm text-gray-500">({option.estimatedDays})</span>
                                 </div>
-                                <span className="font-medium text-sm sm:text-base">
-                                  {option.cost === 0 ? 'FREE' : `$${option.cost.toFixed(2)}`}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  {option.cost === 0 ? (
+                                    <span className="font-medium text-sm sm:text-base text-green-600">FREE</span>
+                                  ) : (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-sm">$</span>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        defaultValue={option.cost.toFixed(2)}
+                                        className="w-16 px-1 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                                        onChange={(e) => {
+                                          const newCost = parseFloat(e.target.value) || option.cost;
+                                          // Update the option cost in real-time
+                                          option.cost = newCost;
+                                        }}
+                                        title="Click to override shipping cost"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
                               </Label>
                             </div>
                           ))}

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -20,6 +19,7 @@ const UserSettings = () => {
     <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
         title="Account Settings"
+        userEmail={user?.email}
         showBack
         onBack={handleBack}
       />

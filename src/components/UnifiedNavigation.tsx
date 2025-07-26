@@ -1,23 +1,19 @@
-
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   Home, 
-  Package, 
   PlusCircle, 
-  BarChart3, 
+  Bell,
   Settings,
-  List,
   Loader2
 } from 'lucide-react';
 
 interface UnifiedNavigationProps {
   loading?: boolean;
   notifications?: {
-    inventory?: number;
-    listings?: number;
+    alerts?: number;
   };
 }
 
@@ -30,14 +26,7 @@ const UnifiedNavigation = ({ loading, notifications }: UnifiedNavigationProps) =
       path: '/', 
       icon: Home, 
       label: 'Dashboard',
-      description: 'Overview & quick actions'
-    },
-    { 
-      path: '/inventory', 
-      icon: Package, 
-      label: 'Inventory',
-      description: 'Manage your items',
-      notification: notifications?.inventory
+      description: 'Command center & overview'
     },
     { 
       path: '/create-listing', 
@@ -47,23 +36,17 @@ const UnifiedNavigation = ({ loading, notifications }: UnifiedNavigationProps) =
       primary: true
     },
     { 
-      path: '/listings', 
-      icon: List, 
-      label: 'Listings',
-      description: 'Manage listings',
-      notification: notifications?.listings
-    },
-    { 
-      path: '/active-listings', 
-      icon: BarChart3, 
-      label: 'Active',
-      description: 'Track performance'
+      path: '/alerts', 
+      icon: Bell, 
+      label: 'Alerts',
+      description: 'Time-sensitive notifications',
+      notification: notifications?.alerts
     },
     { 
       path: '/settings', 
       icon: Settings, 
       label: 'Settings',
-      description: 'Configure app'
+      description: 'Account & configuration'
     },
   ];
 
