@@ -401,14 +401,20 @@ const PhotoGroupingInterface = ({ photoGroups, onGroupsConfirmed, onBack }: Phot
                         onDragStart={() => handleDragStart(photo, group.id, photoIndex)}
                         onClick={() => {
                           const photoKey = `${group.id}-${photoIndex}`;
+                          console.log('Photo clicked:', photoKey, 'Currently selected:', selectedPhotos.has(photoKey));
                           if (selectedPhotos.has(photoKey)) {
                             setSelectedPhotos(prev => {
                               const newSet = new Set(prev);
                               newSet.delete(photoKey);
+                              console.log('Deselected photo, new selection:', Array.from(newSet));
                               return newSet;
                             });
                           } else {
-                            setSelectedPhotos(prev => new Set([...prev, photoKey]));
+                            setSelectedPhotos(prev => {
+                              const newSet = new Set([...prev, photoKey]);
+                              console.log('Selected photo, new selection:', Array.from(newSet));
+                              return newSet;
+                            });
                           }
                         }}
                       >
@@ -427,14 +433,20 @@ const PhotoGroupingInterface = ({ photoGroups, onGroupsConfirmed, onBack }: Phot
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const photoKey = `${group.id}-${photoIndex}`;
+                                console.log('Mobile button clicked:', photoKey, 'Currently selected:', selectedPhotos.has(photoKey));
                                 if (selectedPhotos.has(photoKey)) {
                                   setSelectedPhotos(prev => {
                                     const newSet = new Set(prev);
                                     newSet.delete(photoKey);
+                                    console.log('Mobile deselected photo, new selection:', Array.from(newSet));
                                     return newSet;
                                   });
                                 } else {
-                                  setSelectedPhotos(prev => new Set([...prev, photoKey]));
+                                  setSelectedPhotos(prev => {
+                                    const newSet = new Set([...prev, photoKey]);
+                                    console.log('Mobile selected photo, new selection:', Array.from(newSet));
+                                    return newSet;
+                                  });
                                 }
                               }}
                             >

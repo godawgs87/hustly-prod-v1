@@ -80,6 +80,7 @@ const UnifiedMobileNavigation = ({
     );
   }
 
+  // MOBILE NAV FIX: Only show Home, Create, Settings (cache bust v2)
   const navItems = [
     {
       view: 'dashboard',
