@@ -80,7 +80,7 @@ const UnifiedMobileNavigation = ({
     );
   }
 
-  // MOBILE NAV FIX: Only show Home, Create, Settings (cache bust v2)
+  // MOBILE NAV FIX v3: FORCE ONLY 3 ITEMS - AGGRESSIVE CACHE BUST
   const navItems = [
     {
       view: 'dashboard',
@@ -96,11 +96,17 @@ const UnifiedMobileNavigation = ({
       primary: true
     }
   ];
+  
+  // FORCE ONLY THESE 3 ITEMS - NO SALES, INVENTORY, DATA
+  console.log('MOBILE NAV: Rendering only', navItems.length, 'items + Settings');
+  
+  // Ensure we never render more than these 3 items
+  const limitedNavItems = navItems.slice(0, 2);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600 z-50 shadow-lg">
       <div className="flex justify-around items-center py-2 px-1">
-        {navItems.map(({ view, icon: Icon, label, action, primary }) => (
+        {limitedNavItems.map(({ view, icon: Icon, label, action, primary }) => (
           <div key={view} className="relative">
             <Button
               variant={currentView === view ? 'default' : 'ghost'}
