@@ -54,6 +54,14 @@ export const generateShippingOptions = (weight: number = 1): ShippingOption[] =>
       description: 'Buyer picks up item in person - no shipping required'
     },
     {
+      id: 'free-shipping',
+      name: 'Free Shipping',
+      cost: 0,
+      days: '3-7 business days',
+      estimatedDays: '3-7 business days',
+      description: 'Free shipping included in item price'
+    },
+    {
       id: 'usps-ground',
       name: 'USPS Ground Advantage',
       cost: calculateShippingCost(weight, dimensions, 'ground'),

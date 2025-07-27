@@ -144,7 +144,7 @@ const BulkShippingConfiguration = ({
   );
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 space-y-6">
+    <div className="w-full max-w-7xl mx-auto p-4 space-y-6">
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -179,6 +179,15 @@ const BulkShippingConfiguration = ({
               >
                 <MapPin className="w-3 h-3 mr-1" />
                 All Items → Local Pickup (Free)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkApply('free-shipping', (g) => true)}
+                className="bg-white text-xs sm:text-sm"
+              >
+                <CheckCircle className="w-3 h-3 mr-1" />
+                All Items → Free Shipping
               </Button>
               <Button
                 variant="outline"
