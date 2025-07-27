@@ -509,7 +509,6 @@ const Dashboard = () => {
       {isMobile && (
         <SimplifiedMobileNav
           currentView="dashboard"
-          onNavigate={() => {}}
           title="Dashboard"
         />
       )}

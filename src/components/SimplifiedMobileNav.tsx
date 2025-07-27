@@ -17,6 +17,7 @@ const SimplifiedMobileNav: React.FC<SimplifiedMobileNavProps> = ({
   const navigate = useNavigate();
 
   const handleDefaultNavigation = (view: string) => {
+    console.log('🔥 MOBILE NAV: Navigating to', view);
     switch (view) {
       case 'dashboard':
         navigate('/');
