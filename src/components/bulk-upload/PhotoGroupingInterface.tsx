@@ -399,7 +399,18 @@ const PhotoGroupingInterface = ({ photoGroups, onGroupsConfirmed, onBack }: Phot
                         className="aspect-square bg-gray-100 rounded-lg overflow-hidden relative group cursor-pointer hover:shadow-lg transition-all"
                         draggable
                         onDragStart={() => handleDragStart(photo, group.id, photoIndex)}
-                        onClick={() => movePhotoToNewGroup(photo, group.id, photoIndex)}
+                        onClick={() => {
+                          const photoKey = `${group.id}-${photoIndex}`;
+                          if (selectedPhotos.has(photoKey)) {
+                            setSelectedPhotos(prev => {
+                              const newSet = new Set(prev);
+                              newSet.delete(photoKey);
+                              return newSet;
+                            });
+                          } else {
+                            setSelectedPhotos(prev => new Set([...prev, photoKey]));
+                          }
+                        }}
                       >
                         <img
                           src={URL.createObjectURL(photo)}

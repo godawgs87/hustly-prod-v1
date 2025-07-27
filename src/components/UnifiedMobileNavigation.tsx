@@ -79,32 +79,13 @@ const UnifiedMobileNavigation = ({
       label: 'Create',
       action: () => onNavigate('create'),
       primary: true
-    },
-    {
-      view: 'active-listings',
-      icon: BarChart3,
-      label: 'Sales',
-      action: () => onNavigate('active-listings')
-    },
-    {
-      view: 'inventory',
-      icon: Package,
-      label: 'Inventory',
-      action: () => onNavigate('inventory'),
-      notification: notifications?.inventory
-    },
-    {
-      view: 'data-management',
-      icon: Database,
-      label: 'Data',
-      action: () => onNavigate('data-management')
     }
   ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600 z-50 shadow-lg">
       <div className="flex justify-around items-center py-2 px-1">
-        {navItems.map(({ view, icon: Icon, label, action, notification, primary }) => (
+        {navItems.map(({ view, icon: Icon, label, action, primary }) => (
           <div key={view} className="relative">
             <Button
               variant={currentView === view ? 'default' : 'ghost'}
@@ -122,15 +103,6 @@ const UnifiedMobileNavigation = ({
               )}
               <span className="text-xs">{label}</span>
             </Button>
-            
-            {notification && notification > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 px-1 py-0 text-xs h-4 min-w-4 flex items-center justify-center"
-              >
-                {notification > 99 ? '99+' : notification}
-              </Badge>
-            )}
           </div>
         ))}
         

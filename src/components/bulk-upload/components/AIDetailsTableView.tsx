@@ -139,9 +139,9 @@ const AIDetailsTableView = ({
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+      <Card className="mx-0">
+        <CardHeader className="px-2 py-3 sm:px-6 sm:py-4">
+          <CardTitle className="flex items-center justify-between text-base sm:text-lg">
             <span className="flex items-center gap-2">📊 AI Analysis Details</span>
             {!isAnalyzing && photoGroups.some(g => g.status === 'pending') && (
               <Button 
@@ -154,42 +154,42 @@ const AIDetailsTableView = ({
                     onRunAI(g.id);
                   });
                 }}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm px-2 py-1 sm:px-4 sm:py-2"
               >
                 Start AI Analysis
               </Button>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table className="text-sm">
+        <CardContent className="px-1 py-2 sm:px-6 sm:py-4">
+          <div className="overflow-x-auto -mx-1 sm:mx-0">
+            <Table className="text-xs sm:text-sm w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 px-2 py-2">Status</TableHead>
-                  <TableHead className="w-16 px-2 py-2">Photo</TableHead>
-                  <TableHead className="min-w-[180px] px-2 py-2">Title</TableHead>
-                  <TableHead className="w-20 px-2 py-2">Price</TableHead>
-                  <TableHead className="w-28 px-2 py-2">Category</TableHead>
-                  <TableHead className="w-20 px-2 py-2">Condition</TableHead>
-                  <TableHead className="w-28 px-2 py-2">Measurements</TableHead>
-                  <TableHead className="min-w-[120px] px-2 py-2">Keywords</TableHead>
-                  <TableHead className="min-w-[160px] px-2 py-2">Description</TableHead>
-                  <TableHead className="w-28 px-2 py-2">Actions</TableHead>
+                  <TableHead className="w-8 px-1 py-1 sm:px-2 sm:py-2 text-xs">Status</TableHead>
+                  <TableHead className="w-12 px-1 py-1 sm:px-2 sm:py-2 text-xs">Photo</TableHead>
+                  <TableHead className="min-w-[120px] px-1 py-1 sm:px-2 sm:py-2 text-xs">Title</TableHead>
+                  <TableHead className="w-16 px-1 py-1 sm:px-2 sm:py-2 text-xs">Price</TableHead>
+                  <TableHead className="w-20 px-1 py-1 sm:px-2 sm:py-2 text-xs">Category</TableHead>
+                  <TableHead className="w-16 px-1 py-1 sm:px-2 sm:py-2 text-xs">Condition</TableHead>
+                  <TableHead className="w-20 px-1 py-1 sm:px-2 sm:py-2 text-xs">Measurements</TableHead>
+                  <TableHead className="min-w-[80px] px-1 py-1 sm:px-2 sm:py-2 text-xs">Keywords</TableHead>
+                  <TableHead className="min-w-[100px] px-1 py-1 sm:px-2 sm:py-2 text-xs">Description</TableHead>
+                  <TableHead className="w-20 px-1 py-1 sm:px-2 sm:py-2 text-xs">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {photoGroups.map((group) => (
                   <TableRow key={group.id} className="hover:bg-gray-50">
-                    <TableCell className="px-2 py-2">
-                      <div className="flex flex-col items-center gap-1">
-                        {getStatusIcon(group)}
-                        <div className="text-xs">{getStatusBadge(group)}</div>
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <div className="w-3 h-3 sm:w-4 sm:h-4">{getStatusIcon(group)}</div>
+                        <div className="text-xs leading-none">{getStatusBadge(group)}</div>
                       </div>
                     </TableCell>
                     
-                    <TableCell className="px-2 py-2">
-                      <div className="w-12 h-12 rounded overflow-hidden bg-gray-100">
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
+                      <div className="w-8 h-8 sm:w-12 sm:h-12 rounded overflow-hidden bg-gray-100">
                         {group.photos && group.photos.length > 0 ? (
                           <img
                             src={URL.createObjectURL(group.photos[0])}
@@ -204,22 +204,22 @@ const AIDetailsTableView = ({
                       </div>
                     </TableCell>
                     
-                    <TableCell className="px-2 py-2">
-                      <div className="space-y-1">
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
+                      <div className="space-y-0.5">
                         <div className="font-medium text-xs leading-tight">
                           {group.status === 'processing' ? (
                             <div className="text-blue-600 animate-pulse">Analyzing...</div>
                           ) : (
-                            <div className="line-clamp-2">{group.listingData?.title || group.name}</div>
+                            <div className="line-clamp-1 sm:line-clamp-2">{group.listingData?.title || group.name}</div>
                           )}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 hidden sm:block">
                           {group.photos?.length || 0} photos
                         </div>
                       </div>
                     </TableCell>
                     
-                    <TableCell className="px-2 py-2">
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
                       <div className="text-right font-medium text-xs">
                         {group.status === 'processing' ? (
                           <div className="text-blue-600 animate-pulse">...</div>
@@ -229,20 +229,20 @@ const AIDetailsTableView = ({
                       </div>
                     </TableCell>
                     
-                    <TableCell className="px-2 py-2">
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
                       <div className="text-xs">
                         {group.status === 'processing' ? (
                           <div className="text-blue-600 animate-pulse">...</div>
                         ) : group.listingData?.category ? (
                           typeof group.listingData.category === 'object' && group.listingData.category !== null ? (
                             <div>
-                              <div className="font-medium leading-tight">{(group.listingData.category as any)?.primary || ''}</div>
+                              <div className="font-medium leading-none">{(group.listingData.category as any)?.primary || ''}</div>
                               {(group.listingData.category as any)?.subcategory && (
-                                <div className="text-xs text-gray-500 leading-tight">{(group.listingData.category as any).subcategory}</div>
+                                <div className="text-xs text-gray-500 leading-none hidden sm:block">{(group.listingData.category as any).subcategory}</div>
                               )}
                             </div>
                           ) : (
-                            <div className="leading-tight">{String(group.listingData.category)}</div>
+                            <div className="leading-none">{String(group.listingData.category)}</div>
                           )
                         ) : (
                           '-'
@@ -250,7 +250,7 @@ const AIDetailsTableView = ({
                       </div>
                     </TableCell>
                     
-                    <TableCell className="px-2 py-2">
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
                       <div className="text-xs">
                         {group.status === 'processing' ? (
                           <div className="text-blue-600 animate-pulse">...</div>
@@ -260,8 +260,8 @@ const AIDetailsTableView = ({
                       </div>
                     </TableCell>
                     
-                    <TableCell className="px-2 py-2">
-                      <div className="text-xs space-y-1">
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
+                      <div className="text-xs space-y-0.5">
                         {group.status === 'processing' ? (
                           <div className="text-blue-600 animate-pulse">...</div>
                         ) : group.listingData?.measurements ? (
@@ -269,7 +269,7 @@ const AIDetailsTableView = ({
                             const measurements = group.listingData.measurements;
                             const validMeasurements = Object.entries(measurements)
                               .filter(([key, value]) => value !== null && value !== undefined && value !== '')
-                              .slice(0, 3); // Show max 3 measurements to save space
+                              .slice(0, 2); // Show max 2 measurements on mobile
                             
                             if (validMeasurements.length === 0) {
                               return <span className="text-gray-400">-</span>;
@@ -289,7 +289,7 @@ const AIDetailsTableView = ({
                               }[key] || key.charAt(0).toUpperCase();
                               
                               return (
-                                <div key={key} title={`${key}: ${value}`} className="leading-tight">
+                                <div key={key} title={`${key}: ${value}`} className="leading-none">
                                   {shortKey}: {value}
                                 </div>
                               );
@@ -301,35 +301,35 @@ const AIDetailsTableView = ({
                       </div>
                     </TableCell>
                     
-                    <TableCell className="px-2 py-2">
-                      <div className="space-y-1">
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
+                      <div className="space-y-0.5">
                         {group.status === 'processing' ? (
                           <div className="text-blue-600 animate-pulse">...</div>
                         ) : group.listingData?.keywords && group.listingData.keywords.length > 0 ? (
-                          group.listingData.keywords.slice(0, 2).map((keyword, index) => (
-                            <Badge key={index} variant="outline" className="text-xs mr-1 px-1 py-0">
-                              {keyword}
-                            </Badge>
-                          ))
+                          <div className="flex flex-wrap gap-0.5">
+                            {group.listingData.keywords.slice(0, 1).map((keyword, index) => (
+                              <Badge key={index} variant="outline" className="text-xs px-1 py-0 leading-none">
+                                {keyword.length > 8 ? `${keyword.substring(0, 8)}...` : keyword}
+                              </Badge>
+                            ))}
+                            {group.listingData.keywords.length > 1 && (
+                              <span className="text-xs text-gray-500">+{group.listingData.keywords.length - 1}</span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-gray-400 text-xs">-</span>
-                        )}
-                        {group.listingData?.keywords && group.listingData.keywords.length > 2 && (
-                          <div className="text-xs text-gray-500">
-                            +{group.listingData.keywords.length - 2} more
-                          </div>
                         )}
                       </div>
                     </TableCell>
                     
-                    <TableCell className="px-2 py-2">
-                      <div className="text-xs text-gray-600 max-w-[140px]">
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
+                      <div className="text-xs text-gray-600 max-w-[80px] sm:max-w-[120px]">
                         {group.status === 'processing' ? (
-                          <div className="text-blue-600 animate-pulse">Generating...</div>
+                          <div className="text-blue-600 animate-pulse">...</div>
                         ) : group.listingData?.description ? (
-                          <div className="line-clamp-2 leading-tight">
-                            {group.listingData.description.length > 60 
-                              ? `${group.listingData.description.substring(0, 60)}...`
+                          <div className="line-clamp-1 sm:line-clamp-2 leading-none">
+                            {group.listingData.description.length > 30 
+                              ? `${group.listingData.description.substring(0, 30)}...`
                               : group.listingData.description
                             }
                           </div>
@@ -339,8 +339,8 @@ const AIDetailsTableView = ({
                       </div>
                     </TableCell>
                     
-                    <TableCell className="px-2 py-2">
-                      <div className="flex flex-col gap-1">
+                    <TableCell className="px-1 py-1 sm:px-2 sm:py-2">
+                      <div className="flex flex-col gap-0.5">
                         {group.status === 'pending' && (
                           <Button
                             size="sm"
