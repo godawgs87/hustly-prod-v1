@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Upload, Grid3X3, CheckCircle, Truck, BarChart } from 'lucide-react';
+import { Upload, Grid3X3, CheckCircle, TrendingUp, Truck, BarChart } from 'lucide-react';
 
 interface BulkUploadStepIndicatorProps {
   currentStep: string;
@@ -19,9 +19,11 @@ const BulkUploadStepIndicator = ({
     switch (step) {
       case 'upload': return Upload;
       case 'grouping': return Grid3X3;
-      case 'processing': return CheckCircle;
+      case 'analysis': return CheckCircle;
+      case 'priceResearch': return TrendingUp;
+      case 'confirmation': return BarChart;
       case 'shipping': return Truck;
-      case 'review': return BarChart;
+      case 'finalReview': return BarChart;
       default: return Upload;
     }
   };
@@ -29,8 +31,11 @@ const BulkUploadStepIndicator = ({
   const steps = [
     { key: 'upload', label: 'Upload Photos', completed: photos.length > 0 },
     { key: 'grouping', label: 'Group Items', completed: photoGroups.length > 0 },
-    { key: 'processing', label: 'Process Groups', completed: processingResults.length > 0 },
-    { key: 'review', label: 'Review & Post', completed: photoGroups.every(g => g.selectedShipping) }
+    { key: 'analysis', label: 'AI Analysis', completed: photoGroups.some(g => g.listingData?.title) },
+    { key: 'priceResearch', label: 'Price Research', completed: photoGroups.some(g => g.listingData?.priceResearch) },
+    { key: 'confirmation', label: 'Review Items', completed: photoGroups.length > 0 },
+    { key: 'shipping', label: 'Configure Shipping', completed: photoGroups.every(g => g.selectedShipping) },
+    { key: 'finalReview', label: 'Final Review', completed: false }
   ];
 
   return (

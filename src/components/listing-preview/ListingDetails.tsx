@@ -6,7 +6,7 @@ import SizeInformation from './SizeInformation';
 interface ListingDetailsProps {
   title: string;
   price: number;
-  shippingCost?: number;
+
   category: string;
   condition: string;
   brand?: string;
@@ -28,7 +28,7 @@ interface ListingDetailsProps {
 const ListingDetails = ({
   title,
   price,
-  shippingCost,
+
   category,
   condition,
   brand,
@@ -45,21 +45,9 @@ const ListingDetails = ({
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-gray-900 pr-4">{title}</h2>
       
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <span className="text-sm text-gray-500">Price</span>
-          <p className="text-2xl font-bold text-green-600">${price}</p>
-        </div>
-        <div>
-          <span className="text-sm text-gray-500">Shipping</span>
-          <p className="text-lg font-semibold">
-            {shippingCost === 0 ? (
-              <span className="text-green-600">Free</span>
-            ) : (
-              `$${shippingCost?.toFixed(2) || '9.95'}`
-            )}
-          </p>
-        </div>
+      <div className="mb-4">
+        <span className="text-sm text-gray-500">Price</span>
+        <p className="text-2xl font-bold text-green-600">${price}</p>
       </div>
 
       <div className="flex flex-wrap gap-2">

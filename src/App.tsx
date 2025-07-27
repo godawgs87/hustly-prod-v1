@@ -19,6 +19,7 @@ import SubscriptionPlans from '@/pages/SubscriptionPlans';
 import AlertsPage from '@/pages/AlertsPage';
 import PricingPage from '@/pages/PricingPage';
 import ShippingPage from '@/pages/ShippingPage';
+import PasswordReset from '@/pages/PasswordReset';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Camera, Upload, Sparkles, Zap } from 'lucide-react';
@@ -31,6 +32,7 @@ import CreateListingSteps from '@/components/create-listing/CreateListingSteps';
 import { Step, ListingData } from '@/types/CreateListing';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 // Working CreateListing component that integrates with existing components
 const CreateListingWorking = () => {
@@ -321,9 +323,42 @@ const CreateListingWorking = () => {
     setShippingCost(option.cost || 0);
   };
 
-  const handleListingDataChange = (updates: Partial<ListingData>) => {
+  const handleListingDataChange = async (updates: Partial<ListingData>) => {
+    console.log('💰 [App.tsx] handleListingDataChange called with updates:', updates);
+    console.log('💰 [App.tsx] Current listingData before update:', listingData?.price);
+    
     if (listingData) {
-      setListingData({ ...listingData, ...updates });
+      const updatedListingData = { ...listingData, ...updates };
+      console.log('💰 [App.tsx] Setting updated listingData with price:', updatedListingData.price);
+      setListingData(updatedListingData);
+      
+      // Auto-save changes to database (especially important for price updates)
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Find and update the existing draft listing
+          const { listings, updateListing } = useInventoryStore.getState();
+          const existingDraft = listings.find(listing => 
+            listing.status === 'draft' && 
+            listing.title === listingData.title &&
+            listing.user_id === user.id
+          );
+          
+          if (existingDraft) {
+            const updatedDraft = {
+              ...existingDraft,
+              ...updates,
+              updated_at: new Date().toISOString()
+            };
+            
+            await updateListing(existingDraft.id, updatedDraft);
+            console.log('✅ Auto-saved listing data changes:', updates);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Auto-save failed for listing data changes:', error);
+        // Continue without blocking the UI
+      }
     }
   };
 
@@ -525,20 +560,21 @@ const AppContent = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Routes>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/auth" element={<AuthWrapper />} />
-        <Route path="/inventory" element={<SimpleInventoryPage />} />
-        <Route path="/create-listing" element={<CreateListingWorking />} />
-        <Route path="/active-listings" element={<ActiveListingsWrapper />} />
-        <Route path="/data-management" element={<DataManagementWrapper />} />
-        <Route path="/settings" element={<UserSettings />} />
-        <Route path="/plans" element={<SubscriptionPlans />} />
-        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+        <Route path="/reset-password" element={<PasswordReset />} />
+        <Route path="/inventory" element={<ProtectedRoute><SimpleInventoryPage /></ProtectedRoute>} />
+        <Route path="/create-listing" element={<ProtectedRoute><CreateListingWorking /></ProtectedRoute>} />
+        <Route path="/active-listings" element={<ProtectedRoute><ActiveListingsWrapper /></ProtectedRoute>} />
+        <Route path="/data-management" element={<ProtectedRoute><DataManagementWrapper /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
+        <Route path="/plans" element={<ProtectedRoute><SubscriptionPlans /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />
         <Route path="/ebay/callback" element={<EbayCallback />} />
-        <Route path="/alerts" element={<AlertsPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/shipping" element={<ShippingPage />} />
-        <Route path="*" element={<Dashboard />} />
+        <Route path="/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
+        <Route path="/pricing" element={<ProtectedRoute><PricingPage /></ProtectedRoute>} />
+        <Route path="/shipping" element={<ProtectedRoute><ShippingPage /></ProtectedRoute>} />
+        <Route path="*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       </Routes>
       <Toaster />
       

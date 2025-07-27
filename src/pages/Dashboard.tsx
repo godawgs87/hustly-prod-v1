@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/components/AuthProvider';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import StreamlinedHeader from '@/components/StreamlinedHeader';
 import UnifiedMobileNavigation from '@/components/UnifiedMobileNavigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,93 +74,134 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Mock data - replace with real API calls
-  const [businessMetrics] = useState<BusinessMetrics>({
-    revenue: { current: 2340, change: 12, period: 'vs last month' },
-    profit: { current: 1591, margin: 68, change: 3 },
-    activeListings: { count: 45, platforms: 3 },
-    inventory: { total: 23, readyToList: 12 }
+  // Live business metrics from inventory and listings data
+  const { data: listings = [] } = useQuery({
+    queryKey: ['user-listings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('user_id', user?.id)
+        .eq('status', 'active');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id
   });
 
-  const [platformStatus] = useState<PlatformStatus[]>([
-    {
-      platform: 'eBay',
-      status: 'connected',
-      lastSync: '2 minutes ago',
-      activeListings: 28,
-      pendingActions: 2
+  const { data: inventory = [] } = useQuery({
+    queryKey: ['user-inventory'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('user_id', user?.id);
+      if (error) throw error;
+      return data || [];
     },
-    {
-      platform: 'Mercari',
-      status: 'syncing',
-      lastSync: '5 minutes ago',
-      activeListings: 12,
-      pendingActions: 0
-    },
-    {
-      platform: 'Poshmark',
-      status: 'error',
-      lastSync: '2 hours ago',
-      activeListings: 5,
-      pendingActions: 1
-    }
-  ]);
+    enabled: !!user?.id
+  });
 
-  const [actionItems] = useState<ActionItem[]>([
-    {
-      id: '1',
-      type: 'offer',
-      title: '3 eBay offers awaiting response',
-      description: 'Respond within 24 hours to maintain good seller rating',
-      priority: 'high',
-      platform: 'eBay',
-      actionUrl: '/active-listings'
-    },
-    {
-      id: '2',
-      type: 'shipping',
-      title: '2 items need shipping labels',
-      description: 'Create labels to avoid shipping delays',
-      priority: 'high',
-      actionUrl: '/shipping'
-    },
-    {
-      id: '3',
-      type: 'sync',
-      title: 'Poshmark sync failed',
-      description: 'Reconnect account to resume listing sync',
-      priority: 'medium',
-      platform: 'Poshmark',
-      actionUrl: '/settings'
-    }
-  ]);
+  const businessMetrics: BusinessMetrics = useMemo(() => {
+    const activeListings = listings.filter(l => l.status === 'active');
+    const soldListings = inventory.filter(l => l.status === 'sold' && l.sold_date);
+    const totalRevenue = soldListings.reduce((sum, item) => sum + (item.sold_price || 0), 0);
+    const totalCosts = soldListings.reduce((sum, item) => sum + (item.purchase_price || 0), 0);
+    const profit = totalRevenue - totalCosts;
+    const profitMargin = totalRevenue > 0 ? Math.round((profit / totalRevenue) * 100) : 0;
+    
+    return {
+      revenue: { current: totalRevenue, change: 0, period: 'total' },
+      profit: { current: profit, margin: profitMargin, change: 0 },
+      activeListings: { count: activeListings.length, platforms: 1 }, // TODO: Count actual platforms
+      inventory: { total: inventory.length, readyToList: inventory.filter(l => l.status === 'draft').length }
+    };
+  }, [listings, inventory]);
 
-  const [aiInsights] = useState<AIInsight[]>([
-    {
-      id: '1',
-      type: 'trending',
-      title: 'Electronics trending up 15%',
-      description: 'Perfect time to list electronics - demand is high',
-      impact: 'List now for best results',
-      actionUrl: '/create-listing'
+  // Live platform status from actual connections
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .maybeSingle();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
     },
-    {
-      id: '2',
-      type: 'pricing',
-      title: '3 items ready for repricing',
-      description: 'AI detected pricing opportunities for better profit',
-      impact: '+$45 potential profit',
-      actionUrl: '/pricing'
+    enabled: !!user?.id
+  });
+
+  // Check eBay connection status
+  const { data: marketplaceAccounts } = useQuery({
+    queryKey: ['marketplace-accounts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('marketplace_accounts')
+        .select('*')
+        .eq('user_id', user?.id);
+      if (error) throw error;
+      return data || [];
     },
-    {
-      id: '3',
-      type: 'timing',
-      title: 'Best time to list: Tonight 8-10pm',
-      description: 'Historical data shows peak buyer activity',
-      impact: '23% higher view rate',
-      actionUrl: '/create-listing'
+    enabled: !!user?.id
+  });
+
+  const platformStatus: PlatformStatus[] = useMemo(() => {
+    const ebayListings = listings.filter(l => l.status === 'active').length;
+    const ebayAccount = marketplaceAccounts?.find(acc => acc.platform === 'ebay' && acc.is_connected);
+    const isEbayConnected = !!ebayAccount;
+    
+    return [
+      {
+        platform: 'eBay',
+        status: isEbayConnected ? 'connected' : 'disconnected',
+        lastSync: isEbayConnected ? 'Connected' : 'Not connected',
+        activeListings: ebayListings,
+        pendingActions: 0
+      },
+      {
+        platform: 'Mercari',
+        status: 'disconnected',
+        lastSync: 'Not connected',
+        activeListings: 0,
+        pendingActions: 0
+      },
+      {
+        platform: 'Poshmark',
+        status: 'disconnected',
+        lastSync: 'Not connected',
+        activeListings: 0,
+        pendingActions: 0
+      }
+    ];
+  }, [userProfile, listings]);
+
+  // Action items based on actual data - currently empty, can be expanded with real notifications
+  const actionItems: ActionItem[] = useMemo(() => {
+    const items: ActionItem[] = [];
+    
+    // Add action items based on actual data
+    const draftListings = inventory.filter(l => l.status === 'draft');
+    if (draftListings.length > 0) {
+      items.push({
+        id: 'draft-listings',
+        type: 'sync',
+        title: `${draftListings.length} draft listings ready to publish`,
+        description: 'Complete and publish your draft listings',
+        priority: 'medium',
+        actionUrl: '/inventory'
+      });
     }
-  ]);
+    
+    return items;
+  }, [inventory]);
+
+  // AI insights - currently empty, can be expanded with real AI-generated insights
+  const aiInsights: AIInsight[] = useMemo(() => {
+    // TODO: Implement real AI insights based on user data and market trends
+    return [];
+  }, []);
 
   const getStatusIcon = (status: PlatformStatus['status']) => {
     switch (status) {

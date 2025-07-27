@@ -332,6 +332,15 @@ const AuthPage = ({ onAuthSuccess }: AuthPageProps) => {
                 >
                   {loading ? 'Signing In...' : 'Sign In'}
                 </Button>
+                <div className="text-center">
+                  <Button
+                    variant="link"
+                    onClick={() => navigate('/reset-password')}
+                    className="text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    Forgot your password?
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4">

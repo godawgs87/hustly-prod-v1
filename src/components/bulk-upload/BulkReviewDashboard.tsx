@@ -72,6 +72,24 @@ const BulkReviewDashboard = ({
   const completedItems = photoGroups.filter(g => g.status === 'completed').length;
   const readyForShipping = photoGroups.filter(g => g.status === 'completed' && !g.selectedShipping).length;
   const readyToPost = photoGroups.filter(g => g.status === 'completed' && g.selectedShipping && !g.isPosted).length;
+  
+  // Check if items have price research data (indicating price research was completed)
+  const hasPriceResearch = photoGroups.some(g => 
+    g.status === 'completed' && 
+    g.listingData?.priceResearch && 
+    g.listingData.priceResearch !== 'null' && 
+    g.listingData.priceResearch !== ''
+  );
+  
+  // Items that need price research (completed but no price research data)
+  const needsPriceResearch = photoGroups.filter(g => 
+    g.status === 'completed' && 
+    (!g.listingData?.priceResearch || g.listingData.priceResearch === 'null' || g.listingData.priceResearch === '')
+  ).length;
+  
+  // Check if all completed items are ready but price research failed/was skipped
+  const allItemsCompleted = photoGroups.every(g => g.status === 'completed');
+  const hasFailedPriceResearch = photoGroups.some(g => g.status === 'completed' && !g.listingData?.priceResearch);
   const postedItems = photoGroups.filter(g => g.isPosted).length;
 
   const hasAnyAnalysisStarted = photoGroups.some(g => g.status === 'processing' || g.status === 'completed');
@@ -109,14 +127,36 @@ const BulkReviewDashboard = ({
             </Button>
           )}
 
-          {/* Show Proceed to Shipping button when items are ready for shipping */}
-          {readyForShipping > 0 && onProceedToShipping && (
+          {/* Show Start Price Research button when items need price research */}
+          {needsPriceResearch > 0 && !hasPriceResearch && onProceedToShipping && (
             <Button 
               onClick={onProceedToShipping}
+              className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto text-sm sm:text-base"
+              size="lg"
+            >
+              🔍 Start Price Research ({needsPriceResearch} items)
+            </Button>
+          )}
+          
+          {/* Show Continue to Shipping button when price research is complete */}
+          {hasPriceResearch && readyForShipping > 0 && onProceedToShipping && (
+            <Button 
+              onClick={() => onProceedToShipping && onProceedToShipping()}
+              className="bg-green-600 hover:bg-green-700 w-full sm:w-auto text-sm sm:text-base"
+              size="lg"
+            >
+              🚚 Continue to Shipping ({readyForShipping} items)
+            </Button>
+          )}
+          
+          {/* ALWAYS show continue button when all items completed and no price research */}
+          {allItemsCompleted && needsPriceResearch > 0 && onProceedToShipping && (
+            <Button 
+              onClick={() => onProceedToShipping && onProceedToShipping()}
               className="bg-orange-600 hover:bg-orange-700 w-full sm:w-auto text-sm sm:text-base"
               size="lg"
             >
-              🚚 Proceed to Shipping ({readyForShipping} items)
+              🚚 Continue to Shipping ({needsPriceResearch} items)
             </Button>
           )}
 

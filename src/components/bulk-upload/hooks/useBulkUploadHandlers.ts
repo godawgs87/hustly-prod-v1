@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { PhotoGroup } from '../BulkUploadManager';
 import type { ListingData } from '@/types/CreateListing';
 
-type StepType = 'upload' | 'grouping' | 'analysis' | 'confirmation' | 'shipping' | 'finalReview';
+type StepType = 'upload' | 'grouping' | 'analysis' | 'priceResearch' | 'confirmation' | 'shipping' | 'finalReview';
 
 // Helper function to extract measurements from AI response with category awareness
 const extractMeasurements = (analysisResult: any) => {
@@ -502,10 +502,12 @@ export const useBulkUploadHandlers = (
         shipping_cost: group.selectedShipping?.cost || 0,
         shipping_method: group.selectedShipping?.name || 'Not configured',
         shipping_days: group.selectedShipping?.estimatedDays || 'Unknown',
+        // Convert priceResearch object to string for database storage
+        priceResearch: group.listingData.priceResearch ? JSON.stringify(group.listingData.priceResearch) : null,
       };
 
       const result = await saveListing(
-        listingData,
+        listingData as any, // Type assertion to handle priceResearch string conversion
         group.selectedShipping?.cost || 0, // Use actual shipping cost from configuration
         saveAsDraft ? 'draft' : 'active', // Draft after AI analysis, active after final upload
         undefined // No existing listing ID for new saves
@@ -585,7 +587,7 @@ export const useBulkUploadHandlers = (
   }, [setPhotoGroups]);
 
   const handleConfirmItems = useCallback(() => {
-    setCurrentStep('shipping');
+    setCurrentStep('priceResearch');
   }, [setCurrentStep]);
 
   const handleShippingConfirmed = useCallback(() => {
@@ -609,10 +611,10 @@ export const useBulkUploadHandlers = (
         await handleRetryAnalysis(group.id);
       }
       
-      setCurrentStep('confirmation');
+      setCurrentStep('priceResearch');
       toast({
         title: "AI Analysis Complete!",
-        description: "Review and confirm the AI-generated details for each item.",
+        description: "Starting price research for all items...",
       });
     } catch (error) {
       toast({

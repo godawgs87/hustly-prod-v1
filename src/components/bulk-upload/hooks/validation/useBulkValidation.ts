@@ -18,7 +18,13 @@ export const useBulkValidation = () => {
       errors.push('Shipping option is required');
     }
     
-    if (!group.listingData?.category?.trim()) {
+    // Handle category validation for both string and object types
+    const hasValidCategory = group.listingData?.category && (
+      (typeof group.listingData.category === 'string' && group.listingData.category.trim()) ||
+      (typeof group.listingData.category === 'object' && group.listingData.category !== null && (group.listingData.category as any).primary)
+    );
+    
+    if (!hasValidCategory) {
       errors.push('Category is required');
     }
     

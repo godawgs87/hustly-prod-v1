@@ -3,10 +3,11 @@ import BulkUploadStep from './BulkUploadStep';
 import PhotoGroupingInterface from '../PhotoGroupingInterface';
 import BulkReviewDashboard from '../BulkReviewDashboard';
 import BulkShippingConfiguration from '../BulkShippingConfiguration';
+import BulkPriceResearchStep from '../BulkPriceResearchStep';
 import AIDetailsTableView from './AIDetailsTableView';
 import type { PhotoGroup } from '../BulkUploadManager';
 
-export type StepType = 'upload' | 'grouping' | 'analysis' | 'confirmation' | 'shipping' | 'finalReview';
+export type StepType = 'upload' | 'grouping' | 'analysis' | 'priceResearch' | 'confirmation' | 'shipping' | 'finalReview';
 
 interface BulkUploadStepRendererProps {
   currentStep: StepType;
@@ -31,6 +32,9 @@ interface BulkUploadStepRendererProps {
   onStartAnalysis?: () => void;
   onStartBulkAnalysis?: () => void;
   onProceedToShipping?: () => void;
+  onStartPriceResearch?: () => void;
+  onPriceResearchComplete?: (groupsWithPrices: PhotoGroup[]) => void;
+  isPriceResearching?: boolean;
 }
 
 const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
@@ -101,7 +105,7 @@ const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
                   Back to Grouping
                 </button>
                 <button
-                  onClick={() => props.onStartAnalysis ? props.onStartAnalysis() : props.onStepChange('confirmation')}
+                  onClick={() => props.onStartAnalysis ? props.onStartAnalysis() : props.onStepChange('priceResearch')}
                   className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
                 >
                   Start AI Analysis
@@ -110,6 +114,16 @@ const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
             </>
           )}
         </div>
+      );
+    case 'priceResearch':
+      return (
+        <BulkPriceResearchStep
+          photoGroups={props.photoGroups}
+          onComplete={props.onPriceResearchComplete || (() => props.onStepChange('confirmation'))}
+          onBack={() => props.onStepChange('analysis')}
+          onSkip={() => props.onStepChange('confirmation')}
+          isResearching={props.isPriceResearching}
+        />
       );
     case 'confirmation':
       return (
@@ -136,61 +150,7 @@ const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
           onComplete={props.onShippingComplete}
           onBack={() => props.onStepChange('confirmation')}
           onUpdateGroup={props.onUpdateGroup}
-        >
-          <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <h3 className="text-lg font-semibold mb-3 flex items-center">
-              <span className="mr-2">⚡</span>
-              Quick Apply to Multiple Items
-            </h3>
-            <div className="flex flex-wrap gap-3">
-              <button 
-                className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-lg hover:bg-emerald-200 flex items-center"
-                onClick={() => {
-                  // Apply Free Shipping to all items
-                  props.photoGroups.forEach(group => {
-                    props.onUpdateGroup({
-                      ...group,
-                      selectedShipping: { id: 'free-shipping', cost: 0, name: 'Free Shipping', estimatedDays: '3-5 business days' }
-                    });
-                  });
-                }}
-              >
-                <span className="mr-2">🆓</span>
-                All Items → Free Shipping
-              </button>
-              <button 
-                className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg hover:bg-blue-200 flex items-center"
-                onClick={() => {
-                  // Apply Ground shipping to all items
-                  props.photoGroups.forEach(group => {
-                    props.onUpdateGroup({
-                      ...group,
-                      selectedShipping: { id: 'ground-shipping', cost: 8.00, name: 'USPS Ground Advantage', estimatedDays: '3-5 business days' }
-                    });
-                  });
-                }}
-              >
-                <span className="mr-2">📦</span>
-                Low Value → Ground ($6-10)
-              </button>
-              <button 
-                className="bg-purple-100 text-purple-800 px-4 py-2 rounded-lg hover:bg-purple-200 flex items-center"
-                onClick={() => {
-                  // Apply Priority shipping to all items
-                  props.photoGroups.forEach(group => {
-                    props.onUpdateGroup({
-                      ...group,
-                      selectedShipping: { id: 'priority-shipping', cost: 12.00, name: 'USPS Priority Mail', estimatedDays: '1-3 business days' }
-                    });
-                  });
-                }}
-              >
-                <span className="mr-2">🚀</span>
-                High Value → Priority ($10-15)
-              </button>
-            </div>
-          </div>
-        </BulkShippingConfiguration>
+        />
       );
     case 'finalReview':
       return (

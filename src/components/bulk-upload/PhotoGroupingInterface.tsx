@@ -177,42 +177,159 @@ const PhotoGroupingInterface = ({ photoGroups, onGroupsConfirmed, onBack }: Phot
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+          <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
             <div className="flex items-center gap-2">
               <Grid3X3 className="w-5 h-5" />
-              Review & Adjust AI Grouping
+              <span className="text-lg sm:text-xl">Review AI Grouping</span>
             </div>
-            <div className="flex gap-2 text-sm">
+            <div className="flex flex-wrap gap-2 text-sm">
               <Badge variant="outline" className="bg-green-50 text-green-700">
-                {getHighConfidenceCount()} Groups Ready
+                ✅ {getHighConfidenceCount()} Ready
               </Badge>
               {getNeedsReviewCount() > 0 && (
                 <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
-                  {getNeedsReviewCount()} Need Review
+                  ⚠️ {getNeedsReviewCount()} Review
                 </Badge>
               )}
             </div>
           </CardTitle>
           <p className="text-sm text-gray-600">
-            💡 Tip: Drag photos between groups to fix grouping errors. Click on a photo and select "Move to New Group" to separate it.
+            <span className="hidden sm:inline">💡 Tip: Select any photos from any group by clicking them, then "Combine Selected" to merge them together, or "New Group" to move them. Photos are automatically removed from their original groups.</span>
+            <span className="sm:hidden">💡 Tap any photos from any group, then "Combine" to merge them or "New Group" to move them. Photos are automatically moved.</span>
           </p>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2 mb-4">
-            <Button variant="outline" onClick={createNewGroup}>
+          {/* Photo Selection Actions - Show when photos are selected */}
+          {selectedPhotos.size > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="text-sm font-medium text-blue-900">
+                  {selectedPhotos.size} photo{selectedPhotos.size > 1 ? 's' : ''} selected from {new Set(Array.from(selectedPhotos).map(key => key.split('-')[0])).size} group{new Set(Array.from(selectedPhotos).map(key => key.split('-')[0])).size > 1 ? 's' : ''}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  {selectedPhotos.size > 1 && (
+                    <Button 
+                      onClick={() => {
+                        // Combine selected photos into one group
+                        const selectedPhotoData: { photo: File; fromGroupId: string; photoIndex: number }[] = [];
+                        selectedPhotos.forEach(photoKey => {
+                          const [groupId, photoIndexStr] = photoKey.split('-');
+                          const photoIndex = parseInt(photoIndexStr);
+                          const group = groups.find(g => g.id === groupId);
+                          if (group && group.photos[photoIndex]) {
+                            selectedPhotoData.push({
+                              photo: group.photos[photoIndex],
+                              fromGroupId: groupId,
+                              photoIndex
+                            });
+                          }
+                        });
+                        
+                        if (selectedPhotoData.length > 1) {
+                          const newGroup: PhotoGroup = {
+                            id: `group-${Date.now()}`,
+                            photos: selectedPhotoData.map(p => p.photo),
+                            name: `Combined Group ${groups.length + 1}`,
+                            confidence: 'medium', // Medium confidence for manually combined
+                            status: 'pending'
+                          };
+                          
+                          // Remove photos from original groups and clean up empty groups
+                          setGroups(prev => {
+                            const updatedGroups = prev.map(group => ({
+                              ...group,
+                              photos: group.photos.filter((_, index) => 
+                                !selectedPhotoData.some(p => p.fromGroupId === group.id && p.photoIndex === index)
+                              )
+                            })).filter(group => group.photos.length > 0);
+                            
+                            return [...updatedGroups, newGroup];
+                          });
+                          
+                          setSelectedPhotos(new Set());
+                        }
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
+                    >
+                      <Merge className="w-4 h-4 mr-2" />
+                      Combine Selected
+                    </Button>
+                  )}
+                  <Button 
+                    onClick={() => {
+                      // Move selected photos to new group
+                      const selectedPhotoData: { photo: File; fromGroupId: string; photoIndex: number }[] = [];
+                      selectedPhotos.forEach(photoKey => {
+                        const [groupId, photoIndexStr] = photoKey.split('-');
+                        const photoIndex = parseInt(photoIndexStr);
+                        const group = groups.find(g => g.id === groupId);
+                        if (group && group.photos[photoIndex]) {
+                          selectedPhotoData.push({
+                            photo: group.photos[photoIndex],
+                            fromGroupId: groupId,
+                            photoIndex
+                          });
+                        }
+                      });
+                      
+                      if (selectedPhotoData.length > 0) {
+                        const newGroup: PhotoGroup = {
+                          id: `group-${Date.now()}`,
+                          photos: selectedPhotoData.map(p => p.photo),
+                          name: selectedPhotoData.length === 1 ? `Item ${groups.length + 1}` : `New Group ${groups.length + 1}`,
+                          confidence: 'high',
+                          status: 'pending'
+                        };
+                        
+                        // Remove photos from original groups and clean up empty groups
+                        setGroups(prev => {
+                          const updatedGroups = prev.map(group => ({
+                            ...group,
+                            photos: group.photos.filter((_, index) => 
+                              !selectedPhotoData.some(p => p.fromGroupId === group.id && p.photoIndex === index)
+                            )
+                          })).filter(group => group.photos.length > 0);
+                          
+                          return [...updatedGroups, newGroup];
+                        });
+                        
+                        setSelectedPhotos(new Set());
+                      }
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Group
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setSelectedPhotos(new Set())}
+                    className="w-full sm:w-auto"
+                  >
+                    Clear Selection
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Group Management Actions */}
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+            <Button variant="outline" onClick={createNewGroup} className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
-              New Group
+              New Empty Group
             </Button>
             <Button 
               variant="outline" 
               onClick={mergeSelectedGroups}
               disabled={selectedGroups.size < 2}
+              className="w-full sm:w-auto"
             >
               <Merge className="w-4 h-4 mr-2" />
-              Merge Selected ({selectedGroups.size})
+              Merge Groups ({selectedGroups.size})
             </Button>
-            <Button variant="outline" onClick={() => setSelectedGroups(new Set())}>
-              Clear Selection
+            <Button variant="outline" onClick={() => setSelectedGroups(new Set())} className="w-full sm:w-auto">
+              Clear Group Selection
             </Button>
           </div>
 
@@ -225,93 +342,140 @@ const PhotoGroupingInterface = ({ photoGroups, onGroupsConfirmed, onBack }: Phot
                 onDrop={(e) => handleDrop(e, group.id)}
               >
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                       <input
                         type="checkbox"
                         checked={selectedGroups.has(group.id)}
                         onChange={() => handleGroupSelection(group.id)}
-                        className="rounded"
+                        className="rounded w-4 h-4 flex-shrink-0"
                       />
                       <Input
                         value={group.name}
                         onChange={(e) => handleGroupNameChange(group.id, e.target.value)}
-                        className="font-semibold bg-transparent border-none p-0 h-auto"
+                        className="font-semibold bg-transparent border-none p-0 h-auto text-sm sm:text-base flex-1 min-w-0"
                       />
-                      {getConfidenceIcon(group.confidence)}
-                      <Badge variant="outline" className="text-xs">
-                        {getConfidenceText(group.confidence)}
-                      </Badge>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {getConfidenceIcon(group.confidence)}
+                        <Badge variant="outline" className="text-xs hidden sm:inline-flex">
+                          {getConfidenceText(group.confidence)}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs sm:hidden">
+                          {group.confidence === 'high' ? '✅' : group.confidence === 'medium' ? '⚠️' : '❌'}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-full sm:w-auto">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => splitGroup(group.id)}
                         disabled={group.photos.length < 2}
+                        className="flex-1 sm:flex-none"
                       >
-                        <Split className="w-3 h-3" />
+                        <Split className="w-3 h-3 mr-1 sm:mr-0" />
+                        <span className="sm:hidden">Split</span>
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => deleteGroup(group.id)}
+                        className="flex-1 sm:flex-none text-red-600 hover:text-red-700"
                       >
-                        <XCircle className="w-3 h-3" />
+                        <XCircle className="w-3 h-3 mr-1 sm:mr-0" />
+                        <span className="sm:hidden">Delete</span>
                       </Button>
                     </div>
                   </div>
                   {group.aiSuggestion && (
-                    <p className="text-sm text-gray-600">AI suggests: {group.aiSuggestion}</p>
+                    <p className="text-sm text-gray-600 mt-2">AI suggests: {group.aiSuggestion}</p>
                   )}
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 sm:gap-2">
                     {group.photos.map((photo, photoIndex) => (
                       <div 
                         key={photoIndex} 
-                        className="aspect-square bg-gray-100 rounded overflow-hidden relative group cursor-move"
+                        className="aspect-square bg-gray-100 rounded-lg overflow-hidden relative group cursor-pointer hover:shadow-lg transition-all"
                         draggable
                         onDragStart={() => handleDragStart(photo, group.id, photoIndex)}
+                        onClick={() => movePhotoToNewGroup(photo, group.id, photoIndex)}
                       >
                         <img
                           src={URL.createObjectURL(photo)}
                           alt={`${group.name} photo ${photoIndex + 1}`}
                           className="w-full h-full object-cover"
                         />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        {/* Mobile-friendly selection overlay */}
+                        <div className="absolute inset-0 bg-black/30 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <div className="flex flex-col gap-1">
                             <Button
                               size="sm"
                               variant="secondary"
-                              className="h-6 text-xs"
-                              onClick={() => movePhotoToNewGroup(photo, group.id, photoIndex)}
+                              className="h-8 text-xs bg-blue-500 hover:bg-blue-600 text-white shadow-lg"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const photoKey = `${group.id}-${photoIndex}`;
+                                if (selectedPhotos.has(photoKey)) {
+                                  setSelectedPhotos(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(photoKey);
+                                    return newSet;
+                                  });
+                                } else {
+                                  setSelectedPhotos(prev => new Set([...prev, photoKey]));
+                                }
+                              }}
                             >
-                              <Move className="w-3 h-3 mr-1" />
-                              New Group
+                              {selectedPhotos.has(`${group.id}-${photoIndex}`) ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  <span className="sm:hidden">Selected</span>
+                                  <span className="hidden sm:inline">Selected</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  <span className="sm:hidden">Select</span>
+                                  <span className="hidden sm:inline">Select</span>
+                                </>
+                              )}
                             </Button>
                           </div>
+                        </div>
+                        {/* Selection indicator */}
+                        {selectedPhotos.has(`${group.id}-${photoIndex}`) && (
+                          <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
+                            <CheckCircle className="w-4 h-4" />
+                          </div>
+                        )}
+                        {/* Photo number indicator */}
+                        <div className="absolute top-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                          {photoIndex + 1}
                         </div>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-2 text-sm text-gray-600">
-                    {group.photos.length} photos • Drag photos between groups to reorganize
+                  <div className="mt-3 text-sm text-gray-600">
+                    <span className="font-medium">{group.photos.length} photos</span>
+                    <span className="hidden sm:inline"> • Select photos to reorganize them</span>
+                    <span className="sm:hidden"> • Tap photos to select them</span>
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          <div className="flex justify-between mt-6 pt-4 border-t">
-            <Button variant="outline" onClick={onBack}>
+          <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0 mt-6 pt-4 border-t">
+            <Button variant="outline" onClick={onBack} className="w-full sm:w-auto order-2 sm:order-1">
               Back to Upload
             </Button>
             <Button 
               onClick={() => onGroupsConfirmed(groups)}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 w-full sm:w-auto order-1 sm:order-2 text-base py-3"
+              size="lg"
             >
-              Process All Groups ({groups.length})
+              ✅ Process All Groups ({groups.length})
             </Button>
           </div>
         </CardContent>

@@ -84,7 +84,12 @@ const IndividualItemReview = ({
     if (!editedGroup.listingData?.title?.trim()) errors.push('Title');
     if (!editedGroup.listingData?.price || editedGroup.listingData.price <= 0) errors.push('Price');
     if (!editedGroup.selectedShipping) errors.push('Shipping option');
-    if (!editedGroup.listingData?.category?.trim()) errors.push('Category');
+    // Handle category validation for both string and object types
+    const hasValidCategory = editedGroup.listingData?.category && (
+      (typeof editedGroup.listingData.category === 'string' && editedGroup.listingData.category.trim()) ||
+      (typeof editedGroup.listingData.category === 'object' && editedGroup.listingData.category !== null && (editedGroup.listingData.category as any).primary)
+    );
+    if (!hasValidCategory) errors.push('Category');
     if (!editedGroup.listingData?.condition?.trim()) errors.push('Condition');
     
     if (errors.length > 0) {
@@ -249,7 +254,10 @@ const IndividualItemReview = ({
           editedGroup.listingData?.price && 
           editedGroup.listingData.price > 0 &&
           editedGroup.selectedShipping &&
-          editedGroup.listingData?.category?.trim() &&
+          (editedGroup.listingData?.category && (
+            (typeof editedGroup.listingData.category === 'string' && editedGroup.listingData.category.trim()) ||
+            (typeof editedGroup.listingData.category === 'object' && editedGroup.listingData.category !== null && (editedGroup.listingData.category as any).primary)
+          )) &&
           editedGroup.listingData?.condition?.trim()
         )}
       />

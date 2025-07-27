@@ -179,6 +179,24 @@ const CreateListingContent = ({
               <h3 className="text-lg font-semibold mb-4">Price Research</h3>
               <PriceResearchStep 
                 listingData={listingData}
+                onPriceResearchComplete={(priceData: any, suggestedPrice?: number) => {
+                  console.log('💰 [CreateListingContent] Price research completed with price:', suggestedPrice);
+                  console.log('💰 [CreateListingContent] Current listingData.price before update:', listingData.price);
+                  
+                  if (suggestedPrice && suggestedPrice > 0) {
+                    console.log('💰 [CreateListingContent] Calling onListingDataChange with price:', suggestedPrice);
+                    
+                    // Update the listing data in the parent component
+                    if (onListingDataChange) {
+                      onListingDataChange({ price: suggestedPrice });
+                      console.log('💰 [CreateListingContent] onListingDataChange called successfully');
+                    } else {
+                      console.error('💰 [CreateListingContent] onListingDataChange callback is missing!');
+                    }
+                  } else {
+                    console.warn('💰 [CreateListingContent] Invalid suggested price received:', suggestedPrice);
+                  }
+                }}
                 onComplete={() => {
                   console.log('🎯 Price research completed, staying on analysis page');
                   // Stay on analysis page for seamless experience

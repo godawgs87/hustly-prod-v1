@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { PhotoGroup } from '../BulkUploadManager';
 
-type StepType = 'upload' | 'grouping' | 'review' | 'categories' | 'shipping';
+type StepType = 'upload' | 'grouping' | 'analysis' | 'priceResearch' | 'confirmation' | 'shipping' | 'finalReview';
 
 export const useBulkUploadState = () => {
   const [currentStep, setCurrentStep] = useState<StepType>('upload');

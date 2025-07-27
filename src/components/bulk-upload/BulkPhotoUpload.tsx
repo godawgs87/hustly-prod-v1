@@ -56,9 +56,9 @@ const BulkPhotoUpload = ({ onPhotosUploaded, maxPhotos = 100 }: BulkPhotoUploadP
 
   return (
     <div className="space-y-6">
-      {/* Upload Area */}
+      {/* Upload Area - Mobile Optimized */}
       <div
-        className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
+        className={`border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-colors ${
           dragOver 
             ? 'border-blue-500 bg-blue-50' 
             : 'border-gray-300 hover:border-gray-400'
@@ -70,15 +70,15 @@ const BulkPhotoUpload = ({ onPhotosUploaded, maxPhotos = 100 }: BulkPhotoUploadP
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
       >
-        <div className="flex flex-col items-center space-y-4">
-          <div className="p-6 bg-gray-100 rounded-full">
-            <Upload className="w-12 h-12 text-gray-600" />
+        <div className="flex flex-col items-center space-y-3 sm:space-y-4">
+          <div className="p-4 sm:p-6 bg-gray-100 rounded-full">
+            <Upload className="w-8 h-8 sm:w-12 sm:h-12 text-gray-600" />
           </div>
           <div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
               Bulk Photo Upload
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-sm sm:text-base text-gray-600 mb-4 px-2">
               Upload photos for multiple items at once (up to {maxPhotos} photos)
             </p>
             <input
@@ -91,57 +91,69 @@ const BulkPhotoUpload = ({ onPhotosUploaded, maxPhotos = 100 }: BulkPhotoUploadP
             />
             <Button 
               onClick={() => fileInputRef.current?.click()}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 text-base py-3 px-6"
+              size="lg"
             >
-              <Image className="w-4 h-4 mr-2" />
+              <Image className="w-5 h-5 mr-2" />
               Choose Photos
             </Button>
           </div>
-          <p className="text-sm text-gray-500">
-            Drag and drop photos here or click to browse
+          <p className="text-xs sm:text-sm text-gray-500 px-4">
+            <span className="hidden sm:inline">Drag and drop photos here or </span>
+            <span className="sm:hidden">Tap button above to </span>
+            <span className="sm:hidden">browse photos</span>
+            <span className="hidden sm:inline">click to browse</span>
           </p>
         </div>
       </div>
 
       {/* Upload Progress */}
       {uploadProgress > 0 && (
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
+        <div className="space-y-3">
+          <div className="flex justify-between text-sm font-medium">
             <span>Uploading photos...</span>
-            <span>{uploadProgress}%</span>
+            <span className="text-blue-600">{uploadProgress}%</span>
           </div>
-          <Progress value={uploadProgress} className="w-full" />
+          <Progress value={uploadProgress} className="w-full h-2" />
         </div>
       )}
 
       {/* Photo Grid */}
       {photos.length > 0 && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+            <h3 className="text-base sm:text-lg font-semibold">
               Uploaded Photos ({photos.length}/{maxPhotos})
             </h3>
-            <Button variant="outline" onClick={clearAll}>
+            <Button 
+              variant="outline" 
+              onClick={clearAll}
+              className="w-full sm:w-auto"
+              size="sm"
+            >
               Clear All
             </Button>
           </div>
           
-          <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 sm:gap-2">
             {photos.map((photo, index) => (
-              <Card key={index} className="relative group overflow-hidden aspect-square">
+              <Card key={index} className="relative group overflow-hidden aspect-square hover:shadow-lg transition-shadow">
                 <img
                   src={URL.createObjectURL(photo)}
                   alt={`Upload ${index + 1}`}
                   className="w-full h-full object-cover"
                 />
+                {/* Mobile-friendly remove button */}
                 <button
                   onClick={() => removePhoto(index)}
-                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-7 h-7 sm:w-5 sm:h-5 flex items-center justify-center text-sm sm:text-xs opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shadow-lg"
+                  aria-label={`Remove photo ${index + 1}`}
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-4 h-4 sm:w-3 sm:h-3" />
                 </button>
-                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {index + 1}
+                {/* Photo number indicator - always visible on mobile */}
+                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs sm:text-xs p-1.5 sm:p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  Photo {index + 1}
                 </div>
               </Card>
             ))}

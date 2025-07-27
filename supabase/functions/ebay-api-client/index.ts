@@ -89,7 +89,7 @@ export class EbayAPIClient {
         'Authorization': `Basic ${credentials}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: `grant_type=refresh_token&refresh_token=${account.refresh_token}&scope=https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account`
+      body: `grant_type=refresh_token&refresh_token=${account.refresh_token}&scope=https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/buy.browse`
     });
 
     if (!response.ok) {
@@ -180,20 +180,66 @@ export class EbayAPIClient {
     condition?: string;
     limit?: number;
   }): Promise<any> {
+    console.log('🔍 [Backend] searchCompletedListings called with:', params);
     logStep('SEARCH_COMPLETED_LISTINGS', { query: params.query, category: params.category });
     
-    // ULTRA SIMPLIFIED: Use the most basic search possible
-    const query = 'Ford key fob'; // Simplified query that should definitely return results
+    // Use the actual query from frontend parameter extraction
+    const query = params.query || 'generic item';
+    console.log('🔍 [Backend] Using query:', query);
     
-    // Remove all filters to get maximum results
-    const limitParam = '&limit=20';
+    // Build search parameters
+    const limitParam = `&limit=${Math.min(params.limit || 20, 50)}`;
+    let endpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}${limitParam}`;
     
-    // Most basic eBay Browse API call possible
-    const endpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}${limitParam}`;
+    // Add brand filter if provided
+    if (params.brand) {
+      endpoint += `&aspect_filter=Brand:${encodeURIComponent(params.brand)}`;
+    }
+    
+    // Add condition filter if provided
+    if (params.condition && params.condition !== 'Any') {
+      const conditionMap: { [key: string]: string } = {
+        'New': '1000',
+        'Used': '3000',
+        'Refurbished': '2000'
+      };
+      const conditionId = conditionMap[params.condition];
+      if (conditionId) {
+        endpoint += `&filter=conditionIds:{${conditionId}}`;
+      }
+    }
     
     try {
+      console.log('🌐 [Backend] Final eBay API endpoint:', endpoint);
       logStep('MAKING_EBAY_REQUEST', { endpoint, query: params.query });
       const result = await this.makeRequest(endpoint);
+      console.log('📊 [Backend] eBay API raw result:', {
+        total: result.total,
+        itemCount: result.itemSummaries?.length || 0,
+        hasItems: !!result.itemSummaries
+      });
+      
+      // If no results with specific query, try a broader search
+      if (result.total === 0 && params.brand) {
+        console.log('🔄 [Backend] No results with specific query, trying broader search with brand only');
+        const broaderEndpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(params.brand)}&limit=20`;
+        console.log('🌐 [Backend] Broader eBay API endpoint:', broaderEndpoint);
+        const broaderResult = await this.makeRequest(broaderEndpoint);
+        console.log('📊 [Backend] Broader search result:', {
+          total: broaderResult.total,
+          itemCount: broaderResult.itemSummaries?.length || 0
+        });
+        
+        // Use broader result if it has items
+        if (broaderResult.total > 0) {
+          return {
+            items: broaderResult.itemSummaries || [],
+            total: broaderResult.total,
+            searchQuery: params.brand,
+            searchType: 'brand_fallback'
+          };
+        }
+      }
       
       logStep('EBAY_RAW_RESPONSE', { 
         total: result.total, 
@@ -247,10 +293,27 @@ export class EbayAPIClient {
       };
     }
     
+    // Extract and validate prices with enhanced logging
+    console.log('💰 [Backend] Raw search results for price analysis:', {
+      totalItems: searchResults.items.length,
+      firstFewItems: searchResults.items.slice(0, 3).map((item: any) => ({
+        title: item.title,
+        price: item.price,
+        priceType: typeof item.price
+      }))
+    });
+    
     const prices = searchResults.items
-      .map((item: any) => parseFloat(item.price))
+      .map((item: any) => {
+        // Handle both number and string prices
+        const price = typeof item.price === 'number' ? item.price : parseFloat(item.price);
+        console.log('💰 [Backend] Processing price:', { original: item.price, parsed: price, title: item.title?.substring(0, 50) });
+        return price;
+      })
       .filter((price: number) => !isNaN(price) && price > 0)
       .sort((a: number, b: number) => a - b);
+    
+    console.log('💰 [Backend] Valid prices extracted:', { count: prices.length, prices: prices.slice(0, 10) });
     
     if (prices.length === 0) {
       return {
@@ -260,14 +323,50 @@ export class EbayAPIClient {
       };
     }
     
-    // Calculate price statistics
+    // Calculate price statistics with enhanced stability
     const min = prices[0];
     const max = prices[prices.length - 1];
-    const median = prices[Math.floor(prices.length / 2)];
     const average = prices.reduce((sum, price) => sum + price, 0) / prices.length;
     
-    // Suggest price based on median with slight adjustment
-    const suggestedPrice = Math.round(median * 0.95 * 100) / 100; // 5% below median for competitive pricing
+    // Calculate median more accurately (handle both odd and even lengths)
+    let median;
+    if (prices.length % 2 === 0) {
+      // Even number of prices - average of two middle values
+      const mid1 = prices[Math.floor(prices.length / 2) - 1];
+      const mid2 = prices[Math.floor(prices.length / 2)];
+      median = (mid1 + mid2) / 2;
+    } else {
+      // Odd number of prices - middle value
+      median = prices[Math.floor(prices.length / 2)];
+    }
+    
+    // Enhanced pricing algorithm for consistency and balance
+    // Use balanced approach: 50% median, 50% average for more stable pricing
+    const weightedPrice = (median * 0.5) + (average * 0.5);
+    
+    // Apply consistent competitive discount based on sample size and variance
+    const variance = prices.reduce((sum, price) => sum + Math.pow(price - average, 2), 0) / prices.length;
+    const stdDev = Math.sqrt(variance);
+    const coefficientOfVariation = stdDev / average;
+    
+    let competitiveDiscount = 0.02; // Default 2% discount for consistency
+    if (coefficientOfVariation > 0.5) {
+      // High variance - be slightly more aggressive
+      competitiveDiscount = 0.04;
+    } else if (coefficientOfVariation < 0.2) {
+      // Low variance - minimal discount
+      competitiveDiscount = 0.01;
+    }
+    
+    const suggestedPrice = Math.round(weightedPrice * (1 - competitiveDiscount) * 100) / 100;
+    
+    console.log('💰 [Backend] Price calculation details:', {
+      sampleSize: prices.length,
+      min, max, median, average, weightedPrice,
+      coefficientOfVariation: Math.round(coefficientOfVariation * 100) / 100,
+      competitiveDiscount,
+      suggestedPrice
+    });
     
     // Determine confidence based on sample size and price variance
     let confidence = 'low';
@@ -363,6 +462,15 @@ serve(async (req) => {
 
       case 'research_item_price':
         // Combined action: search + analyze in one call
+        console.log('🔍 [Backend] RECEIVED PARAMS:', {
+          query: params.query,
+          brand: params.brand,
+          condition: params.condition,
+          category: params.category,
+          limit: params.limit,
+          allParams: params
+        });
+        
         logStep('RESEARCH_ITEM_PRICE_START', { query: params.query, brand: params.brand, condition: params.condition });
         
         // Validate required parameters

@@ -14,13 +14,17 @@ const AdminUserManagement = () => {
     isLoading, 
     updateUserRole, 
     updateUserSubscription,
+    resetUserPassword,
     isUpdatingRole,
-    isUpdatingSubscription
+    isUpdatingSubscription,
+    isResettingPassword
   } = useAdminUserManagement();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [tierFilter, setTierFilter] = useState('all');
+  const [passwordResetUserId, setPasswordResetUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
 
   const filteredUsers = users?.filter(user => {
     const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -66,6 +70,28 @@ const AdminUserManagement = () => {
 
   const handleSubscriptionChange = (userId: string, tier: string, status: string) => {
     updateUserSubscription({ userId, tier, status });
+  };
+
+  const handlePasswordReset = (userId: string) => {
+    setPasswordResetUserId(userId);
+    setNewPassword('');
+  };
+
+  const confirmPasswordReset = () => {
+    if (passwordResetUserId && newPassword.length >= 6) {
+      resetUserPassword({ userId: passwordResetUserId, newPassword });
+      setPasswordResetUserId(null);
+      setNewPassword('');
+    }
+  };
+
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewPassword(password);
   };
 
   if (isLoading) {
@@ -213,6 +239,21 @@ const AdminUserManagement = () => {
                       <SelectItem value="trialing">Trialing</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  {/* Password Reset */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePasswordReset(user.id)}
+                    disabled={isResettingPassword}
+                    className="h-8"
+                  >
+                    {isResettingPassword ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      'Reset Password'
+                    )}
+                  </Button>
                 </div>
               </div>
             ))}
@@ -225,6 +266,66 @@ const AdminUserManagement = () => {
           </div>
         </div>
       </Card>
+
+      {/* Password Reset Dialog */}
+      <AlertDialog open={!!passwordResetUserId} onOpenChange={() => setPasswordResetUserId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset User Password</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter a new password for this user. They will be able to change it later in their account settings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">New Password</label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password (min 6 characters)"
+                className="mt-1"
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={generateRandomPassword}
+              >
+                Generate Random Password
+              </Button>
+              {newPassword && (
+                <div className="text-xs text-gray-600 flex items-center">
+                  Password: <code className="ml-1 px-1 bg-gray-100 rounded">{newPassword}</code>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPasswordResetUserId(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmPasswordReset}
+              disabled={!newPassword || newPassword.length < 6 || isResettingPassword}
+            >
+              {isResettingPassword ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Resetting...
+                </>
+              ) : (
+                'Reset Password'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

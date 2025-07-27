@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,41 @@ export const PriceResearchStep: React.FC<PriceResearchStepProps> = ({
   const { account, setAccount } = useEbayStore();
   const [actualConnectionStatus, setActualConnectionStatus] = useState<boolean | null>(null);
   const isConnected = account?.isConnected || actualConnectionStatus || false;
+
+  // Track if we've already called the callback for this price to prevent infinite loops
+  const callbackProcessedRef = useRef<number | null>(null);
+
+  // Auto-populate suggested price when research completes (with loop prevention)
+  useEffect(() => {
+    if (priceData?.priceAnalysis?.suggestedPrice) {
+      const suggestedPrice = typeof priceData.priceAnalysis.suggestedPrice === 'object' ? 
+        priceData.priceAnalysis.suggestedPrice?.value : 
+        priceData.priceAnalysis.suggestedPrice;
+      
+      // Always update the UI field if price is different
+      if (suggestedPrice && suggestedPrice > 0 && suggestedPrice !== selectedPrice) {
+        console.log('💰 [PriceResearchStep] Auto-populating suggested price in UI:', suggestedPrice, 'was:', selectedPrice);
+        setSelectedPrice(suggestedPrice);
+      }
+      
+      // Only call the callback once per unique price to prevent infinite loops
+      if (suggestedPrice && suggestedPrice > 0 && 
+          callbackProcessedRef.current !== suggestedPrice) {
+        
+        console.log('💰 [PriceResearchStep] Calling onPriceResearchComplete for NEW price:', suggestedPrice);
+        
+        // Mark this price as processed for callback
+        callbackProcessedRef.current = suggestedPrice;
+        
+        // Update the main listing data with suggested price
+        if (onPriceResearchComplete) {
+          onPriceResearchComplete(priceData, suggestedPrice);
+        }
+      } else if (suggestedPrice === callbackProcessedRef.current) {
+        console.log('💰 [PriceResearchStep] Skipping callback for already processed price:', suggestedPrice);
+      }
+    }
+  }, [priceData?.priceAnalysis?.suggestedPrice]); // 🚫 Removed problematic dependencies
 
   useEffect(() => {
     console.log('🔬 PriceResearchStep mounted');
@@ -232,7 +267,9 @@ export const PriceResearchStep: React.FC<PriceResearchStepProps> = ({
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-green-600 mb-2">
-                ${priceData.priceAnalysis.suggestedPrice}
+                ${typeof priceData.priceAnalysis.suggestedPrice === 'object' ? 
+                  priceData.priceAnalysis.suggestedPrice?.value || '0' : 
+                  priceData.priceAnalysis.suggestedPrice || '0'}
               </div>
               <div className="flex items-center mb-4">
                 <Badge className={`mr-2 ${getConfidenceColor(priceData.priceAnalysis.confidence)}`}>
@@ -255,12 +292,26 @@ export const PriceResearchStep: React.FC<PriceResearchStepProps> = ({
                   <input
                     type="number"
                     value={selectedPrice}
-                    onChange={(e) => setSelectedPrice(Number(e.target.value))}
+                    onChange={(e) => {
+                      const newPrice = Number(e.target.value);
+                      setSelectedPrice(newPrice);
+                      
+                      // Update the main listing data with the new price
+                      if (onPriceResearchComplete && priceData) {
+                        onPriceResearchComplete({
+                          ...priceData,
+                          selectedPrice: newPrice
+                        }, newPrice);
+                      }
+                    }}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     step="0.01"
                     min="0"
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  This will update your listing price and cross-platform fees
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -312,36 +363,38 @@ export const PriceResearchStep: React.FC<PriceResearchStepProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {priceData.searchResults.items.slice(0, 6).map((item: any, index: number) => (
-                <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                  {item.image && (
-                    <img
-                      src={item.image}
-                      alt={item.title}
-                      className="w-full h-32 object-cover rounded mb-3"
-                    />
-                  )}
-                  <h4 className="font-medium text-sm mb-2 line-clamp-2">{item.title}</h4>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-lg font-bold text-green-600">${item.price}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {item.condition}
-                    </Badge>
+            <div className="max-h-96 overflow-y-auto pr-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {priceData.searchResults.items.map((item: any, index: number) => (
+                  <div key={index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="w-full h-32 object-cover rounded mb-3"
+                      />
+                    )}
+                    <h4 className="font-medium text-sm mb-2 line-clamp-2">{item.title}</h4>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-lg font-bold text-green-600">
+                        ${typeof item.price === 'object' ? item.price?.value || '0' : item.price || '0'}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        {item.condition || 'Unknown'}
+                      </Badge>
+                    </div>
+                    {item.shippingCost && (
+                      <p className="text-xs text-gray-500">
+                        +${typeof item.shippingCost === 'object' ? item.shippingCost?.value || '0' : item.shippingCost || '0'} shipping
+                      </p>
+                    )}
                   </div>
-                  {item.shippingCost && (
-                    <p className="text-xs text-gray-500">
-                      +${item.shippingCost} shipping
-                    </p>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-            {priceData.searchResults.items.length > 6 && (
-              <p className="text-center text-sm text-gray-500 mt-4">
-                Showing 6 of {priceData.searchResults.items.length} comparable listings
-              </p>
-            )}
+            <p className="text-center text-sm text-gray-500 mt-4">
+              Showing all {priceData.searchResults.items.length} comparable listings
+            </p>
           </CardContent>
         </Card>
       )}

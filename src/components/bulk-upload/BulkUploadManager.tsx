@@ -80,6 +80,9 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
   // Preview dialog state
   const [previewGroup, setPreviewGroup] = useState<PhotoGroup | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  
+  // Price research state
+  const [isPriceResearching, setIsPriceResearching] = useState(false);
 
   const handlePhotosUploaded = useCallback((uploadedPhotos: File[]) => {
     state.setPhotos(uploadedPhotos);
@@ -106,12 +109,49 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
   }, [onViewInventory]);
 
   const handleProceedToShipping = useCallback(() => {
-    state.setCurrentStep('shipping');
+    // Check if items have price research data (indicating price research was completed)
+    const hasPriceResearch = state.photoGroups.some(g => 
+      g.status === 'completed' && 
+      g.listingData?.priceResearch && 
+      g.listingData.priceResearch !== 'null' && 
+      g.listingData.priceResearch !== ''
+    );
+    
+    if (hasPriceResearch) {
+      // Price research is complete, proceed to shipping
+      state.setCurrentStep('shipping');
+      toast({
+        title: "Proceeding to Shipping",
+        description: "Configure shipping options for your items.",
+      });
+    } else {
+      // Price research not done yet, start price research
+      state.setCurrentStep('priceResearch');
+      toast({
+        title: "Starting Price Research",
+        description: "Researching market prices for your items...",
+      });
+    }
+  }, [state.setCurrentStep, state.photoGroups, toast]);
+
+  const handleStartPriceResearch = useCallback(() => {
+    setIsPriceResearching(true);
+    state.setCurrentStep('priceResearch');
     toast({
-      title: "Proceeding to Shipping",
-      description: "Configure shipping options for your listings.",
+      title: "Starting Price Research",
+      description: "Researching market prices for your items...",
     });
   }, [state.setCurrentStep, toast]);
+
+  const handlePriceResearchComplete = useCallback((groupsWithPrices: PhotoGroup[]) => {
+    state.setPhotoGroups(groupsWithPrices);
+    setIsPriceResearching(false);
+    state.setCurrentStep('confirmation'); // Return to review/confirmation with updated prices
+    toast({
+      title: "Price Research Complete!",
+      description: "Market prices have been researched and applied to your items. Review and continue to shipping.",
+    });
+  }, [state.setPhotoGroups, state.setCurrentStep, toast]);
 
   const handlePreviewItem = useCallback((groupId: string) => {
     const group = state.photoGroups.find(g => g.id === groupId);
@@ -128,6 +168,11 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     setIsPreviewOpen(false);
   }, [state.setPhotoGroups]);
 
+  const handleEditItem = useCallback((groupId: string) => {
+    console.log('Edit item:', groupId);
+    // Edit functionality will be handled by the review dashboard
+  }, []);
+
   const handlers = useBulkUploadHandlers(
     state.photos,
     state.photoGroups,
@@ -135,6 +180,7 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     state.setCurrentStep,
     state.setPhotoGroups,
     onComplete,
+    handleEditItem,
     handlePreviewItem
   );
 
@@ -159,7 +205,7 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     onUpdateGroup: handlers.handleUpdateGroup,
     onRetryAnalysis: handlers.handleRetryAnalysis,
     onRunAI: handlers.handleRetryAnalysis,
-    onBack: handlers.handleBack,
+    onBack: () => handlers.handleBack('upload'),
     onCategoriesComplete: handleCategoriesComplete,
     onShippingComplete: handleShippingComplete,
     onViewInventory: handleViewInventory,
@@ -167,6 +213,9 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     onStartAnalysis: handlers.handleStartAnalysis,
     onStartBulkAnalysis: handlers.handleStartAnalysis,
     onProceedToShipping: handleProceedToShipping,
+    onStartPriceResearch: handleStartPriceResearch,
+    onPriceResearchComplete: handlePriceResearchComplete,
+    isPriceResearching: isPriceResearching,
   }), [
     state.currentStep,
     state.photos,
@@ -189,6 +238,9 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     state.setCurrentStep,
     handlers.handleStartAnalysis,
     handleProceedToShipping,
+    handleStartPriceResearch,
+    handlePriceResearchComplete,
+    isPriceResearching,
   ]);
 
   return (
