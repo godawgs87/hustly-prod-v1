@@ -230,7 +230,9 @@ const PhotoGroupingInterface: React.FC<PhotoGroupingInterfaceProps> = ({
                         selectedPhotos.forEach(photoKey => {
                           const [groupId, photoIndexStr] = photoKey.split('-');
                           const photoIndex = parseInt(photoIndexStr);
+                          console.log('🔍 Processing photo key:', photoKey, 'groupId:', groupId, 'photoIndex:', photoIndex);
                           const group = groups.find(g => g.id === groupId);
+                          console.log('🔍 Found group:', group?.id, 'photo exists:', !!group?.photos[photoIndex]);
                           if (group && group.photos[photoIndex]) {
                             selectedPhotoData.push({
                               photo: group.photos[photoIndex],
@@ -239,8 +241,10 @@ const PhotoGroupingInterface: React.FC<PhotoGroupingInterfaceProps> = ({
                             });
                           }
                         });
+                        console.log('🔍 Selected photo data:', selectedPhotoData.length, 'photos');
                         
                         if (selectedPhotoData.length > 1) {
+                          console.log('🔥 Creating new combined group with', selectedPhotoData.length, 'photos');
                           const newGroup: PhotoGroup = {
                             id: `group-${Date.now()}`,
                             photos: selectedPhotoData.map(p => p.photo),
@@ -248,20 +252,26 @@ const PhotoGroupingInterface: React.FC<PhotoGroupingInterfaceProps> = ({
                             confidence: 'medium', // Medium confidence for manually combined
                             status: 'pending'
                           };
+                          console.log('🔥 New group created:', newGroup.id, newGroup.name);
                           
                           // Remove photos from original groups and clean up empty groups
                           setGroups(prev => {
+                            console.log('🔥 Updating groups, current count:', prev.length);
                             const updatedGroups = prev.map(group => ({
                               ...group,
                               photos: group.photos.filter((_, index) => 
                                 !selectedPhotoData.some(p => p.fromGroupId === group.id && p.photoIndex === index)
                               )
                             })).filter(group => group.photos.length > 0);
+                            console.log('🔥 Updated groups count:', updatedGroups.length, 'adding new group');
                             
                             return [...updatedGroups, newGroup];
                           });
                           
+                          console.log('🔥 Clearing selected photos');
                           setSelectedPhotos(new Set());
+                        } else {
+                          console.log('⚠️ Not enough photos to combine:', selectedPhotoData.length);
                         }
                       }}
                       className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
