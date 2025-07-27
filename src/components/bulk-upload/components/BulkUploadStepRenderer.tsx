@@ -39,6 +39,8 @@ interface BulkUploadStepRendererProps {
 
 const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
   const { currentStep } = props;
+  
+  console.log('🔍 BULK UPLOAD STEP:', currentStep, 'photoGroups:', props.photoGroups?.length || 0);
 
   switch (currentStep) {
     case 'upload':

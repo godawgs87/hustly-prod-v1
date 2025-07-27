@@ -13,8 +13,14 @@ interface PhotoGroupingInterfaceProps {
   onBack: () => void;
 }
 
-const PhotoGroupingInterface = ({ photoGroups, onGroupsConfirmed, onBack }: PhotoGroupingInterfaceProps) => {
-  const [groups, setGroups] = useState<PhotoGroup[]>(photoGroups);
+const PhotoGroupingInterface: React.FC<PhotoGroupingInterfaceProps> = ({
+  photoGroups: initialGroups,
+  onGroupsConfirmed,
+  onBack
+}) => {
+  console.log('🔍 PHOTO GROUPING INTERFACE: Rendering with', initialGroups?.length || 0, 'groups');
+
+  const [groups, setGroups] = useState<PhotoGroup[]>(initialGroups);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [draggedPhoto, setDraggedPhoto] = useState<{ photo: File; fromGroupId: string; photoIndex: number } | null>(null);
