@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Settings, ArrowLeft, Package, Home, Plus, Loader2, BarChart3, Database } from 'lucide-react';
 
 interface UnifiedMobileNavigationProps {
-  currentView: string;
-  onNavigate: (view: 'dashboard' | 'create' | 'inventory' | 'active-listings' | 'data-management') => void;
+  currentView?: string;
+  onNavigate?: (view: 'dashboard' | 'create' | 'inventory' | 'active-listings' | 'data-management') => void;
   showBack?: boolean;
   onBack?: () => void;
   title?: string;
@@ -19,19 +19,33 @@ interface UnifiedMobileNavigationProps {
 }
 
 const UnifiedMobileNavigation = ({ 
-  currentView, 
+  currentView = 'dashboard', 
   onNavigate, 
   showBack = false, 
   onBack,
   title,
-  loading,
+  loading = false,
   notifications
-}: UnifiedMobileNavigationProps) => {
+}: UnifiedMobileNavigationProps = {}) => {
   const navigate = useNavigate();
   
   const handleSettingsClick = () => {
     if (loading) return;
     navigate('/settings');
+  };
+
+  const handleDefaultNavigation = (view: string) => {
+    if (loading) return;
+    switch (view) {
+      case 'dashboard':
+        navigate('/');
+        break;
+      case 'create':
+        navigate('/create-listing');
+        break;
+      default:
+        navigate('/');
+    }
   };
 
   if (showBack && onBack) {
@@ -71,13 +85,13 @@ const UnifiedMobileNavigation = ({
       view: 'dashboard',
       icon: Home,
       label: 'Home',
-      action: () => onNavigate('dashboard')
+      action: () => onNavigate ? onNavigate('dashboard') : handleDefaultNavigation('dashboard')
     },
     {
       view: 'create',
       icon: Plus,
       label: 'Create',
-      action: () => onNavigate('create'),
+      action: () => onNavigate ? onNavigate('create') : handleDefaultNavigation('create'),
       primary: true
     }
   ];
