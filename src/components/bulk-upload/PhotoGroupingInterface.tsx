@@ -224,6 +224,7 @@ const PhotoGroupingInterface: React.FC<PhotoGroupingInterfaceProps> = ({
                   {selectedPhotos.size > 1 && (
                     <Button 
                       onClick={() => {
+                        console.log('🔥 COMBINE SELECTED CLICKED! selectedPhotos:', Array.from(selectedPhotos));
                         // Combine selected photos into one group
                         const selectedPhotoData: { photo: File; fromGroupId: string; photoIndex: number }[] = [];
                         selectedPhotos.forEach(photoKey => {
@@ -271,6 +272,7 @@ const PhotoGroupingInterface: React.FC<PhotoGroupingInterfaceProps> = ({
                   )}
                   <Button 
                     onClick={() => {
+                      console.log('🔥 NEW GROUP CLICKED! selectedPhotos:', Array.from(selectedPhotos));
                       // Move selected photos to new group
                       const selectedPhotoData: { photo: File; fromGroupId: string; photoIndex: number }[] = [];
                       selectedPhotos.forEach(photoKey => {
