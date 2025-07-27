@@ -17,6 +17,7 @@ import { EbayService } from '@/services/api/ebayService';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import EbayTokenExpiryWarning from '@/components/EbayTokenExpiryWarning';
 import type { PhotoGroup } from './BulkUploadManager';
 
 interface BulkPriceResearchStepProps {
@@ -320,6 +321,9 @@ const BulkPriceResearchStep: React.FC<BulkPriceResearchStepProps> = ({
           We'll automatically research market prices for all {photoGroups.length} items using eBay's sold listings data. 
           This will help optimize your pricing for better sales.
         </p>
+        
+        {/* eBay Token Expiry Warning */}
+        <EbayTokenExpiryWarning showOnlyIfExpiringSoon={false} className="max-w-md" />
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md">
           <h4 className="font-medium mb-2 flex items-center">
             <Zap className="w-4 h-4 mr-2 text-blue-600" />

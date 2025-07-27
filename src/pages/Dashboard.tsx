@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import StreamlinedHeader from '@/components/StreamlinedHeader';
 import SimplifiedMobileNav from '@/components/SimplifiedMobileNav';
+import EbayTokenExpiryWarning from '@/components/EbayTokenExpiryWarning';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -348,6 +349,9 @@ const Dashboard = () => {
             </Card>
           </div>
         </section>
+
+        {/* eBay Token Expiry Warning */}
+        <EbayTokenExpiryWarning className="mb-6" />
 
         {/* Action Required */}
         {actionItems.length > 0 && (
