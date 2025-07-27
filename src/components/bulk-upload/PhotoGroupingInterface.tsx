@@ -200,6 +200,14 @@ const PhotoGroupingInterface = ({ photoGroups, onGroupsConfirmed, onBack }: Phot
         </CardHeader>
         <CardContent>
           {/* Photo Selection Actions - Show when photos are selected */}
+          {(() => {
+            console.log('🔍 PHOTO SELECTION DEBUG:', {
+              selectedPhotosSize: selectedPhotos.size,
+              selectedPhotosArray: Array.from(selectedPhotos),
+              shouldShowCombineButton: selectedPhotos.size > 1
+            });
+            return null;
+          })()}
           {selectedPhotos.size > 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
