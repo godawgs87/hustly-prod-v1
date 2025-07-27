@@ -228,8 +228,12 @@ const PhotoGroupingInterface: React.FC<PhotoGroupingInterfaceProps> = ({
                         // Combine selected photos into one group
                         const selectedPhotoData: { photo: File; fromGroupId: string; photoIndex: number }[] = [];
                         selectedPhotos.forEach(photoKey => {
-                          const [groupId, photoIndexStr] = photoKey.split('-');
-                          const photoIndex = parseInt(photoIndexStr);
+                          // Photo key format: "group-{timestamp}-{groupIndex}-{photoIndex}"
+                          // Split from the right to get the last two parts as groupIndex and photoIndex
+                          const parts = photoKey.split('-');
+                          const photoIndex = parseInt(parts[parts.length - 1]); // Last part is photo index
+                          const groupIndex = parseInt(parts[parts.length - 2]); // Second to last is group index
+                          const groupId = parts.slice(0, -2).join('-'); // Everything before the last two parts
                           console.log('🔍 Processing photo key:', photoKey, 'groupId:', groupId, 'photoIndex:', photoIndex);
                           const group = groups.find(g => g.id === groupId);
                           console.log('🔍 Found group:', group?.id, 'photo exists:', !!group?.photos[photoIndex]);
@@ -286,8 +290,10 @@ const PhotoGroupingInterface: React.FC<PhotoGroupingInterfaceProps> = ({
                       // Move selected photos to new group
                       const selectedPhotoData: { photo: File; fromGroupId: string; photoIndex: number }[] = [];
                       selectedPhotos.forEach(photoKey => {
-                        const [groupId, photoIndexStr] = photoKey.split('-');
-                        const photoIndex = parseInt(photoIndexStr);
+                        // Photo key format: "group-{timestamp}-{groupIndex}-{photoIndex}"
+                        const parts = photoKey.split('-');
+                        const photoIndex = parseInt(parts[parts.length - 1]);
+                        const groupId = parts.slice(0, -2).join('-');
                         const group = groups.find(g => g.id === groupId);
                         if (group && group.photos[photoIndex]) {
                           selectedPhotoData.push({
