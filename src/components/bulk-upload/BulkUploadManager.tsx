@@ -125,28 +125,28 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
         description: "Configure shipping options for your items.",
       });
     } else {
-      // Price research not done yet, start price research
-      state.setCurrentStep('priceResearch');
+      // Price research not done yet, go to combined analysis
+      state.setCurrentStep('combinedAnalysis');
       toast({
-        title: "Starting Price Research",
-        description: "Researching market prices for your items...",
+        title: "Review & Price Research",
+        description: "Review AI analysis and run price research for your items.",
       });
     }
   }, [state.setCurrentStep, state.photoGroups, toast]);
 
   const handleStartPriceResearch = useCallback(() => {
     setIsPriceResearching(true);
-    state.setCurrentStep('priceResearch');
+    state.setCurrentStep('combinedAnalysis');
     toast({
-      title: "Starting Price Research",
-      description: "Researching market prices for your items...",
+      title: "Review & Price Research",
+      description: "Review AI analysis and run price research for your items.",
     });
   }, [state.setCurrentStep, toast]);
 
   const handlePriceResearchComplete = useCallback((groupsWithPrices: PhotoGroup[]) => {
     state.setPhotoGroups(groupsWithPrices);
     setIsPriceResearching(false);
-    state.setCurrentStep('confirmation'); // Return to review/confirmation with updated prices
+    state.setCurrentStep('combinedAnalysis'); // Return to combined analysis with updated prices
     toast({
       title: "Price Research Complete!",
       description: "Market prices have been researched and applied to your items. Review and continue to shipping.",

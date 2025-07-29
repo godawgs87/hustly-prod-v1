@@ -100,9 +100,18 @@ export const validateEbayConnection = async (): Promise<EbayConnectionStatus> =>
       };
     }
 
-    // Warn if expires within 30 minutes
-    if (timeUntilExpiry <= 30 * 60 * 1000) {
-      issues.push(`Token expires in ${minutesUntilExpiry} minutes`);
+    // Only warn if expires within 7 days (normal eBay tokens last 180+ days)
+    // Don't warn for short-term fluctuations or normal long-term tokens
+    if (timeUntilExpiry <= 7 * 24 * 60 * 60 * 1000) { // 7 days in milliseconds
+      if (timeUntilExpiry <= 60 * 60 * 1000) { // Less than 1 hour
+        issues.push(`Token expires in ${minutesUntilExpiry} minutes`);
+      } else if (timeUntilExpiry <= 24 * 60 * 60 * 1000) { // Less than 1 day
+        const hoursUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60 * 60));
+        issues.push(`Token expires in ${hoursUntilExpiry} hours`);
+      } else { // Less than 7 days
+        const daysUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60 * 60 * 24));
+        issues.push(`Token expires in ${daysUntilExpiry} days`);
+      }
     }
 
     return {

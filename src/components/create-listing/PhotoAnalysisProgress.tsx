@@ -9,7 +9,7 @@ const PhotoAnalysisProgress = () => {
   const [currentStage, setCurrentStage] = React.useState(0);
 
   const stages = [
-    { icon: Camera, label: 'Compressing images...', duration: 3000 },
+    { icon: Camera, label: 'Optimizing photos for analysis...', duration: 3000 },
     { icon: Brain, label: 'AI analyzing content...', duration: 5000 },
     { icon: FileText, label: 'Generating description...', duration: 3000 },
     { icon: DollarSign, label: 'Researching pricing...', duration: 4000 }

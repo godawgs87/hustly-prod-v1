@@ -46,23 +46,46 @@ const BulkPriceResearchStep: React.FC<BulkPriceResearchStepProps> = ({
 }) => {
   const { user } = useAuth();
   
-  // Check eBay connection status using marketplace_accounts table
-  const { data: marketplaceAccounts } = useQuery({
-    queryKey: ['marketplace-accounts', user?.id],
+  // Helper function to check if token is expired
+  const isTokenExpired = (account: any) => {
+    if (!account.token_expires_at) return false;
+    const expiryTime = new Date(account.token_expires_at).getTime();
+    const now = Date.now();
+    return expiryTime <= now;
+  };
+  
+  // CRITICAL FIX: Aggressive eBay connection check with no caching for ammac89 bug
+  const { data: marketplaceAccounts, refetch: refetchAccounts } = useQuery({
+    queryKey: ['marketplace-accounts-price-research', user?.id, Date.now()], // Force fresh data
     queryFn: async () => {
       if (!user?.id) return [];
+      console.log('🔍 PRICE RESEARCH: Fetching fresh eBay connection data for user:', user.id);
+      
+      // Force fresh database query with no cache
       const { data, error } = await supabase
         .from('marketplace_accounts')
         .select('*')
-        .eq('user_id', user.id);
-      if (error) throw error;
+        .eq('user_id', user.id)
+        .eq('platform', 'ebay');
+        
+      if (error) {
+        console.error('❌ PRICE RESEARCH: Database error:', error);
+        throw error;
+      }
+      
+      console.log('✅ PRICE RESEARCH: Fresh eBay account data:', data);
       return data || [];
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    staleTime: 0, // No caching - always fresh
+    gcTime: 0, // Don't cache results
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true
   });
   
   const ebayAccount = marketplaceAccounts?.find(acc => acc.platform === 'ebay' && acc.is_connected);
-  const isConnected = !!ebayAccount;
+  const isConnected = !!ebayAccount && ebayAccount.oauth_token && !isTokenExpired(ebayAccount);
   const [progress, setProgress] = useState<PriceResearchProgress[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);

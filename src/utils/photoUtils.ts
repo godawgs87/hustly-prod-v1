@@ -20,9 +20,11 @@ export const convertFilesToBase64 = async (files: File[]): Promise<string[]> => 
       continue;
     }
     
-    // Check file size (limit to 5MB per file for faster processing)
-    if (file.size > 5 * 1024 * 1024) {
-      console.warn(`File ${i + 1} is large (${file.size} bytes), compressing...`);
+    // Check file size and only compress if needed (>5MB)
+    const isLargeFile = file.size > 5 * 1024 * 1024;
+    if (isLargeFile) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      console.log(`Optimizing large photo ${i + 1} (${sizeMB}MB) for faster processing...`);
     }
     
     try {

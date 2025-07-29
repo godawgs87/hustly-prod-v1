@@ -6,123 +6,164 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, Package, DollarSign, Clock, ArrowUpRight, RefreshCw, AlertCircle } from 'lucide-react';
+import { TrendingUp, Package, DollarSign, Clock, ArrowUpRight, RefreshCw, AlertCircle, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PlatformManager from './PlatformManager';
 import OfferManager from './OfferManager';
 import CrossListingRules from './CrossListingRules';
+import EnterpriseSalesOperationsComplete from './EnterpriseSalesOperationsComplete';
 
 interface SalesOperationsManagerProps {
   onNavigateToInventory: () => void;
 }
 
-const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManagerProps) => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [platforms, setPlatforms] = useState([]);
-  const [rules, setRules] = useState([]);
-  const [offers, setOffers] = useState([]);
-  const [platformListings, setPlatformListings] = useState([]);
-  const [platformLoading, setPlatformLoading] = useState(true);
-  const [platformError, setPlatformError] = useState<string | null>(null);
+export default function SalesOperationsManager({ onNavigateToInventory }: SalesOperationsManagerProps) {
+  const { listings, isLoading, error, fetchListings } = useInventoryStore();
   const { toast } = useToast();
-  
-  const { listings, isLoading, error, stats, fetchListings } = useInventoryStore();
 
-  // Load data on mount - similar pattern to inventory manager
+  // Mock data for components that need props
+  const [platforms] = useState([
+    { 
+      id: 'ebay', 
+      name: 'eBay', 
+      icon: '🛒',
+      isActive: true,
+      settings: {
+        autoList: true,
+        autoDelist: false,
+        autoPrice: true,
+        offerManagement: true
+      },
+      fees: {
+        listingFee: 0.35,
+        finalValueFee: 13.25,
+        paymentProcessingFee: 2.9
+      }
+    },
+    { 
+      id: 'amazon', 
+      name: 'Amazon', 
+      icon: '📦',
+      isActive: false,
+      settings: {
+        autoList: false,
+        autoDelist: false,
+        autoPrice: false,
+        offerManagement: false
+      },
+      fees: {
+        listingFee: 0.99,
+        finalValueFee: 15.0,
+        paymentProcessingFee: 2.9
+      }
+    },
+    { 
+      id: 'facebook', 
+      name: 'Facebook Marketplace', 
+      icon: '📘',
+      isActive: false,
+      settings: {
+        autoList: false,
+        autoDelist: false,
+        autoPrice: false,
+        offerManagement: false
+      },
+      fees: {
+        listingFee: 0.0,
+        finalValueFee: 5.0,
+        paymentProcessingFee: 2.9
+      }
+    }
+  ]);
+
+  const [offers] = useState([]);
+  const [rules] = useState([]);
+
   useEffect(() => {
     fetchListings();
   }, [fetchListings]);
 
-  // Load platform data after inventory loads
-  useEffect(() => {
-    if (isLoading || listings.length === 0) {
-      return;
-    }
+  const handlePlatformToggle = useCallback((platformId: string) => {
+    toast({
+      title: "Platform Toggle",
+      description: `Platform ${platformId} toggled`,
+    });
+  }, [toast]);
 
-    const loadPlatformData = async () => {
-      try {
-        setPlatformLoading(true);
-        setPlatformError(null);
-        
-        const [platformsRes, rulesRes, offersRes, listingsRes] = await Promise.all([
-          PlatformService.getPlatforms(),
-          PlatformService.getCrossListingRules(),
-          PlatformService.getListingOffers(),
-          PlatformService.getPlatformListings()
-        ]);
-        
-        setPlatforms(platformsRes);
-        setRules(rulesRes);
-        setOffers(offersRes);
-        setPlatformListings(listingsRes);
-      } catch (error: any) {
-        console.error('Failed to load platform data:', error);
-        setPlatformError(error.message || 'Failed to load platform data');
-      } finally {
-        setPlatformLoading(false);
-      }
-    };
+  const handlePlatformSettings = useCallback((platformId: string) => {
+    toast({
+      title: "Platform Settings",
+      description: `Opening settings for ${platformId}`,
+    });
+  }, [toast]);
 
-    loadPlatformData();
-  }, [isLoading, listings.length]);
+  const handleAddPlatform = useCallback(() => {
+    toast({
+      title: "Add Platform",
+      description: "Add new platform functionality",
+    });
+  }, [toast]);
 
-  // Mock handlers for platform operations
-  const handlePlatformToggle = (platformId: string, enabled: boolean) => {
-    console.log('Toggle platform:', platformId, enabled);
-  };
+  const handleCreateOffer = useCallback(() => {
+    toast({
+      title: "Create Offer",
+      description: "Create new offer functionality",
+    });
+  }, [toast]);
 
-  const handlePlatformSettings = (platformId: string) => {
-    console.log('Platform settings:', platformId);
-  };
+  const handleSendOffer = useCallback((offerId: string) => {
+    toast({
+      title: "Send Offer",
+      description: `Sending offer ${offerId}`,
+    });
+  }, [toast]);
 
-  const handleAddPlatform = () => {
-    console.log('Add platform');
-  };
+  const handleCancelOffer = useCallback((offerId: string) => {
+    toast({
+      title: "Cancel Offer",
+      description: `Cancelling offer ${offerId}`,
+    });
+  }, [toast]);
 
-  const handleCreateRule = () => {
-    console.log('Create rule');
-  };
+  const handleCreateRule = useCallback(() => {
+    toast({
+      title: "Create Rule",
+      description: "Create new rule functionality",
+    });
+  }, [toast]);
 
-  const handleEditRule = (ruleId: string) => {
-    console.log('Edit rule:', ruleId);
-  };
+  const handleEditRule = useCallback((ruleId: string) => {
+    toast({
+      title: "Edit Rule",
+      description: `Editing rule ${ruleId}`,
+    });
+  }, [toast]);
 
-  const handleDeleteRule = (ruleId: string) => {
-    console.log('Delete rule:', ruleId);
-  };
+  const handleDeleteRule = useCallback((ruleId: string) => {
+    toast({
+      title: "Delete Rule",
+      description: `Deleting rule ${ruleId}`,
+    });
+  }, [toast]);
 
-  const handleToggleRule = (ruleId: string, enabled: boolean) => {
-    console.log('Toggle rule:', ruleId, enabled);
-  };
+  const handleToggleRule = useCallback((ruleId: string) => {
+    toast({
+      title: "Toggle Rule",
+      description: `Toggling rule ${ruleId}`,
+    });
+  }, [toast]);
 
-  const handleCreateOffer = (offer: any) => {
-    console.log('Create offer:', offer);
-  };
-
-  const handleSendOffer = (offerId: string) => {
-    console.log('Send offer:', offerId);
-  };
-
-  const handleCancelOffer = (offerId: string) => {
-    console.log('Cancel offer:', offerId);
-  };
-
-  // Handle loading states - similar to inventory manager
-  if (isLoading && listings.length === 0) {
+  if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <p className="text-gray-600">Loading sales operations...</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -227,89 +268,31 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
       </div>
 
       {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="platforms">Platforms</TabsTrigger>
-          <TabsTrigger value="offers">Offers</TabsTrigger>
-          <TabsTrigger value="rules">Rules</TabsTrigger>
+      <Tabs defaultValue="automation" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-1">
+          <TabsTrigger value="automation" className="text-xs md:text-sm px-2 md:px-4">Enterprise</TabsTrigger>
+          <TabsTrigger value="platforms" className="text-xs md:text-sm px-2 md:px-4">Platforms</TabsTrigger>
+          <TabsTrigger value="rules" className="text-xs md:text-sm px-2 md:px-4">Rules</TabsTrigger>
+          <TabsTrigger value="offers" className="text-xs md:text-sm px-2 md:px-4">Offers</TabsTrigger>
+          <TabsTrigger value="analytics" className="text-xs md:text-sm px-2 md:px-4">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Active Listings Overview
-                <Button onClick={onNavigateToInventory} variant="outline" size="sm">
-                  <ArrowUpRight className="w-4 h-4 mr-2" />
-                  Manage Inventory
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {activeListings.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600 mb-4">No active listings found</p>
-                  <Button onClick={onNavigateToInventory}>
-                    Create Your First Listing
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {activeListings.slice(0, 6).map((listing) => (
-                    <Card key={listing.id} className="border">
-                      <CardContent className="p-4">
-                        <div className="space-y-2">
-                          <h3 className="font-medium text-sm line-clamp-2">{listing.title}</h3>
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold text-green-600">
-                              ${listing.price?.toFixed(2)}
-                            </span>
-                            <Badge variant="secondary">{(() => {
-                              const category = listing.category;
-                              if (category && typeof category === 'object' && 'primary' in category) {
-                                return String((category as any).primary || 'Uncategorized');
-                              }
-                              return String(category || 'Uncategorized');
-                            })()}</Badge>
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            Listed: {listing.listed_date 
-                              ? new Date(listing.listed_date).toLocaleDateString()
-                              : new Date(listing.created_at).toLocaleDateString()
-                            }
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="automation">
+          <EnterpriseSalesOperationsComplete onNavigateToInventory={onNavigateToInventory} />
         </TabsContent>
 
-        <TabsContent value="platforms">
-          <PlatformManager
+        <TabsContent value="platforms" className="space-y-6">
+          <PlatformManager 
             platforms={platforms}
-            platformListings={platformListings}
+            platformListings={[]}
             onPlatformToggle={handlePlatformToggle}
             onPlatformSettings={handlePlatformSettings}
             onAddPlatform={handleAddPlatform}
           />
         </TabsContent>
 
-        <TabsContent value="offers">
-          <OfferManager
-            offers={offers}
-            onCreateOffer={handleCreateOffer}
-            onSendOffer={handleSendOffer}
-            onCancelOffer={handleCancelOffer}
-          />
-        </TabsContent>
-
-        <TabsContent value="rules">
-          <CrossListingRules
+        <TabsContent value="rules" className="space-y-6">
+          <CrossListingRules 
             rules={rules}
             onCreateRule={handleCreateRule}
             onEditRule={handleEditRule}
@@ -317,9 +300,40 @@ const SalesOperationsManager = ({ onNavigateToInventory }: SalesOperationsManage
             onToggleRule={handleToggleRule}
           />
         </TabsContent>
+
+        <TabsContent value="offers" className="space-y-6">
+          <OfferManager 
+            offers={offers}
+            onCreateOffer={handleCreateOffer}
+            onSendOffer={handleSendOffer}
+            onCancelOffer={handleCancelOffer}
+          />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sales Analytics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-sm text-gray-600">Total Listings</p>
+                  <p className="text-2xl font-bold">{listings.length}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-600">Active Listings</p>
+                  <p className="text-2xl font-bold">{listings.filter(l => l.status === 'active').length}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-600">Sold Items</p>
+                  <p className="text-2xl font-bold">{listings.filter(l => l.status === 'sold').length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
-};
-
-export default SalesOperationsManager;
+}

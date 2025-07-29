@@ -257,9 +257,17 @@ serve(async (req) => {
 
         console.log('Storing marketplace account for user:', user.id);
         
-        // Calculate expiration time
-        const expiresIn = tokenData.expires_in || 7200;
+        // Calculate expiration time - eBay user tokens should last 180 days
+        // Use tokenData.expires_in if provided, otherwise default to 180 days (15552000 seconds)
+        const expiresIn = tokenData.expires_in || (180 * 24 * 60 * 60); // 180 days in seconds
         const expirationTime = new Date(Date.now() + expiresIn * 1000);
+        
+        console.log('Token expiration info:', {
+          provided_expires_in: tokenData.expires_in,
+          using_expires_in: expiresIn,
+          expiration_time: expirationTime.toISOString(),
+          days_from_now: Math.round(expiresIn / (24 * 60 * 60))
+        });
 
         // Use a simple username for now to avoid timeouts
         const realUsername = `ebay_user_${Date.now()}`;

@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { PhotoGroup } from '../BulkUploadManager';
 import type { ListingData } from '@/types/CreateListing';
 
-type StepType = 'upload' | 'grouping' | 'analysis' | 'priceResearch' | 'confirmation' | 'shipping' | 'finalReview';
+type StepType = 'upload' | 'grouping' | 'combinedAnalysis' | 'shipping' | 'finalReview';
 
 // Helper function to extract measurements from AI response with category awareness
 const extractMeasurements = (analysisResult: any) => {
@@ -359,12 +359,12 @@ export const useBulkUploadHandlers = (
   }, [photoGroups, setPhotoGroups, toast]);
 
   const handleGroupsConfirmed = useCallback(async (confirmedGroups: PhotoGroup[]) => {
-    // Just set the groups and move directly to confirmation/table view - skip analysis step
+    // Move to new combined analysis step
     setPhotoGroups(confirmedGroups);
-    setCurrentStep('confirmation');
+    setCurrentStep('combinedAnalysis');
     toast({
       title: "Groups Confirmed!",
-      description: "Review your items and click 'Start AI Analysis' when ready.",
+      description: "Starting AI analysis and price research...",
     });
   }, [setPhotoGroups, setCurrentStep, toast]);
 
@@ -587,7 +587,7 @@ export const useBulkUploadHandlers = (
   }, [setPhotoGroups]);
 
   const handleConfirmItems = useCallback(() => {
-    setCurrentStep('priceResearch');
+    setCurrentStep('shipping');
   }, [setCurrentStep]);
 
   const handleShippingConfirmed = useCallback(() => {
@@ -611,7 +611,7 @@ export const useBulkUploadHandlers = (
         await handleRetryAnalysis(group.id);
       }
       
-      setCurrentStep('priceResearch');
+      setCurrentStep('shipping');
       toast({
         title: "AI Analysis Complete!",
         description: "Starting price research for all items...",
