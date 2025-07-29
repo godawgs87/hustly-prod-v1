@@ -262,6 +262,28 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         </p>
       </div>
 
+      {/* Top Action Buttons - Moved for better visibility */}
+      <div className="flex justify-between items-center mb-6">
+        <Button 
+          variant="outline" 
+          onClick={handleBackToGrouping}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Photo Grouping
+        </Button>
+        
+        {(allCompleted || analysisStarted) && (
+          <Button 
+            onClick={handleContinueToShipping}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-2 text-lg font-semibold"
+          >
+            Continue to Shipping Configuration
+            <ArrowRight className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+
       {/* Progress Status */}
       {analysisStarted && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -454,39 +476,18 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
-      <div className="flex justify-between pt-6">
-        <Button 
-          variant="outline" 
-          onClick={handleBackToGrouping}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Photo Grouping
-        </Button>
-        
-        <div className="flex gap-3">
-          {!analysisStarted && (
-            <Button 
-              onClick={startAnalysis}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
-            >
-              <Brain className="w-4 h-4" />
-              Start Analysis
-            </Button>
-          )}
-          
-          {(allCompleted || analysisStarted) && (
-            <Button 
-              onClick={handleContinueToShipping}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-            >
-              Continue to Shipping Configuration
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          )}
+      {/* Start Analysis Button - Center when not started */}
+      {!analysisStarted && (
+        <div className="flex justify-center pt-6">
+          <Button 
+            onClick={startAnalysis}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-8 py-3 text-lg font-semibold"
+          >
+            <Brain className="w-4 h-4" />
+            Start Analysis
+          </Button>
         </div>
-      </div>
+      )}
     </div>
   );
 };
