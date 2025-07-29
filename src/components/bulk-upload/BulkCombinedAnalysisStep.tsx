@@ -14,10 +14,14 @@ import {
   Edit, 
   AlertTriangle, 
   ArrowLeft, 
-  ArrowRight 
+  ArrowRight,
+  Search
 } from 'lucide-react';
 import { PhotoGroup } from '@/types/bulk-upload';
 import { usePhotoAnalysis } from '@/hooks/usePhotoAnalysis';
+import { validateEbayConnection } from '@/utils/ebayConnectionValidator';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/components/AuthProvider';
 
 interface BulkCombinedAnalysisStepProps {
   photoGroups: PhotoGroup[];
@@ -45,6 +49,18 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const { analyzePhotos } = usePhotoAnalysis();
+  const { user } = useAuth();
+
+  // Check eBay connection with proper validation
+  const { data: ebayConnection, isLoading: isCheckingEbay } = useQuery({
+    queryKey: ['ebay-connection-status', user?.id],
+    queryFn: validateEbayConnection,
+    enabled: !!user,
+    refetchInterval: 30 * 60 * 1000, // Check every 30 minutes
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+  });
+
+  const isEbayConnected = ebayConnection?.isConnected && ebayConnection?.isTokenValid;
 
   // Initialize progress for all groups
   useEffect(() => {
@@ -116,6 +132,62 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
     }
   };
 
+  const processPriceResearch = async (groupId: string) => {
+    if (!isEbayConnected) {
+      toast.error('eBay not connected. Please connect your eBay account in Settings to enable price research.');
+      return;
+    }
+
+    updateProgress(groupId, { priceStatus: 'processing' });
+    
+    try {
+      const group = completedGroups.find(g => g.id === groupId) || photoGroups.find(g => g.id === groupId);
+      if (!group?.listingData?.title) {
+        throw new Error('No title available for price research');
+      }
+
+      // Call price research API (you'll need to implement this)
+      const response = await fetch('/api/price-research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: group.listingData.title,
+          category: group.listingData.category,
+          condition: group.listingData.condition
+        })
+      });
+
+      if (!response.ok) throw new Error('Price research failed');
+      
+      const priceData = await response.json();
+      
+      // Update the group with price research data
+      setCompletedGroups(prev => prev.map(g => 
+        g.id === groupId 
+          ? {
+              ...g,
+              listingData: {
+                ...g.listingData,
+                price: priceData.suggestedPrice || g.listingData?.price || 25,
+                priceResearch: priceData
+              }
+            }
+          : g
+      ));
+
+      updateProgress(groupId, { priceStatus: 'completed' });
+      toast.success(`Price research completed for ${group.name}`);
+      
+    } catch (error) {
+      console.error('❌ Price research failed:', error);
+      updateProgress(groupId, { 
+        priceStatus: 'error',
+        error: error instanceof Error ? error.message : 'Price research failed'
+      });
+      toast.error('Price research failed. You can set prices manually.');
+    }
+  };
+
   const startAnalysis = async () => {
     setAnalysisStarted(true);
     setIsProcessing(true);
@@ -176,14 +248,8 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
 
   const allCompleted = progress.length > 0 && progress.every(p => p.aiStatus === 'completed' || p.aiStatus === 'error');
 
-  // ALWAYS SHOW TABLE - NO SPLASH SCREEN EVER
   return (
     <div className="space-y-6">
-      {/* OBVIOUS INDICATOR - NEW TABLE COMPONENT LOADED */}
-      <div className="bg-red-500 text-white p-4 text-center font-bold text-xl">
-        🚨 NEW TABLE-ONLY COMPONENT LOADED - NO SPLASH SCREEN 🚨
-      </div>
-      
       {/* Header */}
       <div className="text-center">
         <h2 className="text-2xl font-bold flex items-center justify-center gap-2 mb-2">
@@ -291,6 +357,20 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                               Pending
                             </Badge>
                           )}
+                          
+                          {/* Price Research Status */}
+                          {groupProgress?.priceStatus === 'completed' && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">
+                              <DollarSign className="w-3 h-3 mr-1" />
+                              Price
+                            </Badge>
+                          )}
+                          {groupProgress?.priceStatus === 'processing' && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              Pricing
+                            </Badge>
+                          )}
                         </div>
                       </td>
                       
@@ -342,6 +422,22 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
+                          
+                          {/* Price Research Button */}
+                          {groupProgress?.aiStatus === 'completed' && groupProgress?.priceStatus !== 'completed' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => processPriceResearch(group.id)}
+                              disabled={groupProgress?.priceStatus === 'processing'}
+                            >
+                              {groupProgress?.priceStatus === 'processing' ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Search className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
                           {groupProgress?.error && (
                             <div title={groupProgress.error}>
                               <AlertTriangle className="w-4 h-4 text-red-500" />
