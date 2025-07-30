@@ -95,10 +95,18 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
           ? `${(aiResult.category as any).primary}${(aiResult.category as any).subcategory ? ' > ' + (aiResult.category as any).subcategory : ''}`
           : aiResult.category || 'Clothing, Shoes & Accessories',
         condition: aiResult.condition || 'Used',
-        keywords: aiResult.keywords || [group.name.toLowerCase()]
+        keywords: aiResult.keywords || [group.name.toLowerCase()],
+        measurements: aiResult.measurements || {}
       };
 
       updateProgress(group.id, { aiStatus: 'completed' });
+
+      // Auto-trigger price research immediately after AI analysis completes
+      if (isEbayConnected) {
+        setTimeout(() => {
+          processPriceResearch(group.id);
+        }, 500); // Small delay to let UI update
+      }
 
       return {
         ...group,
@@ -315,6 +323,7 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                   <th className="text-left p-3 font-medium">Title</th>
                   <th className="text-left p-3 font-medium">Price</th>
                   <th className="text-left p-3 font-medium">Category</th>
+                  <th className="text-left p-3 font-medium">Measurements</th>
                   <th className="text-left p-3 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -427,6 +436,19 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                       <td className="p-3">
                         <span className="text-sm text-gray-600">
                           {displayGroup.listingData?.category || 'Clothing, Shoes & Accessories'}
+                        </span>
+                      </td>
+                      
+                      {/* Measurements */}
+                      <td className="p-3">
+                        <span className="text-sm text-gray-600">
+                          {displayGroup.listingData?.measurements && Object.keys(displayGroup.listingData.measurements).length > 0
+                            ? Object.entries(displayGroup.listingData.measurements)
+                                .filter(([key, value]) => value && value !== '')
+                                .map(([key, value]) => `${key}: ${value}`)
+                                .join(', ')
+                            : '-'
+                          }
                         </span>
                       </td>
                       
