@@ -33,7 +33,17 @@ const BulkShippingConfiguration = ({
   useEffect(() => {
     const initializeShipping = () => {
       const updatedGroups = photoGroups.map(group => {
-        if (group.status !== 'completed') return group;
+        // Accept items with AI analysis data (listingData exists) regardless of status
+        if (!group.listingData?.title) {
+          console.log(`⚠️ Skipping group ${group.id} - no listing data:`, group);
+          return group;
+        }
+        
+        console.log(`✅ Processing group ${group.id} for shipping:`, {
+          title: group.listingData.title,
+          status: group.status,
+          hasListingData: !!group.listingData
+        });
 
         // Estimate weight based on item category/type
         const estimatedWeight = estimateItemWeight(group);

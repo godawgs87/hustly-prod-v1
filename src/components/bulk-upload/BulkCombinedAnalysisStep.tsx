@@ -445,21 +445,33 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                             <Edit className="w-4 h-4" />
                           </Button>
                           
-                          {/* Price Research Button */}
-                          {groupProgress?.aiStatus === 'completed' && groupProgress?.priceStatus !== 'completed' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => processPriceResearch(group.id)}
-                              disabled={groupProgress?.priceStatus === 'processing'}
-                            >
-                              {groupProgress?.priceStatus === 'processing' ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Search className="w-4 h-4" />
-                              )}
-                            </Button>
-                          )}
+                          {/* Price Research Button - Enhanced with debugging */}
+                          {(() => {
+                            const shouldShowPriceButton = groupProgress?.aiStatus === 'completed' && groupProgress?.priceStatus !== 'completed';
+                            console.log(`🔍 Price Research Button Debug for ${group.id}:`, {
+                              aiStatus: groupProgress?.aiStatus,
+                              priceStatus: groupProgress?.priceStatus,
+                              shouldShow: shouldShowPriceButton,
+                              isEbayConnected,
+                              ebayConnection
+                            });
+                            
+                            return shouldShowPriceButton ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => processPriceResearch(group.id)}
+                                disabled={groupProgress?.priceStatus === 'processing'}
+                                title={isEbayConnected ? 'Run Price Research' : 'eBay not connected'}
+                              >
+                                {groupProgress?.priceStatus === 'processing' ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Search className="w-4 h-4" />
+                                )}
+                              </Button>
+                            ) : null;
+                          })()}
                           {groupProgress?.error && (
                             <div title={groupProgress.error}>
                               <AlertTriangle className="w-4 h-4 text-red-500" />
