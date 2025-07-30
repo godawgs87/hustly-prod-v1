@@ -18,6 +18,7 @@ import {
   Search
 } from 'lucide-react';
 import { PhotoGroup } from '@/types/bulk-upload';
+import { EbayService } from '@/services/api/ebayService';
 import { usePhotoAnalysis } from '@/hooks/usePhotoAnalysis';
 import { validateEbayConnection } from '@/utils/ebayConnectionValidator';
 import { useQuery } from '@tanstack/react-query';
@@ -146,29 +147,24 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         throw new Error('No title available for price research');
       }
 
-      // Call price research API (you'll need to implement this)
-      const response = await fetch('/api/price-research', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: group.listingData.title,
-          category: group.listingData.category,
-          condition: group.listingData.condition
-        })
+      // Use EbayService for price research
+      const priceData = await EbayService.researchItemPrice({
+        query: group.listingData.title,
+        brand: group.listingData.brand,
+        condition: group.listingData.condition,
+        limit: 10
       });
-
-      if (!response.ok) throw new Error('Price research failed');
-      
-      const priceData = await response.json();
       
       // Update the group with price research data
+      const suggestedPrice = priceData?.data?.priceAnalysis?.suggestedPrice || group.listingData?.price || 25;
+      
       setCompletedGroups(prev => prev.map(g => 
         g.id === groupId 
           ? {
               ...g,
               listingData: {
                 ...g.listingData,
-                price: priceData.suggestedPrice || g.listingData?.price || 25,
+                price: suggestedPrice,
                 priceResearch: priceData
               }
             }
