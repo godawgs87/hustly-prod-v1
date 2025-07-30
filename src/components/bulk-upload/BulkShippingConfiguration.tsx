@@ -27,7 +27,7 @@ const BulkShippingConfiguration = ({
   children 
 }: BulkShippingConfigurationProps) => {
   const { toast } = useToast();
-  const [groups, setGroups] = useState<PhotoGroup[]>([]);
+  const [groups, setGroups] = useState<PhotoGroup[]>(photoGroups);
 
   // Initialize groups with smart shipping defaults
   useEffect(() => {

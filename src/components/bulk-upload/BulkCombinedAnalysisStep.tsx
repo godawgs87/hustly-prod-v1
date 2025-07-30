@@ -447,16 +447,18 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                           
                           {/* Price Research Button - Enhanced with debugging */}
                           {(() => {
-                            const shouldShowPriceButton = groupProgress?.aiStatus === 'completed' && groupProgress?.priceStatus !== 'completed';
+                            const shouldShow = groupProgress?.aiStatus === 'completed' && 
+                                             isEbayConnected && 
+                                             groupProgress?.priceStatus !== 'completed';
                             console.log(`🔍 Price Research Button Debug for ${group.id}:`, {
                               aiStatus: groupProgress?.aiStatus,
                               priceStatus: groupProgress?.priceStatus,
-                              shouldShow: shouldShowPriceButton,
+                              shouldShow: shouldShow,
                               isEbayConnected,
                               ebayConnection
                             });
                             
-                            return shouldShowPriceButton ? (
+                            return shouldShow ? (
                               <Button
                                 variant="outline"
                                 size="sm"
