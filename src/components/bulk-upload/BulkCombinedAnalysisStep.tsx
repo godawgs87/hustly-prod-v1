@@ -458,11 +458,12 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                             
                             return shouldShowPriceButton ? (
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
                                 onClick={() => processPriceResearch(group.id)}
                                 disabled={groupProgress?.priceStatus === 'processing'}
                                 title={isEbayConnected ? 'Run Price Research' : 'eBay not connected'}
+                                className="border-blue-300 text-blue-600 hover:bg-blue-50 bg-white"
                               >
                                 {groupProgress?.priceStatus === 'processing' ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -470,7 +471,11 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                                   <Search className="w-4 h-4" />
                                 )}
                               </Button>
-                            ) : null;
+                            ) : (
+                              <div className="text-xs text-gray-400 px-2">
+                                {groupProgress?.aiStatus !== 'completed' ? 'AI pending' : 'Price done'}
+                              </div>
+                            );
                           })()}
                           {groupProgress?.error && (
                             <div title={groupProgress.error}>

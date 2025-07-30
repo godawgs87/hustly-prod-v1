@@ -147,7 +147,8 @@ const BulkShippingConfiguration = ({
     });
   };
 
-  const completedGroups = groups.filter(g => g.status === 'completed');
+  // Count all groups with listing data (AI analysis completed) instead of just status === 'completed'
+  const completedGroups = groups.filter(g => g.listingData?.title);
   const configuredCount = completedGroups.filter(g => g.selectedShipping).length;
   const totalShippingCost = completedGroups.reduce((sum, group) => 
     sum + (group.selectedShipping?.cost || 0), 0
