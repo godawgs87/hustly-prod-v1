@@ -102,10 +102,22 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       updateProgress(group.id, { aiStatus: 'completed' });
 
       // Auto-trigger price research immediately after AI analysis completes
-      if (isEbayConnected) {
+      // Only if AI analysis actually succeeded (not fallback error data)
+      const hasValidTitle = aiData.title && 
+                           !aiData.title.includes('Needs Review') && 
+                           !aiData.title.includes('Listing Not Fully Generated');
+      
+      if (isEbayConnected && hasValidTitle) {
+        console.log(`🚀 Auto-triggering price research for ${group.name} with title: ${aiData.title}`);
         setTimeout(() => {
           processPriceResearch(group.id);
         }, 500); // Small delay to let UI update
+      } else {
+        console.log(`⏸️ Skipping auto price research for ${group.name}:`, {
+          isEbayConnected,
+          hasValidTitle,
+          title: aiData.title
+        });
       }
 
       return {
