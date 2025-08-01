@@ -100,6 +100,14 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       };
 
       updateProgress(group.id, { aiStatus: 'completed' });
+      
+      // Mark the actual PhotoGroup as completed after AI analysis
+      setCompletedGroups(prev => prev.map(g => 
+        g.id === group.id ? { ...g, status: 'completed' } : g
+      ));
+      
+      // Note: onComplete expects array of groups, but we'll let the parent handle individual updates
+      // The status update in completedGroups should be sufficient for the ready state logic
 
       // Auto-trigger price research immediately after AI analysis completes
       // Only if AI analysis actually succeeded (not fallback error data)
@@ -196,11 +204,21 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       
     } catch (error) {
       console.error('❌ Price research failed:', error);
+      
+      // Check for specific eBay token errors
+      let errorMessage = 'Price research failed';
+      if (error.message?.includes('invalid_scope') || error.message?.includes('token')) {
+        errorMessage = 'eBay connection expired. Please reconnect your eBay account in Settings.';
+        toast.error(errorMessage);
+      } else {
+        const group = completedGroups.find(g => g.id === groupId) || photoGroups.find(g => g.id === groupId);
+        toast.error(`Price research failed for ${group?.name || 'item'}. You can set prices manually.`);
+      }
+      
       updateProgress(groupId, { 
         priceStatus: 'error',
-        error: error instanceof Error ? error.message : 'Price research failed'
+        error: errorMessage
       });
-      toast.error('Price research failed. You can set prices manually.');
     }
   };
 

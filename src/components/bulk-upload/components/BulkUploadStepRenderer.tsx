@@ -6,6 +6,7 @@ import BulkShippingConfiguration from '../BulkShippingConfiguration';
 import BulkPriceResearchStep from '../BulkPriceResearchStep';
 import BulkCombinedAnalysisStep from '../BulkCombinedAnalysisStep';
 import AIDetailsTableView from './AIDetailsTableView';
+import BulkFinalReviewStep from './BulkFinalReviewStep';
 import type { PhotoGroup } from '../BulkUploadManager';
 
 export type StepType = 'upload' | 'grouping' | 'combinedAnalysis' | 'shipping' | 'finalReview' | 'priceResearch';
@@ -91,35 +92,13 @@ const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
       );
     case 'finalReview':
       return (
-        <div>
-          {/* Add back button and Upload All button */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-4">
-              <button
-                className="bg-gray-500 text-white px-4 py-2 rounded shadow hover:bg-gray-600 font-medium"
-                onClick={() => props.onStepChange('shipping')}
-              >
-                ← Back to Shipping
-              </button>
-              <h2 className="text-xl font-semibold text-gray-900">Final Review & Upload</h2>
-            </div>
-            <button
-              className="bg-green-600 text-white px-6 py-2 rounded shadow hover:bg-green-700 font-semibold text-lg"
-              onClick={props.onPostAll}
-            >
-              📦 Upload All to Inventory
-            </button>
-          </div>
-          <AIDetailsTableView
-            photoGroups={props.photoGroups}
-            onEditItem={props.onEditItem}
-            onPreviewItem={props.onPreviewItem}
-            onPostItem={props.onPostItem}
-            onRunAI={props.onRetryAnalysis}
-            onUpdateGroup={props.onUpdateGroup}
-            isAnalyzing={props.isAnalyzing}
-          />
-        </div>
+        <BulkFinalReviewStep
+          photoGroups={props.photoGroups}
+          onEditItem={props.onEditItem}
+          onPreviewItem={props.onPreviewItem}
+          onPostAll={props.onPostAll}
+          onBackToShipping={() => props.onStepChange('shipping')}
+        />
       );
       
     case 'priceResearch':
