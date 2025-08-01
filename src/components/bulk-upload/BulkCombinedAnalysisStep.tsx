@@ -100,14 +100,6 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       };
 
       updateProgress(group.id, { aiStatus: 'completed' });
-      
-      // Mark the actual PhotoGroup as completed after AI analysis
-      setCompletedGroups(prev => prev.map(g => 
-        g.id === group.id ? { ...g, status: 'completed' } : g
-      ));
-      
-      // Note: onComplete expects array of groups, but we'll let the parent handle individual updates
-      // The status update in completedGroups should be sufficient for the ready state logic
 
       // Auto-trigger price research immediately after AI analysis completes
       // Only if AI analysis actually succeeded (not fallback error data)
@@ -138,25 +130,36 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       };
     } catch (error) {
       console.error('❌ Analysis failed for group:', group.name, error);
+      
+      // Create fallback data to prevent crashes
+      const fallbackData = {
+        title: `${group.name} - Manual Review Required`,
+        description: 'AI analysis failed. Please edit this listing manually.',
+        price: 25,
+        category: 'Uncategorized',
+        brand: 'Unknown',
+        condition: 'Good',
+        measurements: {}
+      };
+      
+      // Update the group with fallback data so user can continue
+      setCompletedGroups(prev => prev.map(g => 
+        g.id === group.id 
+          ? { ...g, listingData: fallbackData, status: 'completed' }
+          : g
+      ));
+      
       updateProgress(group.id, { 
-        aiStatus: 'error', 
-        error: error instanceof Error ? error.message : 'Analysis failed' 
+        aiStatus: 'error',
+        error: error instanceof Error ? error.message : 'Analysis failed'
       });
       
-      toast.error(`Analysis failed for ${group.name}. Using defaults.`);
+      toast.error(`Analysis failed for ${group.name}. Fallback data created - please edit manually.`);
       
-      // Return group with default data
+      // Return group with fallback data
       return {
         ...group,
-        listingData: {
-          ...group.listingData,
-          title: group.listingData?.title || `${group.name} - Premium Quality`,
-          description: group.listingData?.description || `High-quality ${group.name.toLowerCase()} in excellent condition.`,
-          category: group.listingData?.category || 'Clothing, Shoes & Accessories',
-          condition: group.listingData?.condition || 'Used',
-          keywords: group.listingData?.keywords || [group.name.toLowerCase()],
-          price: group.listingData?.price || 25
-        }
+        listingData: fallbackData
       };
     }
   };
@@ -204,21 +207,11 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       
     } catch (error) {
       console.error('❌ Price research failed:', error);
-      
-      // Check for specific eBay token errors
-      let errorMessage = 'Price research failed';
-      if (error.message?.includes('invalid_scope') || error.message?.includes('token')) {
-        errorMessage = 'eBay connection expired. Please reconnect your eBay account in Settings.';
-        toast.error(errorMessage);
-      } else {
-        const group = completedGroups.find(g => g.id === groupId) || photoGroups.find(g => g.id === groupId);
-        toast.error(`Price research failed for ${group?.name || 'item'}. You can set prices manually.`);
-      }
-      
       updateProgress(groupId, { 
         priceStatus: 'error',
-        error: errorMessage
+        error: error instanceof Error ? error.message : 'Price research failed'
       });
+      toast.error('Price research failed. You can set prices manually.');
     }
   };
 
