@@ -29,13 +29,20 @@ export function parseOpenAIResponse(content: string) {
     }
   }
 
-  // Only check for content filtering if we couldn't find valid JSON
-  if (content.includes("I'm sorry, I can't assist") || 
-      content.includes("I cannot analyze") || 
-      (content.includes("I'm unable to") && !content.includes('```json')) ||
-      content.length < 50) {
+  // More robust content filtering detection - only trigger fallback for clear refusals
+  const hasContentFiltering = (
+    content.includes("I'm sorry, I can't assist") ||
+    content.includes("I cannot analyze") ||
+    content.includes("I'm not able to") ||
+    (content.includes("I'm unable to") && !content.includes('```json') && !content.includes('{'))
+  );
+  
+  const isTooShort = content.length < 30;
+  
+  if (hasContentFiltering || isTooShort) {
     console.log('🚨 OpenAI content filtering detected, using fallback');
-    console.log('Reason: Content filtering or too short response');
+    console.log('Reason:', hasContentFiltering ? 'Content filtering' : 'Response too short');
+    console.log('Content length:', content.length);
     return createFallbackListing();
   }
 
@@ -48,24 +55,57 @@ export function parseOpenAIResponse(content: string) {
     cleanContent = cleanContent.replace(/```json\s*/, '');
     cleanContent = cleanContent.replace(/```\s*$/, '');
     
-    // Find JSON object boundaries
-    const jsonStart = cleanContent.indexOf('{');
-    const jsonEnd = cleanContent.lastIndexOf('}');
+    // Find JSON object boundaries with multiple attempts
+    let jsonStart = cleanContent.indexOf('{');
+    let jsonEnd = cleanContent.lastIndexOf('}');
     
+    // If no JSON found, try looking for it in different ways
     if (jsonStart === -1 || jsonEnd === -1) {
-      console.log('No JSON found in response, using fallback');
+      // Try looking for JSON after common prefixes
+      const jsonPrefixes = ['```json', 'json', 'JSON:', '{'];
+      for (const prefix of jsonPrefixes) {
+        const prefixIndex = cleanContent.indexOf(prefix);
+        if (prefixIndex !== -1) {
+          const searchStart = prefixIndex + prefix.length;
+          const newJsonStart = cleanContent.indexOf('{', searchStart);
+          if (newJsonStart !== -1) {
+            jsonStart = newJsonStart;
+            jsonEnd = cleanContent.lastIndexOf('}');
+            break;
+          }
+        }
+      }
+    }
+    
+    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+      console.log('No valid JSON boundaries found in response, using fallback');
+      console.log('jsonStart:', jsonStart, 'jsonEnd:', jsonEnd);
       return createFallbackListing();
     }
     
     const jsonString = cleanContent.substring(jsonStart, jsonEnd + 1);
-    console.log('Extracted JSON string:', jsonString);
+    console.log('Extracted JSON string length:', jsonString.length);
+    console.log('JSON preview:', jsonString.substring(0, 200) + '...');
     
     const listingData = JSON.parse(jsonString);
     
-    // Validate required fields
-    if (!listingData.title || !listingData.description) {
-      console.log('Missing required fields, using fallback');
+    // More flexible validation - accept if we have either title or some meaningful content
+    if (!listingData.title && !listingData.description && !listingData.brand) {
+      console.log('No meaningful content found in parsed JSON, using fallback');
+      console.log('Parsed keys:', Object.keys(listingData));
       return createFallbackListing();
+    }
+    
+    // If missing title but have other data, try to construct a basic title
+    if (!listingData.title && (listingData.brand || listingData.description)) {
+      console.log('Missing title, attempting to construct from available data');
+      listingData.title = listingData.brand || 'Product Listing';
+    }
+    
+    // If missing description, provide a basic one
+    if (!listingData.description) {
+      console.log('Missing description, providing basic description');
+      listingData.description = 'Product description not available. Please review and add details.';
     }
     
     // Ensure price is a number
