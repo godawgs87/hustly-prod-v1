@@ -3,6 +3,8 @@ export function parseOpenAIResponse(content: string) {
   console.log('Raw OpenAI content:', content);
   console.log('Content length:', content.length);
   console.log('Content type:', typeof content);
+  console.log('First 200 chars:', content.substring(0, 200));
+  console.log('Last 200 chars:', content.substring(Math.max(0, content.length - 200)));
 
   // First, try to find JSON content even if there's disclaimer text
   const jsonStart = content.indexOf('{');
