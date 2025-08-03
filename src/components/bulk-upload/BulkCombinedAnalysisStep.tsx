@@ -99,9 +99,25 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         measurements: aiResult.measurements || {}
       };
 
+      // Update the group data FIRST with AI results
+      const updatedGroupData = {
+        ...group,
+        listingData: {
+          ...group.listingData,
+          ...aiData,
+          price: group.listingData?.price || 25
+        },
+        status: 'completed'
+      };
+      
+      // Mark the actual PhotoGroup as completed after AI analysis
+      setCompletedGroups(prev => prev.map(g => 
+        g.id === group.id ? updatedGroupData : g
+      ));
+      
       updateProgress(group.id, { aiStatus: 'completed' });
 
-      // Auto-trigger price research immediately after AI analysis completes
+      // Auto-trigger price research AFTER group data is updated
       // Only if AI analysis actually succeeded (not fallback error data)
       const hasValidTitle = aiData.title && 
                            !aiData.title.includes('Needs Review') && 
@@ -109,9 +125,10 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       
       if (isEbayConnected && hasValidTitle) {
         console.log(`🚀 Auto-triggering price research for ${group.name} with title: ${aiData.title}`);
+        // Longer delay to ensure state updates have propagated
         setTimeout(() => {
           processPriceResearch(group.id);
-        }, 500); // Small delay to let UI update
+        }, 1000);
       } else {
         console.log(`⏸️ Skipping auto price research for ${group.name}:`, {
           isEbayConnected,
@@ -120,14 +137,8 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         });
       }
 
-      return {
-        ...group,
-        listingData: {
-          ...group.listingData,
-          ...aiData,
-          price: group.listingData?.price || 25
-        }
-      };
+      // Return the updated group data
+      return updatedGroupData;
     } catch (error) {
       console.error('❌ Analysis failed for group:', group.name, error);
       
