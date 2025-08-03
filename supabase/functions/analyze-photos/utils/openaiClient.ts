@@ -76,11 +76,33 @@ export async function analyzePhotosWithOpenAI(apiKey: string, base64Images: stri
 
   const data = await response.json();
   console.log('OpenAI response received');
+  console.log('=== OPENAI RAW RESPONSE DEBUG ===');
+  console.log('Response structure:', {
+    hasChoices: !!data.choices,
+    choicesLength: data.choices?.length,
+    hasFirstChoice: !!data.choices?.[0],
+    hasMessage: !!data.choices?.[0]?.message,
+    hasContent: !!data.choices?.[0]?.message?.content
+  });
   
   if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    console.error('Invalid OpenAI response structure:', JSON.stringify(data, null, 2));
     throw new Error('Invalid response structure from OpenAI');
   }
 
   const content = data.choices[0].message.content.trim();
-  return parseOpenAIResponse(content);
+  console.log('=== OPENAI CONTENT TO PARSE ===');
+  console.log('Content length:', content.length);
+  console.log('Content type:', typeof content);
+  console.log('Full content:', content);
+  console.log('First 300 chars:', content.substring(0, 300));
+  console.log('Last 300 chars:', content.substring(Math.max(0, content.length - 300)));
+  console.log('=== END OPENAI CONTENT ===');
+  
+  const parsedResult = parseOpenAIResponse(content);
+  console.log('=== PARSER RESULT ===');
+  console.log('Parsed result:', JSON.stringify(parsedResult, null, 2));
+  console.log('=== END PARSER RESULT ===');
+  
+  return parsedResult;
 }
