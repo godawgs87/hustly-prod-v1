@@ -35,6 +35,7 @@ interface GroupProgress {
   aiStatus: 'pending' | 'processing' | 'completed' | 'error';
   priceStatus: 'pending' | 'processing' | 'completed' | 'error';
   error?: string;
+  priceData?: any;
 }
 
 export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> = ({
@@ -99,43 +100,45 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         measurements: aiResult.measurements || {}
       };
 
-      // Update the group data FIRST with AI results
+      // Update group data with AI results FIRST
       const updatedGroupData = {
         ...group,
         listingData: {
           ...group.listingData,
           ...aiData,
-          price: group.listingData?.price || 25
+          price: group.listingData?.price || 25 // Keep existing price or default
         },
         status: 'completed'
       };
-      
-      // Mark the actual PhotoGroup as completed after AI analysis
-      setCompletedGroups(prev => prev.map(g => 
-        g.id === group.id ? updatedGroupData : g
-      ));
-      
-      updateProgress(group.id, { aiStatus: 'completed' });
 
-      // Auto-trigger price research AFTER group data is updated
-      // Only if AI analysis actually succeeded (not fallback error data)
+      // Update state with new group data
+      setCompletedGroups(prev => 
+        prev.map(g => g.id === group.id ? updatedGroupData : g)
+      );
+
+      console.log('✅ AI Result:', aiData);
+
+      // Auto-trigger price research with updated group data (no race condition)
       const hasValidTitle = aiData.title && 
-                           !aiData.title.includes('Needs Review') && 
-                           !aiData.title.includes('Listing Not Fully Generated');
-      
+                           aiData.title !== 'Needs Review - Listing Not Fully Generated' &&
+                           aiData.title.trim().length > 0;
+
       if (isEbayConnected && hasValidTitle) {
-        console.log(`🚀 Auto-triggering price research for ${group.name} with title: ${aiData.title}`);
-        // Longer delay to ensure state updates have propagated
+        console.log('🚀 Auto-triggering price research for', group.name, 'with title:', aiData.title);
+        
+        // Pass the updated group data directly to avoid race condition
         setTimeout(() => {
-          processPriceResearch(group.id);
-        }, 1000);
+          processPriceResearch(group.id, updatedGroupData);
+        }, 500); // Shorter delay since we're passing data directly
       } else {
-        console.log(`⏸️ Skipping auto price research for ${group.name}:`, {
+        console.log('⏸️ Skipping auto price research for', group.name, ':', {
           isEbayConnected,
           hasValidTitle,
           title: aiData.title
         });
       }
+
+      updateProgress(group.id, { aiStatus: 'completed' });
 
       // Return the updated group data
       return updatedGroupData;
@@ -175,7 +178,7 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
     }
   };
 
-  const processPriceResearch = async (groupId: string) => {
+  const processPriceResearch = async (groupId: string, updatedGroupData?: any) => {
     if (!isEbayConnected) {
       toast.error('eBay not connected. Please connect your eBay account in Settings to enable price research.');
       return;
@@ -184,45 +187,69 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
     updateProgress(groupId, { priceStatus: 'processing' });
     
     try {
-      const group = completedGroups.find(g => g.id === groupId) || photoGroups.find(g => g.id === groupId);
+      // Use updated group data if provided (from AI analysis), otherwise find existing group
+      const group = updatedGroupData || 
+                   completedGroups.find(g => g.id === groupId) || 
+                   photoGroups.find(g => g.id === groupId);
+      
       if (!group?.listingData?.title) {
+        console.log('❌ No title available for price research, group data:', group);
         throw new Error('No title available for price research');
       }
 
-      // Use EbayService for price research
-      const priceData = await EbayService.researchItemPrice({
-        query: group.listingData.title,
-        brand: group.listingData.brand,
-        condition: group.listingData.condition,
-        limit: 10
-      });
-      
-      // Update the group with price research data
-      const suggestedPrice = priceData?.data?.priceAnalysis?.suggestedPrice || group.listingData?.price || 25;
-      
-      setCompletedGroups(prev => prev.map(g => 
-        g.id === groupId 
-          ? {
-              ...g,
-              listingData: {
-                ...g.listingData,
-                price: suggestedPrice,
-                priceResearch: priceData
-              }
-            }
-          : g
-      ));
+      console.log('🔍 Starting price research for:', group.listingData.title);
 
-      updateProgress(groupId, { priceStatus: 'completed' });
-      toast.success(`Price research completed for ${group.name}`);
+      // Extract research parameters from AI analysis (same as single upload)
+      const researchParams = EbayService.extractPriceResearchParams(group.listingData);
       
-    } catch (error) {
+      // Perform price research (same as single upload)
+      const result = await EbayService.researchItemPrice(researchParams);
+      console.log('🔍 Price research result:', result);
+
+      if (result.data) {
+        const totalComps = result.data.searchResults?.total || 0;
+        const suggestedPrice = result.data.priceAnalysis?.suggestedPrice || 0;
+        
+        console.log('💰 Found suggested price:', suggestedPrice, 'from', totalComps, 'comparables');
+
+        // Auto-populate the price field with suggested price (same as single upload)
+        if (suggestedPrice > 0) {
+          const updatedGroup = {
+            ...group,
+            listingData: {
+              ...group.listingData,
+              price: suggestedPrice // Auto-fill the price field
+            }
+          };
+
+          // Update the group with the new price
+          setCompletedGroups(prev => 
+            prev.map(g => g.id === groupId ? updatedGroup : g)
+          );
+
+          toast.success(`Price research complete: $${suggestedPrice} (from ${totalComps} comparables)`);
+        } else {
+          toast.info('No exact matches found, keeping current price');
+        }
+
+        updateProgress(groupId, { 
+          priceStatus: 'completed',
+          priceData: result.data 
+        });
+      } else {
+        throw new Error('No price data received');
+      }
+    } catch (error: any) {
       console.error('❌ Price research failed:', error);
-      updateProgress(groupId, { 
-        priceStatus: 'error',
-        error: error instanceof Error ? error.message : 'Price research failed'
-      });
-      toast.error('Price research failed. You can set prices manually.');
+      
+      // Enhanced error handling for eBay token issues
+      if (error.message?.includes('invalid_scope') || error.message?.includes('token')) {
+        toast.error('eBay connection expired. Please reconnect your eBay account in Settings.');
+      } else {
+        toast.error(`Price research failed: ${error.message}`);
+      }
+      
+      updateProgress(groupId, { priceStatus: 'error' });
     }
   };
 
