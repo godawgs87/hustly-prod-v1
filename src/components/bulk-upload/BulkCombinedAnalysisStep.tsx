@@ -214,6 +214,8 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
 
         // Auto-populate the price field with suggested price (same as single upload)
         if (suggestedPrice > 0) {
+          console.log('💰 Updating price for group:', groupId, 'from', group.listingData?.price, 'to', suggestedPrice);
+          
           const updatedGroup = {
             ...group,
             listingData: {
@@ -222,9 +224,18 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
             }
           };
 
+          console.log('💰 Updated group data:', updatedGroup);
+
           // Update the group with the new price
-          setCompletedGroups(prev => 
-            prev.map(g => g.id === groupId ? updatedGroup : g)
+          setCompletedGroups(prev => {
+            const newGroups = prev.map(g => g.id === groupId ? updatedGroup : g);
+            console.log('💰 Updated completedGroups:', newGroups);
+            return newGroups;
+          });
+
+          // Force UI re-render by updating progress state
+          setProgress(prev => 
+            prev.map(p => p.groupId === groupId ? { ...p, priceUpdated: Date.now() } : p)
           );
 
           toast.success(`Price research complete: $${suggestedPrice} (from ${totalComps} comparables)`);
