@@ -12,6 +12,7 @@ import {
   Clock, 
   Loader2, 
   Edit, 
+  Eye,
   AlertTriangle, 
   ArrowLeft, 
   ArrowRight,
@@ -25,6 +26,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/AuthProvider';
 import { useListingSave } from '@/hooks/useListingSave';
 import { supabase } from '@/integrations/supabase/client';
+import EnhancedPreviewDialog from './components/EnhancedPreviewDialog';
 
 interface BulkCombinedAnalysisStepProps {
   photoGroups: PhotoGroup[];
@@ -53,6 +55,8 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
   const [currentIndex, setCurrentIndex] = useState(0);
   const [savingItems, setSavingItems] = useState<Set<string>>(new Set());
   const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
+  const [previewGroup, setPreviewGroup] = useState<PhotoGroup | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const { analyzePhotos } = usePhotoAnalysis();
   const { user } = useAuth();
@@ -498,6 +502,21 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
     ));
   };
 
+  const handlePreviewItem = (groupId: string) => {
+    const group = completedGroups.find(g => g.id === groupId);
+    if (group) {
+      setPreviewGroup(group);
+      setIsPreviewOpen(true);
+    }
+  };
+
+  const handlePreviewSave = (updatedGroup: PhotoGroup) => {
+    setCompletedGroups(prev => prev.map(group => 
+      group.id === updatedGroup.id ? updatedGroup : group
+    ));
+    setIsPreviewOpen(false);
+  };
+
   const overallProgress = photoGroups.length > 0 
     ? Math.round(((currentIndex + (isProcessing ? 0 : 1)) / photoGroups.length) * 100)
     : 0;
@@ -720,14 +739,28 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                       
                       {/* Actions */}
                       <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingGroup(isEditing ? null : group.id)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
+                        <div className="flex flex-col gap-2">
+                          {/* Edit/Preview buttons stacked vertically */}
+                          <div className="flex flex-col gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingGroup(isEditing ? null : group.id)}
+                              className="w-full justify-start"
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              {isEditing ? 'Save' : 'Edit'}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handlePreviewItem(group.id)}
+                              className="w-full justify-start"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              Preview
+                            </Button>
+                          </div>
                           
                           {/* Unified Retry Button for Failed Items */}
                           {(() => {
@@ -813,6 +846,14 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
           </Button>
         </div>
       )}
+
+      {/* Preview Dialog */}
+      <EnhancedPreviewDialog
+        group={previewGroup}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        onSave={handlePreviewSave}
+      />
     </div>
   );
 };
