@@ -23,6 +23,8 @@ import { usePhotoAnalysis } from '@/hooks/usePhotoAnalysis';
 import { validateEbayConnection } from '@/utils/ebayConnectionValidator';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/AuthProvider';
+import { useListingSave } from '@/hooks/useListingSave';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BulkCombinedAnalysisStepProps {
   photoGroups: PhotoGroup[];
@@ -54,6 +56,7 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
 
   const { analyzePhotos } = usePhotoAnalysis();
   const { user } = useAuth();
+  const { saveListing } = useListingSave();
   const userEmail = user?.email;
 
   // Check eBay connection with proper validation
@@ -303,38 +306,72 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
 
       console.log('💾 Auto-saving item to inventory:', group.listingData.title);
 
-      // Prepare listing data for inventory save
-      const listingData = {
-        ...group.listingData,
-        photos: group.photos.map(photo => ({
-          file: photo.file,
-          preview: photo.preview,
-          id: photo.id
-        })),
-        status: 'draft', // Save as draft, not published
-        source: 'bulk_upload',
-        created_at: new Date().toISOString()
-      };
-
-      // Call the same inventory save function used in single upload
-      const response = await fetch('/api/inventory', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'create',
-          listing: listingData,
-          userEmail
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to save item: ${response.statusText}`);
+      // Upload photos to Supabase storage first (simplified version of handlePostItem)
+      const uploadedPhotoUrls: string[] = [];
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!currentUser) {
+        throw new Error('You must be logged in to auto-save items');
       }
 
-      const result = await response.json();
-      console.log('✅ Item auto-saved to inventory:', result.id);
+      // Upload each photo to get permanent URLs
+      for (let i = 0; i < group.photos.length; i++) {
+        const file = group.photos[i];
+        const fileExt = file.name.split('.').pop() || 'jpg';
+        const fileName = `${currentUser.id}_${Date.now()}_${i}.${fileExt}`;
+        const filePath = `listings/${currentUser.id}/${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('listing-photos')
+          .upload(filePath, file, { upsert: true });
+
+        if (uploadError) {
+          throw new Error(`Failed to upload photo ${i + 1}: ${uploadError.message}`);
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('listing-photos')
+          .getPublicUrl(filePath);
+        
+        uploadedPhotoUrls.push(urlData.publicUrl);
+      }
+
+      // Prepare listing data for saveListing function
+      const listingData = {
+        ...group.listingData,
+        title: group.listingData.title || 'Untitled Item',
+        description: group.listingData.description || 'No description available',
+        price: group.listingData.price || 0,
+        category: typeof group.listingData.category === 'string' 
+          ? group.listingData.category 
+          : group.listingData.category?.name || 'Uncategorized',
+        condition: group.listingData.condition || 'Used',
+        photos: uploadedPhotoUrls, // Use permanent URLs
+        measurements: {
+          length: String(group.listingData.measurements?.length || ''),
+          width: String(group.listingData.measurements?.width || ''),
+          height: String(group.listingData.measurements?.height || ''),
+          weight: String(group.listingData.measurements?.weight || '')
+        },
+        shipping_cost: 0,
+        shipping_method: 'Not configured',
+        shipping_days: 'Unknown',
+        priceResearch: group.listingData.priceResearch ? JSON.stringify(group.listingData.priceResearch) : null,
+      };
+
+      // Use the correct saveListing function (same as final upload)
+      const result = await saveListing(
+        listingData as any,
+        0, // shipping cost
+        'draft', // save as draft
+        undefined // no existing listing ID
+      );
+      
+      if (!result) {
+        throw new Error('Failed to save item to inventory');
+      }
+
+      console.log('✅ Item auto-saved to inventory:', result.listingId);
       
       setSavedItems(prev => new Set([...prev, groupId]));
       toast.success(`"${group.listingData.title}" saved to inventory`);
