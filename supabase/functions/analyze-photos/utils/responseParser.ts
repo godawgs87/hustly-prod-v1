@@ -29,20 +29,26 @@ export function parseOpenAIResponse(content: string) {
     }
   }
 
-  // More robust content filtering detection - only trigger fallback for clear refusals
-  const hasContentFiltering = (
-    content.includes("I'm sorry, I can't assist") ||
-    content.includes("I cannot analyze") ||
-    content.includes("I'm not able to") ||
-    (content.includes("I'm unable to") && !content.includes('```json') && !content.includes('{'))
-  );
+  // Even more robust content filtering detection - be very conservative about fallbacks
+  const clearRefusalPhrases = [
+    "I'm sorry, I can't assist",
+    "I cannot analyze",
+    "I'm not able to analyze",
+    "I cannot provide",
+    "I'm unable to provide",
+    "I can't help with"
+  ];
   
-  const isTooShort = content.length < 30;
+  const hasContentFiltering = clearRefusalPhrases.some(phrase => content.includes(phrase));
+  
+  // Only consider it too short if it's extremely short AND has no JSON-like content
+  const isTooShort = content.length < 20 && !content.includes('{') && !content.includes('"');
   
   if (hasContentFiltering || isTooShort) {
     console.log('🚨 OpenAI content filtering detected, using fallback');
     console.log('Reason:', hasContentFiltering ? 'Content filtering' : 'Response too short');
     console.log('Content length:', content.length);
+    console.log('Content preview:', content.substring(0, 100));
     return createFallbackListing();
   }
 
@@ -55,14 +61,13 @@ export function parseOpenAIResponse(content: string) {
     cleanContent = cleanContent.replace(/```json\s*/, '');
     cleanContent = cleanContent.replace(/```\s*$/, '');
     
-    // Find JSON object boundaries with multiple attempts
+    // Enhanced JSON boundary detection with multiple strategies
     let jsonStart = cleanContent.indexOf('{');
     let jsonEnd = cleanContent.lastIndexOf('}');
     
-    // If no JSON found, try looking for it in different ways
+    // Strategy 1: Look for JSON after common prefixes
     if (jsonStart === -1 || jsonEnd === -1) {
-      // Try looking for JSON after common prefixes
-      const jsonPrefixes = ['```json', 'json', 'JSON:', '{'];
+      const jsonPrefixes = ['```json', 'json', 'JSON:', 'Here is the', 'Here\'s the', '{'];
       for (const prefix of jsonPrefixes) {
         const prefixIndex = cleanContent.indexOf(prefix);
         if (prefixIndex !== -1) {
@@ -70,9 +75,37 @@ export function parseOpenAIResponse(content: string) {
           const newJsonStart = cleanContent.indexOf('{', searchStart);
           if (newJsonStart !== -1) {
             jsonStart = newJsonStart;
-            jsonEnd = cleanContent.lastIndexOf('}');
-            break;
+            // Find matching closing brace
+            let braceCount = 0;
+            let endIndex = jsonStart;
+            for (let i = jsonStart; i < cleanContent.length; i++) {
+              if (cleanContent[i] === '{') braceCount++;
+              if (cleanContent[i] === '}') {
+                braceCount--;
+                if (braceCount === 0) {
+                  jsonEnd = i;
+                  break;
+                }
+              }
+            }
+            if (jsonEnd > jsonStart) break;
           }
+        }
+      }
+    }
+    
+    // Strategy 2: If still no valid JSON, try to extract any object-like structure
+    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+      // Look for any quoted strings that might indicate JSON-like content
+      const hasQuotedContent = /"\w+"\s*:/.test(cleanContent);
+      if (hasQuotedContent) {
+        console.log('Found quoted content, attempting to extract partial JSON');
+        // Try to find the first and last meaningful braces
+        const firstBrace = cleanContent.indexOf('{');
+        const lastBrace = cleanContent.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          jsonStart = firstBrace;
+          jsonEnd = lastBrace;
         }
       }
     }
