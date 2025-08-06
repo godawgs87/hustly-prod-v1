@@ -2,10 +2,48 @@ import { validateOpenAIApiKey } from './apiValidation.ts';
 import { parseOpenAIResponse } from './responseParser.ts';
 import { buildAnalysisPrompt, prepareImageMessages } from './promptBuilder.ts';
 
-export async function analyzePhotosWithOpenAI(apiKey: string, base64Images: string[]) {
+// Retry configuration for scalability
+interface RetryConfig {
+  maxRetries: number;
+  baseDelay: number;
+  maxDelay: number;
+  retryableErrors: string[];
+}
+
+const RETRY_CONFIG: RetryConfig = {
+  maxRetries: 2, // Conservative for bulk uploads
+  baseDelay: 1000, // Start with 1 second
+  maxDelay: 5000, // Max 5 seconds to avoid long delays
+  retryableErrors: [
+    "I'm unable to analyze",
+    "I cannot analyze",
+    "I'm not able to analyze",
+    "I cannot provide",
+    "I'm unable to provide"
+  ]
+};
+
+// Add jitter to prevent thundering herd with bulk uploads
+function calculateDelay(attempt: number, baseDelay: number, maxDelay: number): number {
+  const exponentialDelay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+  const jitter = Math.random() * 0.3 * exponentialDelay; // 30% jitter
+  return Math.floor(exponentialDelay + jitter);
+}
+
+// Check if response should be retried
+function shouldRetry(content: string, attempt: number): boolean {
+  if (attempt >= RETRY_CONFIG.maxRetries) return false;
+  
+  return RETRY_CONFIG.retryableErrors.some(error => 
+    content.toLowerCase().includes(error.toLowerCase())
+  );
+}
+
+export async function analyzePhotosWithOpenAI(apiKey: string, base64Images: string[], retryAttempt: number = 0) {
   await validateOpenAIApiKey(apiKey);
   
-  console.log('Analyzing photos with OpenAI...');
+  const isRetry = retryAttempt > 0;
+  console.log(isRetry ? `🔄 Retry attempt ${retryAttempt}/2 for photo analysis` : 'Analyzing photos with OpenAI...');
   console.log('Number of images:', base64Images.length);
   console.log('API Key present:', !!apiKey);
   console.log('API Key format valid:', apiKey?.startsWith('sk-'));
@@ -76,6 +114,7 @@ export async function analyzePhotosWithOpenAI(apiKey: string, base64Images: stri
 
   const data = await response.json();
   console.log('OpenAI response received');
+  
   console.log('=== OPENAI RAW RESPONSE DEBUG ===');
   console.log('Response structure:', {
     hasChoices: !!data.choices,
@@ -90,7 +129,21 @@ export async function analyzePhotosWithOpenAI(apiKey: string, base64Images: stri
     throw new Error('Invalid response structure from OpenAI');
   }
 
+  // Extract content for retry logic and parsing
   const content = data.choices[0].message.content.trim();
+  
+  // Check if we should retry due to disclaimer/refusal response
+  if (shouldRetry(content, retryAttempt)) {
+    const delay = calculateDelay(retryAttempt, RETRY_CONFIG.baseDelay, RETRY_CONFIG.maxDelay);
+    console.log(`⚠️ OpenAI returned disclaimer text, retrying in ${delay}ms (attempt ${retryAttempt + 1}/${RETRY_CONFIG.maxRetries})`);
+    console.log('Disclaimer content:', content.substring(0, 100));
+    
+    // Wait with jittered exponential backoff
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    // Recursive retry
+    return analyzePhotosWithOpenAI(apiKey, base64Images, retryAttempt + 1);
+  }
   console.log('=== OPENAI CONTENT TO PARSE ===');
   console.log('Content length:', content.length);
   console.log('Content type:', typeof content);
