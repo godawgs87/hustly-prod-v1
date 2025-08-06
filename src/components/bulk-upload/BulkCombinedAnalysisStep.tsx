@@ -216,18 +216,18 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         
         console.log('💰 Found suggested price:', suggestedPrice, 'from', totalComps, 'comparables');
 
+        // Create updated group with price data (whether we have a suggested price or not)
+        const updatedGroup = {
+          ...group,
+          listingData: {
+            ...group.listingData,
+            price: suggestedPrice > 0 ? suggestedPrice : (group.listingData?.price || 25)
+          }
+        };
+
         // Auto-populate the price field with suggested price (same as single upload)
         if (suggestedPrice > 0) {
           console.log('💰 Updating price for group:', groupId, 'from', group.listingData?.price, 'to', suggestedPrice);
-          
-          const updatedGroup = {
-            ...group,
-            listingData: {
-              ...group.listingData,
-              price: suggestedPrice // Auto-fill the price field
-            }
-          };
-
           console.log('💰 Updated group data:', updatedGroup);
 
           // Update the group with the new price
@@ -263,7 +263,8 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         });
         
         // Auto-save item to inventory after successful AI analysis + price research
-        await autoSaveItemToInventory(groupId);
+        // Pass the updated group data directly to avoid race condition
+        await autoSaveItemToInventory(groupId, updatedGroup);
       } else {
         throw new Error('No price data received');
       }
@@ -282,14 +283,15 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
   };
 
   // Auto-save item to inventory after successful AI analysis + price research
-  const autoSaveItemToInventory = async (groupId: string) => {
+  const autoSaveItemToInventory = async (groupId: string, groupData?: PhotoGroup) => {
     let group: PhotoGroup | undefined;
     try {
       setSavingItems(prev => new Set([...prev, groupId]));
       
-      group = completedGroups.find(g => g.id === groupId);
+      // Use passed group data first, then search completedGroups as fallback
+      group = groupData || completedGroups.find(g => g.id === groupId);
       if (!group?.listingData) {
-        console.warn('⚠️ No listing data found for group:', groupId);
+        console.warn('⚠️ No listing data found for group:', groupId, 'completedGroups:', completedGroups.length);
         return;
       }
 

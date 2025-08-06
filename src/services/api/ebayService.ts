@@ -257,7 +257,7 @@ export class EbayService {
       }
     });
     
-    // Extract feature descriptors
+    // Extract feature descriptors (avoid duplicates)
     const featureKeywords = [
       'brushless', 'cordless', 'battery', 'rechargeable', 'wireless', 'bluetooth',
       'digital', 'analog', 'automatic', 'manual', 'programmable', 'smart',
@@ -266,7 +266,8 @@ export class EbayService {
     ];
     
     featureKeywords.forEach(keyword => {
-      if (titleLower.includes(keyword.toLowerCase())) {
+      if (titleLower.includes(keyword.toLowerCase()) && 
+          !searchTerms.some(term => term.toLowerCase() === keyword.toLowerCase())) {
         searchTerms.push(keyword);
       }
     });
@@ -277,9 +278,13 @@ export class EbayService {
       searchTerms.push(yearMatch[0]);
     }
     
-    // Remove duplicates and create focused query
-    const uniqueTerms = [...new Set(searchTerms.map(term => term.trim()))]
-      .filter(term => term.length > 1);
+    // Remove duplicates and create focused query (case-insensitive deduplication)
+    const uniqueTerms = searchTerms
+      .map(term => term.trim())
+      .filter(term => term.length > 1)
+      .filter((term, index, arr) => 
+        arr.findIndex(t => t.toLowerCase() === term.toLowerCase()) === index
+      );
     
     // Build comprehensive but focused query
     let queryParts = [];
@@ -289,16 +294,22 @@ export class EbayService {
       queryParts.push(brand);
     }
     
-    // Add core product terms (prioritize meaningful words)
+    // Add core product terms (prioritize meaningful words, avoid duplicates)
     const coreTerms = uniqueTerms
-      .filter(term => term !== brand && term.length > 2)
-      .filter(term => !['used', 'new', 'condition', 'item'].includes(term.toLowerCase()))
-      .slice(0, 5); // Keep it focused but comprehensive
+      .filter(term => 
+        term.toLowerCase() !== brand.toLowerCase() && 
+        term.length > 2 &&
+        !['used', 'new', 'condition', 'item'].includes(term.toLowerCase())
+      )
+      .slice(0, 4); // Keep it focused but comprehensive
     
     queryParts.push(...coreTerms);
     
-    // Create the final query - more specific for better price matching
-    const query = queryParts.join(' ').trim();
+    // Create the final query - remove any remaining duplicates
+    const finalQueryParts = queryParts.filter((part, index, arr) => 
+      arr.findIndex(p => p.toLowerCase() === part.toLowerCase()) === index
+    );
+    const query = finalQueryParts.join(' ').trim();
     
     console.log('🎯 [EbayService] Final search query:', query);
     console.log('📊 [EbayService] Query components:', { brand, coreTerms, condition });
