@@ -126,10 +126,11 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       if (isEbayConnected && hasValidTitle) {
         console.log('🚀 Auto-triggering price research for', group.name, 'with title:', aiData.title);
         
-        // Pass the updated group data directly to avoid race condition
+        // Force state synchronization before price research
         setTimeout(() => {
+          console.log('🔄 Triggering price research after state sync for:', group.id);
           processPriceResearch(group.id, updatedGroupData);
-        }, 500); // Shorter delay since we're passing data directly
+        }, 100); // Minimal delay to ensure state update
       } else {
         console.log('⏸️ Skipping auto price research for', group.name, ':', {
           isEbayConnected,
@@ -288,8 +289,12 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         const processedGroup = await processGroupAnalysis(photoGroups[i]);
         processedGroups.push(processedGroup);
         
-        // Update completedGroups immediately so price research can access it
-        setCompletedGroups(prev => [...prev, processedGroup]);
+        // Update completedGroups immediately BEFORE any price research triggers
+        setCompletedGroups(prev => {
+          const newGroups = [...prev, processedGroup];
+          console.log('🔄 Updated completedGroups immediately:', newGroups.length, 'groups');
+          return newGroups;
+        });
       }
       
       setIsProcessing(false);
