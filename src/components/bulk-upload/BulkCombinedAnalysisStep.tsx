@@ -49,9 +49,12 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
   const [analysisStarted, setAnalysisStarted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [savingItems, setSavingItems] = useState<Set<string>>(new Set());
+  const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
 
   const { analyzePhotos } = usePhotoAnalysis();
   const { user } = useAuth();
+  const userEmail = user?.email;
 
   // Check eBay connection with proper validation
   const { data: ebayConnection, isLoading: isCheckingEbay } = useQuery({
@@ -258,6 +261,9 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
           priceStatus: 'completed',
           priceData: result.data 
         });
+        
+        // Auto-save item to inventory after successful AI analysis + price research
+        await autoSaveItemToInventory(groupId);
       } else {
         throw new Error('No price data received');
       }
@@ -272,6 +278,124 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       }
       
       updateProgress(groupId, { priceStatus: 'error' });
+    }
+  };
+
+  // Auto-save item to inventory after successful AI analysis + price research
+  const autoSaveItemToInventory = async (groupId: string) => {
+    let group: PhotoGroup | undefined;
+    try {
+      setSavingItems(prev => new Set([...prev, groupId]));
+      
+      group = completedGroups.find(g => g.id === groupId);
+      if (!group?.listingData) {
+        console.warn('⚠️ No listing data found for group:', groupId);
+        return;
+      }
+
+      // Skip saving if already saved
+      if (savedItems.has(groupId)) {
+        console.log('✅ Item already saved to inventory:', groupId);
+        return;
+      }
+
+      console.log('💾 Auto-saving item to inventory:', group.listingData.title);
+
+      // Prepare listing data for inventory save
+      const listingData = {
+        ...group.listingData,
+        photos: group.photos.map(photo => ({
+          file: photo.file,
+          preview: photo.preview,
+          id: photo.id
+        })),
+        status: 'draft', // Save as draft, not published
+        source: 'bulk_upload',
+        created_at: new Date().toISOString()
+      };
+
+      // Call the same inventory save function used in single upload
+      const response = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'create',
+          listing: listingData,
+          userEmail
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to save item: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Item auto-saved to inventory:', result.id);
+      
+      setSavedItems(prev => new Set([...prev, groupId]));
+      toast.success(`"${group.listingData.title}" saved to inventory`);
+      
+    } catch (error: any) {
+      console.error('❌ Auto-save failed:', error);
+      toast.error(`Failed to save "${group?.listingData?.title || 'item'}" to inventory`);
+    } finally {
+      setSavingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(groupId);
+        return newSet;
+      });
+    }
+  };
+
+  // Unified retry function for both AI analysis and price research
+  const retryAnalysisAndPricing = async (groupId: string) => {
+    try {
+      console.log('🔄 Retrying AI analysis and price research for:', groupId);
+      
+      const group = photoGroups.find(g => g.id === groupId);
+      if (!group) {
+        toast.error('Group not found');
+        return;
+      }
+
+      // Reset progress for this group
+      updateProgress(groupId, { 
+        aiStatus: 'processing', 
+        priceStatus: 'pending',
+        priceData: undefined 
+      });
+
+      // Run AI analysis
+      const processedGroup = await processGroupAnalysis(group);
+      
+      // Update completedGroups immediately
+      setCompletedGroups(prev => {
+        const existingIndex = prev.findIndex(g => g.id === groupId);
+        if (existingIndex >= 0) {
+          const newGroups = [...prev];
+          newGroups[existingIndex] = processedGroup;
+          return newGroups;
+        } else {
+          return [...prev, processedGroup];
+        }
+      });
+
+      // Auto-trigger price research if AI analysis succeeded
+      if (processedGroup.listingData && processedGroup.listingData.title !== 'Needs Review - Listing Not Fully Generated') {
+        console.log('🔄 Auto-triggering price research after retry...');
+        setTimeout(() => {
+          processPriceResearch(groupId, processedGroup);
+        }, 1000);
+      } else {
+        toast.warning('AI analysis still failed. Please try again or edit manually.');
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Retry failed:', error);
+      toast.error(`Retry failed: ${error.message}`);
+      updateProgress(groupId, { aiStatus: 'error', priceStatus: 'error' });
     }
   };
 
@@ -487,6 +611,20 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                               Pricing
                             </Badge>
                           )}
+                          
+                          {/* Auto-Save Status */}
+                          {savingItems.has(group.id) && (
+                            <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              Saving
+                            </Badge>
+                          )}
+                          {savedItems.has(group.id) && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Saved
+                            </Badge>
+                          )}
                         </div>
                       </td>
                       
@@ -552,37 +690,59 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
                             <Edit className="w-4 h-4" />
                           </Button>
                           
-                          {/* Price Research Button - Enhanced with debugging */}
+                          {/* Unified Retry Button for Failed Items */}
                           {(() => {
-                            const shouldShow = groupProgress?.aiStatus === 'completed' && 
-                                             isEbayConnected && 
-                                             groupProgress?.priceStatus !== 'completed';
-                            console.log(`🔍 Price Research Button Debug for ${group.id}:`, {
-                              aiStatus: groupProgress?.aiStatus,
-                              priceStatus: groupProgress?.priceStatus,
-                              shouldShow: shouldShow,
-                              isEbayConnected,
-                              ebayConnection
-                            });
+                            const aiStatus = groupProgress?.aiStatus;
+                            const priceStatus = groupProgress?.priceStatus;
+                            const hasFailed = displayGroup.listingData?.title === 'Needs Review - Listing Not Fully Generated' || 
+                                            aiStatus === 'error' || priceStatus === 'error';
+                            const isProcessing = aiStatus === 'processing' || priceStatus === 'processing';
+                            const needsPriceResearch = aiStatus === 'completed' && 
+                                                     isEbayConnected && 
+                                                     priceStatus !== 'completed' &&
+                                                     displayGroup.listingData?.title !== 'Needs Review - Listing Not Fully Generated';
                             
-                            return shouldShow ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => processPriceResearch(group.id)}
-                                disabled={groupProgress?.priceStatus === 'processing'}
-                                title={isEbayConnected ? 'Run Price Research' : 'eBay not connected'}
-                                className="border-blue-300 text-blue-600 hover:bg-blue-50 bg-white"
-                              >
-                                {groupProgress?.priceStatus === 'processing' ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Search className="w-4 h-4" />
-                                )}
-                              </Button>
-                            ) : (
+                            // Show unified retry button for failed items
+                            if (hasFailed && !isProcessing) {
+                              return (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => retryAnalysisAndPricing(group.id)}
+                                  className="border-orange-300 text-orange-600 hover:bg-orange-50 bg-white"
+                                  title="Retry AI Analysis and Price Research"
+                                >
+                                  <Brain className="w-4 h-4 mr-1" />
+                                  Retry
+                                </Button>
+                              );
+                            }
+                            
+                            // Show price research button for items that need pricing
+                            if (needsPriceResearch) {
+                              return (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => processPriceResearch(group.id)}
+                                  disabled={priceStatus === 'processing'}
+                                  title="Run Price Research"
+                                  className="border-blue-300 text-blue-600 hover:bg-blue-50 bg-white"
+                                >
+                                  {priceStatus === 'processing' ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Search className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              );
+                            }
+                            
+                            // Show status for completed items
+                            return (
                               <div className="text-xs text-gray-400 px-2">
-                                {groupProgress?.aiStatus !== 'completed' ? 'AI pending' : 'Price done'}
+                                {aiStatus !== 'completed' ? 'AI pending' : 
+                                 priceStatus !== 'completed' ? 'Price pending' : 'Complete'}
                               </div>
                             );
                           })()}
