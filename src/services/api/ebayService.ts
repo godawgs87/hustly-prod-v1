@@ -159,14 +159,27 @@ export class EbayService {
     const description = listingData.description || '';
     const brand = listingData.brand || '';
     const category = listingData.category?.name || '';
+    const condition = listingData.condition || 'Used';
     
-    // Create a more focused search query
+    console.log('🔍 [EbayService] Extracting params from:', { title, brand, category, condition });
+    
+    // For better price accuracy, use a more comprehensive approach
     let searchTerms = [];
     
-    // Add brand if available
-    if (brand && brand.toLowerCase() !== 'unknown') {
+    // Always include brand if available and meaningful
+    if (brand && brand.toLowerCase() !== 'unknown' && brand.length > 2) {
       searchTerms.push(brand);
     }
+    
+    // Extract core product name from title (first few meaningful words)
+    const titleWords = title.split(' ').filter(word => 
+      word.length > 2 && 
+      !['the', 'and', 'for', 'with', 'size', 'color'].includes(word.toLowerCase())
+    );
+    
+    // Add first 2-3 key product words (after brand if present)
+    const productWords = titleWords.slice(brand ? 1 : 0, 4);
+    searchTerms.push(...productWords);
     
     // Extract model numbers and part numbers from title (more comprehensive patterns)
     const modelPatterns = [
@@ -188,26 +201,43 @@ export class EbayService {
       }
     });
     
-    // Extract product type keywords based on category and title
-    const productTypeKeywords = {
-      'Tools & Hardware': ['drill', 'driver', 'impact', 'saw', 'grinder', 'sander', 'wrench', 'screwdriver', 'hammer', 'pliers'],
-      'Automotive': ['key fob', 'remote', 'keyless', 'entry', 'transmitter', 'starter', 'alarm', 'car', 'vehicle'],
-      'Electronics': ['phone', 'tablet', 'laptop', 'headphones', 'speaker', 'charger', 'cable', 'camera', 'tv', 'monitor'],
-      'Clothing': ['shirt', 'pants', 'dress', 'jacket', 'shoes', 'boots', 'sneakers', 'coat', 'sweater'],
-      'Home & Garden': ['lamp', 'chair', 'table', 'vase', 'plant', 'tool', 'kitchen', 'toaster', 'blender', 'microwave', 'coffee maker', 'mixer'],
-      'Sports': ['ball', 'bat', 'glove', 'helmet', 'jersey', 'equipment', 'gear', 'fitness'],
-      'Kitchen': ['toaster', 'blender', 'microwave', 'coffee maker', 'mixer', 'oven', 'fryer', 'grill', 'pot', 'pan'],
-      'Appliances': ['toaster', 'blender', 'microwave', 'coffee maker', 'mixer', 'vacuum', 'iron', 'steamer']
+    // Add specific product identifiers for common categories
+    const categorySpecificTerms = {
+      'Clothing': {
+        'shoes': ['slides', 'sandals', 'sneakers', 'boots', 'loafers'],
+        'apparel': ['shirt', 'pants', 'dress', 'jacket', 'coat']
+      },
+      'Toys': {
+        'nerf': ['blaster', 'gun', 'dart', 'elite', 'disruptor'],
+        'action': ['figure', 'toy', 'collectible']
+      },
+      'Electronics': ['phone', 'tablet', 'laptop', 'headphones', 'speaker'],
+      'Tools': ['drill', 'driver', 'impact', 'saw', 'grinder']
     };
     
-    // Find relevant product type keywords
+    // Add category-specific terms if they match
     const titleLower = title.toLowerCase();
-    const categoryKeywords = productTypeKeywords[category] || [];
-    
-    // Add category-specific keywords
-    categoryKeywords.forEach(keyword => {
-      if (titleLower.includes(keyword)) {
-        searchTerms.push(keyword);
+    Object.entries(categorySpecificTerms).forEach(([cat, terms]) => {
+      if (category.toLowerCase().includes(cat.toLowerCase())) {
+        if (Array.isArray(terms)) {
+          // Handle array of strings
+          terms.forEach(keyword => {
+            if (titleLower.includes(keyword.toLowerCase())) {
+              searchTerms.push(keyword);
+            }
+          });
+        } else if (typeof terms === 'object' && terms !== null) {
+          // Handle nested object structure
+          Object.values(terms).forEach((keywords: any) => {
+            if (Array.isArray(keywords)) {
+              keywords.forEach(keyword => {
+                if (titleLower.includes(keyword.toLowerCase())) {
+                  searchTerms.push(keyword);
+                }
+              });
+            }
+          });
+        }
       }
     });
     
@@ -247,35 +277,31 @@ export class EbayService {
       searchTerms.push(yearMatch[0]);
     }
     
-    // Create focused query with intelligent prioritization
-    const uniqueTerms = [...new Set(searchTerms)];
+    // Remove duplicates and create focused query
+    const uniqueTerms = [...new Set(searchTerms.map(term => term.trim()))]
+      .filter(term => term.length > 1);
     
-    // Build query with priority: brand + product type + key descriptors + model
+    // Build comprehensive but focused query
     let queryParts = [];
     
-    // Always include brand if available
-    if (brand && brand.toLowerCase() !== 'unknown') {
+    // Start with brand if available
+    if (brand && brand.toLowerCase() !== 'unknown' && brand.length > 2) {
       queryParts.push(brand);
     }
     
-    // Add the most relevant product type and descriptors (prioritize longer, more specific terms)
-    const sortedTerms = uniqueTerms
-      .filter(term => term !== brand) // Don't duplicate brand
-      .sort((a, b) => {
-        // Prioritize terms with numbers (like "2-slice")
-        const aHasNumber = /\d/.test(a);
-        const bHasNumber = /\d/.test(b);
-        if (aHasNumber && !bHasNumber) return -1;
-        if (!aHasNumber && bHasNumber) return 1;
-        
-        // Then prioritize longer terms (more specific)
-        return b.length - a.length;
-      })
-      .slice(0, 4); // Take top 4 most relevant terms
+    // Add core product terms (prioritize meaningful words)
+    const coreTerms = uniqueTerms
+      .filter(term => term !== brand && term.length > 2)
+      .filter(term => !['used', 'new', 'condition', 'item'].includes(term.toLowerCase()))
+      .slice(0, 5); // Keep it focused but comprehensive
     
-    queryParts.push(...sortedTerms);
+    queryParts.push(...coreTerms);
     
+    // Create the final query - more specific for better price matching
     const query = queryParts.join(' ').trim();
+    
+    console.log('🎯 [EbayService] Final search query:', query);
+    console.log('📊 [EbayService] Query components:', { brand, coreTerms, condition });
     
     console.log('🏷️ [EbayService] Extracted price research params:', {
       query,
