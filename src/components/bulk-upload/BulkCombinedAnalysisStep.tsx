@@ -228,7 +228,17 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
 
           // Update the group with the new price
           setCompletedGroups(prev => {
-            const newGroups = prev.map(g => g.id === groupId ? updatedGroup : g);
+            const existingGroupIndex = prev.findIndex(g => g.id === groupId);
+            let newGroups;
+            
+            if (existingGroupIndex >= 0) {
+              // Update existing group
+              newGroups = prev.map(g => g.id === groupId ? updatedGroup : g);
+            } else {
+              // Add new group if it doesn't exist
+              newGroups = [...prev, updatedGroup];
+            }
+            
             console.log('💰 Updated completedGroups:', newGroups);
             return newGroups;
           });
@@ -277,9 +287,11 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
         
         const processedGroup = await processGroupAnalysis(photoGroups[i]);
         processedGroups.push(processedGroup);
+        
+        // Update completedGroups immediately so price research can access it
+        setCompletedGroups(prev => [...prev, processedGroup]);
       }
       
-      setCompletedGroups(processedGroups);
       setIsProcessing(false);
       
     } catch (error) {
