@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,7 @@ import {
   ArrowRight,
   Search
 } from 'lucide-react';
-import { PhotoGroup } from '@/types/bulk-upload';
+import { PhotoGroup } from './BulkUploadManager';
 import { EbayService } from '@/services/api/ebayService';
 import { usePhotoAnalysis } from '@/hooks/usePhotoAnalysis';
 import { validateEbayConnection } from '@/utils/ebayConnectionValidator';
@@ -34,10 +34,11 @@ interface BulkCombinedAnalysisStepProps {
   onBack: () => void;
 }
 
-interface GroupProgress {
+interface ProgressItem {
   groupId: string;
   aiStatus: 'pending' | 'processing' | 'completed' | 'error';
   priceStatus: 'pending' | 'processing' | 'completed' | 'error';
+  saveStatus: 'pending' | 'processing' | 'completed' | 'error';
   error?: string;
   priceData?: any;
 }
@@ -47,7 +48,7 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
   onComplete,
   onBack
 }) => {
-  const [progress, setProgress] = useState<GroupProgress[]>([]);
+  const [progress, setProgress] = useState<ProgressItem[]>([]);
   const [completedGroups, setCompletedGroups] = useState<PhotoGroup[]>([]);
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [analysisStarted, setAnalysisStarted] = useState(false);
@@ -79,12 +80,13 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
     const initialProgress = photoGroups.map(group => ({
       groupId: group.id,
       aiStatus: 'pending' as const,
-      priceStatus: 'pending' as const
+      priceStatus: 'pending' as const,
+      saveStatus: 'pending' as const
     }));
     setProgress(initialProgress);
   }, [photoGroups]);
 
-  const updateProgress = (groupId: string, updates: Partial<GroupProgress>) => {
+  const updateProgress = (groupId: string, updates: Partial<ProgressItem>) => {
     setProgress(prev => prev.map(p => 
       p.groupId === groupId ? { ...p, ...updates } : p
     ));
