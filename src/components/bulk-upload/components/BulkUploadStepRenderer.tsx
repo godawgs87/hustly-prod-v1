@@ -4,8 +4,8 @@ import PhotoGroupingInterface from '../PhotoGroupingInterface';
 import BulkReviewDashboard from '../BulkReviewDashboard';
 import BulkShippingConfiguration from '../BulkShippingConfiguration';
 import BulkPriceResearchStep from '../BulkPriceResearchStep';
-import { OptimizedBulkCombinedAnalysisStep } from '../OptimizedBulkCombinedAnalysisStep';
-import { OptimizedPhotoGrouping } from '../components/OptimizedPhotoGrouping';
+import BulkCombinedAnalysisStep from '../BulkCombinedAnalysisStep';
+
 import AIDetailsTableView from './AIDetailsTableView';
 import BulkFinalReviewStep from './BulkFinalReviewStep';
 import type { PhotoGroup } from '../BulkUploadManager';
@@ -59,16 +59,16 @@ const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
       
     case 'grouping':
       return (
-        <OptimizedPhotoGrouping
-          photos={props.photos}
-          onGroupingComplete={props.onGroupsConfirmed}
+        <PhotoGroupingInterface
+          photoGroups={props.photoGroups}
+          onGroupsConfirmed={props.onGroupsConfirmed}
           onBack={() => props.onStepChange('upload')}
         />
       );
       
     case 'combinedAnalysis':
       return (
-        <OptimizedBulkCombinedAnalysisStep
+        <BulkCombinedAnalysisStep
           photoGroups={props.photoGroups}
           onComplete={(groupsWithData) => {
             // Update groups with AI and price data, then proceed to shipping
