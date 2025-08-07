@@ -214,12 +214,12 @@ const BulkFinalReviewStep = ({
 
                       {/* Actions */}
                       <td className="p-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => onEditItem(group.id)}
-                            className="flex items-center gap-1"
+                            className="flex items-center gap-1 w-full justify-start"
                           >
                             <Edit className="w-4 h-4" />
                             Edit
@@ -228,7 +228,7 @@ const BulkFinalReviewStep = ({
                             variant="ghost"
                             size="sm"
                             onClick={() => onPreviewItem(group.id)}
-                            className="flex items-center gap-1"
+                            className="flex items-center gap-1 w-full justify-start"
                           >
                             <Eye className="w-4 h-4" />
                             Preview
