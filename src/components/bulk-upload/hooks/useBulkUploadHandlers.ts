@@ -414,8 +414,17 @@ export const useBulkUploadHandlers = (
         throw new Error('You must be logged in to upload photos');
       }
 
-      // Upload each photo to Supabase storage with retry logic
-      for (let i = 0; i < group.photos.length; i++) {
+      // Check if photos are already uploaded (from auto-save) to avoid redundant uploads
+      if (group.listingData?.photos && Array.isArray(group.listingData.photos) && 
+          group.listingData.photos.length > 0 && 
+          group.listingData.photos.every(url => typeof url === 'string' && url.startsWith('http'))) {
+        // Use existing photo URLs from auto-save
+        uploadedPhotoUrls.push(...group.listingData.photos);
+        console.log('✅ Using existing photo URLs from auto-save:', uploadedPhotoUrls.length, 'photos');
+      } else {
+        // Upload each photo to Supabase storage with retry logic (fallback for items without auto-save)
+        console.log('📤 Uploading photos for item without auto-save...');
+        for (let i = 0; i < group.photos.length; i++) {
         const file = group.photos[i];
         const fileExt = file.name.split('.').pop() || 'jpg';
         const fileName = `${user.id}_${Date.now()}_${i}.${fileExt}`;
@@ -464,6 +473,7 @@ export const useBulkUploadHandlers = (
         }
         
         uploadedPhotoUrls.push(finalPublicUrl);
+        }
       }
 
       // Actually save the listing with permanent image URLs
@@ -564,9 +574,28 @@ export const useBulkUploadHandlers = (
       readyGroups.some(rg => rg.id === g.id) ? { ...g, isPosted: true } : g
     ));
     
-    for (const group of readyGroups) {
-      console.log('📤 Posting group:', group.id);
-      await handlePostItem(group.id);
+    // Process items in parallel for faster upload (limit concurrency to avoid overwhelming server)
+    const BATCH_SIZE = 2; // Process 2 items at a time
+    const batches = [];
+    for (let i = 0; i < readyGroups.length; i += BATCH_SIZE) {
+      batches.push(readyGroups.slice(i, i + BATCH_SIZE));
+    }
+    
+    let successCount = 0;
+    for (const batch of batches) {
+      console.log('📤 Processing batch:', batch.map(g => g.id));
+      const batchPromises = batch.map(group => {
+        console.log('📤 Posting group:', group.id);
+        return handlePostItem(group.id).then(() => {
+          successCount++;
+          console.log(`✅ Posted ${successCount}/${readyGroups.length} items`);
+        }).catch(error => {
+          console.error(`❌ Failed to post ${group.id}:`, error);
+          throw error;
+        });
+      });
+      
+      await Promise.all(batchPromises);
     }
 
     toast({
@@ -574,10 +603,10 @@ export const useBulkUploadHandlers = (
       description: `Successfully posted ${readyGroups.length} items to inventory.`,
     });
 
-    // Redirect to inventory page after successful upload
+    // Immediate redirect with shorter delay for better UX
     setTimeout(() => {
       window.location.href = '/inventory';
-    }, 1500); // Small delay to let user see the success message
+    }, 500); // Reduced from 1500ms to 500ms
   }, [photoGroups, setPhotoGroups, handlePostItem, toast]);
 
   const handleUpdateGroup = useCallback((updatedGroup: PhotoGroup) => {
