@@ -6,6 +6,7 @@ import type { StepType } from './components/BulkUploadStepRenderer';
 import BulkUploadStepRenderer from './components/BulkUploadStepRenderer';
 import { useBulkUploadState } from './hooks/useBulkUploadState';
 import { useBulkUploadHandlers } from './hooks/useBulkUploadHandlers';
+import EnhancedPreviewDialog from './components/EnhancedPreviewDialog';
 
 export interface PhotoGroup {
   id: string;
@@ -209,7 +210,7 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     onCategoriesComplete: handleCategoriesComplete,
     onShippingComplete: handleShippingComplete,
     onViewInventory: handleViewInventory,
-    onStepChange: state.setCurrentStep,
+    onStepChange: (step: StepType) => state.setCurrentStep(step as any),
     onStartAnalysis: handlers.handleStartAnalysis,
     onStartBulkAnalysis: handlers.handleStartAnalysis,
     onProceedToShipping: handleProceedToShipping,
@@ -255,6 +256,14 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
       />
 
       <BulkUploadStepRenderer {...stepRendererProps} />
+      
+      {/* Preview Dialog */}
+      <EnhancedPreviewDialog
+        group={previewGroup}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        onSave={handlePreviewSave}
+      />
     </div>
   );
 };
