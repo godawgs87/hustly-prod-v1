@@ -9,7 +9,7 @@ import {
   Loader2, 
   CheckCircle, 
   AlertTriangle,
-  Compress,
+  Archive,
   Eye,
   EyeOff
 } from 'lucide-react';
@@ -324,7 +324,7 @@ export const OptimizedPhotoGrouping: React.FC<OptimizedPhotoGroupingProps> = ({
               
               {progress.compressedPhotos > 0 && (
                 <div className="flex items-center gap-2">
-                  <Compress className="w-4 h-4 text-orange-500" />
+                  <Archive className="h-4 w-4" />
                   <span>Compressed: {progress.compressedPhotos}</span>
                 </div>
               )}

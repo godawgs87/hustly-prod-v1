@@ -18,8 +18,8 @@ import { useCascadeProcessor } from './hooks/useCascadeProcessor';
 import { CascadeProgressIndicator } from './components/CascadeProgressIndicator';
 import { validateEbayConnection } from '@/utils/ebayConnectionValidator';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/useAuth';
-import { EnhancedPreviewDialog } from './components/EnhancedPreviewDialog';
+import { useAuth } from '@/components/AuthProvider';
+import EnhancedPreviewDialog from './components/EnhancedPreviewDialog';
 
 interface OptimizedBulkCombinedAnalysisStepProps {
   photoGroups: PhotoGroup[];
@@ -224,7 +224,7 @@ export const OptimizedBulkCombinedAnalysisStep: React.FC<OptimizedBulkCombinedAn
                           <span className="text-sm">
                             {typeof group.listingData?.category === 'string' 
                               ? group.listingData.category 
-                              : group.listingData?.category?.name || 'Uncategorized'}
+                              : 'Uncategorized'}
                           </span>
                         </td>
                         <td className="p-2">
