@@ -123,8 +123,7 @@ export const useCascadeProcessor = (isEbayConnected: boolean) => {
       });
 
       const result = await EbayService.researchItemPrice({
-        title: group.listingData.title,
-        brand: group.listingData.brand || '',
+        query: group.listingData.title,
         category: group.listingData.category || '',
         condition: group.listingData.condition || 'Used'
       });
@@ -202,9 +201,9 @@ export const useCascadeProcessor = (isEbayConnected: boolean) => {
         price: group.listingData.price || 0,
         category: typeof group.listingData.category === 'string' 
           ? group.listingData.category 
-          : group.listingData.category?.name || 'Uncategorized',
+          : 'Uncategorized',
         condition: group.listingData.condition || 'Used',
-        photos: group.photos, // Will be uploaded by saveListing
+        photos: [], // Photos will be uploaded by saveListing from group.photos
         measurements: {
           length: String(group.listingData.measurements?.length || ''),
           width: String(group.listingData.measurements?.width || ''),
@@ -214,10 +213,16 @@ export const useCascadeProcessor = (isEbayConnected: boolean) => {
         shipping_cost: 0,
         shipping_method: 'Not configured',
         status: 'draft',
-        priceResearch: group.listingData.priceResearch ? JSON.stringify(group.listingData.priceResearch) : null,
+        priceResearch: group.listingData.priceResearch ? (() => {
+          try {
+            return JSON.parse(group.listingData.priceResearch);
+          } catch {
+            return undefined;
+          }
+        })() : undefined
       };
 
-      const result = await saveListing(listingData);
+      const result = await saveListing(listingData, 0, 'draft');
       
       if (result.success) {
         updateProgress(group.id, { 
@@ -228,7 +233,7 @@ export const useCascadeProcessor = (isEbayConnected: boolean) => {
         console.log('✅ [Save Stage] Completed:', group.name);
         toast.success(`"${group.listingData.title}" saved to inventory`);
       } else {
-        throw new Error(result.error || 'Save failed');
+        throw new Error('Save failed');
       }
     } catch (error) {
       console.error('❌ [Save Stage] Failed:', group.name, error);
