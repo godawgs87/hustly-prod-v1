@@ -2,10 +2,15 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEbayStore } from '@/stores/ebayStore';
+import { useQueryClient } from '@tanstack/react-query';
+
+const OAUTH_PROCESSING_KEY = 'ebay_oauth_processing';
+const OAUTH_HANDLED_KEY = 'ebay_oauth_handled';
 
 export const useEbayConnection = () => {
   const { toast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
   const checkEbayConnection = async () => {
     try {
@@ -45,12 +50,27 @@ export const useEbayConnection = () => {
 
   const handlePendingOAuth = async () => {
     const pendingOAuth = localStorage.getItem('ebay_oauth_pending');
-    if (pendingOAuth) {
-      try {
-        const { code, state } = JSON.parse(pendingOAuth);
-        const { data: { session } } = await supabase.auth.getSession();
-        
+    if (!pendingOAuth) return false;
+
+    // If we've already handled a recent OAuth completion, do not process again
+    if (localStorage.getItem(OAUTH_HANDLED_KEY) === 'true') {
+      localStorage.removeItem('ebay_oauth_pending');
+      return false;
+    }
+
+    // Prevent duplicate parallel processing across components/mounts
+    if (sessionStorage.getItem(OAUTH_PROCESSING_KEY) === '1') {
+      return false;
+    }
+
+    try {
+      const { code, state } = JSON.parse(pendingOAuth);
+      const { data: { session } } = await supabase.auth.getSession();
+
       if (session) {
+        // Mark processing to avoid concurrent exchanges
+        sessionStorage.setItem(OAUTH_PROCESSING_KEY, '1');
+
         // Use supabase.functions.invoke for consistency
         const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
           body: {
@@ -68,36 +88,63 @@ export const useEbayConnection = () => {
           throw new Error(`Function error: ${error.message}`);
         }
 
-          if (data.success) {
-            localStorage.removeItem('ebay_oauth_pending');
-            
-            // Update eBay store with connection status
-            const { setAccount } = useEbayStore.getState();
-            setAccount({
-              id: data.username || 'ebay_user',
-              username: data.username || 'eBay User',
-              isConnected: true,
-              oauthToken: 'connected' // We don't store the actual token in the frontend
-            });
-            
-            toast({
-              title: "eBay Connected Successfully",
-              description: `Your eBay account (${data.username}) is now connected and ready to use`
-            });
-            
-            return true;
-          }
+        if (data.success) {
+          localStorage.removeItem('ebay_oauth_pending');
+          localStorage.setItem(OAUTH_HANDLED_KEY, 'true');
+
+          // Update eBay store with connection status
+          const { setAccount } = useEbayStore.getState();
+          setAccount({
+            id: data.username || 'ebay_user',
+            username: data.username || 'eBay User',
+            isConnected: true,
+            oauthToken: 'connected' // We don't store the actual token in the frontend
+          });
+
+          // Invalidate connection status queries for this user so UI updates immediately
+          queryClient.invalidateQueries({ queryKey: ['ebay-connection-status', session.user.id] });
+
+          toast({
+            title: "eBay Connected Successfully",
+            description: `Your eBay account (${data.username}) is now connected and ready to use`
+          });
+
+          return true;
         }
-      } catch (error: any) {
-        console.error('Failed to complete pending eBay OAuth:', error);
-        localStorage.removeItem('ebay_oauth_pending');
-        toast({
-          title: "Connection Failed",
-          description: "Failed to complete eBay connection. Please try again.",
-          variant: "destructive"
-        });
       }
+    } catch (error: any) {
+      console.error('Failed to complete pending eBay OAuth:', error);
+      // If token exchange fails (e.g., duplicate processing), verify connection state
+      try {
+        const { data: { session: sessionAfter } } = await supabase.auth.getSession();
+        const isConnected = await checkEbayConnection();
+        if (isConnected) {
+          localStorage.removeItem('ebay_oauth_pending');
+          localStorage.setItem(OAUTH_HANDLED_KEY, 'true');
+          if (sessionAfter?.user?.id) {
+            queryClient.invalidateQueries({ queryKey: ['ebay-connection-status', sessionAfter.user.id] });
+          }
+          toast({
+            title: "eBay Connection Confirmed",
+            description: "Your eBay account is connected.",
+          });
+          return true;
+        }
+      } catch (verifyErr) {
+        console.warn('OAuth verification step failed:', verifyErr);
+      }
+
+      localStorage.removeItem('ebay_oauth_pending');
+      toast({
+        title: "Connection Failed",
+        description: "Failed to complete eBay connection. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      // Always clear processing lock
+      sessionStorage.removeItem(OAUTH_PROCESSING_KEY);
     }
+
     return false;
   };
 
@@ -111,6 +158,8 @@ export const useEbayConnection = () => {
       }
       
       console.log('✅ User session verified, calling edge function...');
+      // Clear any prior handled flag to allow a fresh OAuth completion
+      localStorage.removeItem(OAUTH_HANDLED_KEY);
       
       // Use supabase.functions.invoke for consistency
       const { data, error } = await supabase.functions.invoke('ebay-oauth-modern', {
@@ -161,6 +210,9 @@ export const useEbayConnection = () => {
           console.error('Error disconnecting eBay:', error);
           throw error;
         }
+
+        // Invalidate connection status queries for this user so UI updates immediately
+        queryClient.invalidateQueries({ queryKey: ['ebay-connection-status', session.user.id] });
       }
       
       toast({

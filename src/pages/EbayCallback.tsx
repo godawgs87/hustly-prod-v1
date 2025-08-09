@@ -6,6 +6,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/components/AuthProvider';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+
+const OAUTH_PROCESSING_KEY = 'ebay_oauth_processing';
+const OAUTH_HANDLED_KEY = 'ebay_oauth_handled';
 
 const EbayCallback = () => {
   const [searchParams] = useSearchParams();
@@ -13,6 +17,7 @@ const EbayCallback = () => {
   const { toast } = useToast();
   const { user, session, loading: authLoading } = useAuth();
   const [processing, setProcessing] = useState(true);
+  const queryClient = useQueryClient();
 
   // Wait for auth to initialize before processing
   useEffect(() => {
@@ -43,6 +48,14 @@ const EbayCallback = () => {
           throw new Error('No authorization code received from eBay');
         }
 
+        // If we've already handled a recent OAuth completion, avoid re-processing
+        if (localStorage.getItem(OAUTH_HANDLED_KEY) === 'true') {
+          console.log('🔁 OAuth already handled, redirecting to settings');
+          localStorage.removeItem('ebay_oauth_pending');
+          navigate('/settings', { replace: true });
+          return;
+        }
+
         // Check if we have a user/session from auth provider
         if (!user || !session) {
           console.log('⚠️ No authenticated user, storing OAuth data for later');
@@ -63,6 +76,13 @@ const EbayCallback = () => {
 
         console.log('✅ User authenticated, proceeding with token exchange');
 
+        // Prevent duplicate parallel processing across mounts/renders
+        if (sessionStorage.getItem(OAUTH_PROCESSING_KEY) === '1') {
+          console.log('⏸️ OAuth processing already in progress, skipping duplicate');
+          return;
+        }
+        sessionStorage.setItem(OAUTH_PROCESSING_KEY, '1');
+
         // Exchange code for token with explicit session token
         const { data: responseData, error: functionError } = await supabase.functions.invoke('ebay-oauth-modern', {
           body: {
@@ -80,6 +100,35 @@ const EbayCallback = () => {
 
         if (functionError) {
           console.error('❌ Function returned error:', functionError);
+          // If the function returns a 400 after a prior success (used/invalid code),
+          // verify connection and treat as success if already connected
+          try {
+            const { data: accounts } = await supabase
+              .from('marketplace_accounts')
+              .select('*')
+              .eq('platform', 'ebay')
+              .eq('user_id', user!.id)
+              .eq('is_connected', true)
+              .eq('is_active', true);
+
+            if (accounts && accounts.length > 0) {
+              console.log('✅ Connection already established, proceeding');
+              localStorage.removeItem('ebay_oauth_pending');
+              localStorage.setItem(OAUTH_HANDLED_KEY, 'true');
+              queryClient.invalidateQueries({ queryKey: ['ebay-connection-status', user!.id] });
+              toast({
+                title: "eBay Connection Confirmed",
+                description: "Your eBay account is connected.",
+              });
+              setTimeout(() => {
+                navigate('/settings', { replace: true });
+              }, 1500);
+              return;
+            }
+          } catch (verifyErr) {
+            console.warn('Verification after function error failed:', verifyErr);
+          }
+
           throw new Error(`Function error: ${functionError.message}`);
         }
 
@@ -88,6 +137,8 @@ const EbayCallback = () => {
         if (responseData?.success || responseData?.status === 'success') {
           // Clear any pending OAuth data
           localStorage.removeItem('ebay_oauth_pending');
+          localStorage.setItem(OAUTH_HANDLED_KEY, 'true');
+          queryClient.invalidateQueries({ queryKey: ['ebay-connection-status', user!.id] });
           
           toast({
             title: "eBay Connected Successfully! 🎉",
@@ -116,6 +167,8 @@ const EbayCallback = () => {
           navigate('/settings', { replace: true });
         }, 3000);
       } finally {
+        // Always clear processing lock
+        sessionStorage.removeItem(OAUTH_PROCESSING_KEY);
         setProcessing(false);
       }
     };

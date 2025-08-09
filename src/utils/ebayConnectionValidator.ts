@@ -14,12 +14,26 @@ export const validateEbayConnection = async (): Promise<EbayConnectionStatus> =>
   const issues: string[] = [];
   
   try {
-    // Get eBay account
+    // Ensure we have the authenticated user context
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) {
+      issues.push('Not authenticated');
+      return {
+        isConnected: false,
+        isTokenValid: false,
+        needsReconnection: true,
+        issues
+      };
+    }
+
+    // Get eBay account scoped to current user
     const { data: account, error } = await supabase
       .from('marketplace_accounts')
       .select('*')
       .eq('platform', 'ebay')
       .eq('is_active', true)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (error) {
@@ -83,11 +97,12 @@ export const validateEbayConnection = async (): Promise<EbayConnectionStatus> =>
     if (timeUntilExpiry <= 0) {
       issues.push(`Token expired ${Math.abs(minutesUntilExpiry)} minutes ago`);
       
-      // Auto-mark as disconnected if expired
+      // Auto-mark as disconnected if expired (scoped to current user)
       await supabase
         .from('marketplace_accounts')
         .update({ is_connected: false, is_active: false })
-        .eq('id', account.id);
+        .eq('id', account.id)
+        .eq('user_id', userId);
 
       return {
         isConnected: false,
@@ -137,11 +152,17 @@ export const validateEbayConnection = async (): Promise<EbayConnectionStatus> =>
 
 export const cleanupExpiredEbayConnections = async (): Promise<number> => {
   try {
+    // Ensure we have the authenticated user context
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) return 0;
+
     const { data: expiredAccounts } = await supabase
       .from('marketplace_accounts')
       .select('id, oauth_expires_at')
       .eq('platform', 'ebay')
-      .eq('is_connected', true);
+      .eq('is_connected', true)
+      .eq('user_id', userId);
 
     if (!expiredAccounts) return 0;
 
@@ -154,7 +175,8 @@ export const cleanupExpiredEbayConnections = async (): Promise<number> => {
       await supabase
         .from('marketplace_accounts')
         .update({ is_connected: false, is_active: false })
-        .in('id', expiredIds);
+        .in('id', expiredIds)
+        .eq('user_id', userId);
     }
 
     return expiredIds.length;
