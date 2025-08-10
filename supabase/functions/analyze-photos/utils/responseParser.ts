@@ -1,3 +1,5 @@
+import { mapAIResponseToLegacyFormat, validateAIResponse } from './responseMapper.ts';
+
 export function parseOpenAIResponse(content: string) {
   console.log('=== OPENAI RESPONSE PARSING START ===');
   console.log('Raw OpenAI content:', content);
@@ -15,15 +17,22 @@ export function parseOpenAIResponse(content: string) {
     console.log('🔍 Found JSON boundaries, attempting to parse...');
     try {
       const jsonString = content.substring(jsonStart, jsonEnd + 1);
-      console.log('Extracted JSON string:', jsonString);
       
-      const listingData = JSON.parse(jsonString);
+      // Try to parse as JSON
+      const parsedData = JSON.parse(jsonString);
+      console.log('✅ Successfully parsed JSON');
+      console.log('Parsed listing data:', JSON.stringify(parsedData, null, 2));
       
-      // Validate that we have essential fields
-      if (listingData.title && listingData.description) {
-        console.log('✅ Successfully parsed JSON with valid data');
-        return processValidListing(listingData);
+      // Map new format to legacy format if needed
+      const listingData = mapAIResponseToLegacyFormat(parsedData);
+      
+      // Validate essential fields
+      if (!validateAIResponse(listingData)) {
+        console.log('⚠️ Missing essential fields, using fallback');
+        return createFallbackListing();
       }
+      
+      return processValidListing(listingData);
     } catch (parseError) {
       console.log('⚠️ JSON parsing failed, checking for content filtering...');
     }
