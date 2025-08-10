@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Settings, Bug, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const EnhancedDebugPanel = () => {
+const DebugPanel = () => {
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -400,4 +400,4 @@ const EnhancedDebugPanel = () => {
   );
 };
 
-export default EnhancedDebugPanel;
+export default DebugPanel;

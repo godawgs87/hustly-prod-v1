@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import PhotoManager, { PhotoItem } from './PhotoManager';
 
-interface EnhancedPhotoUploadProps {
+interface PhotoUploadProps {
   onPhotosChange: (photos: File[]) => void;
   maxPhotos?: number;
   initialPhotos?: File[];
   showEditor?: boolean;
 }
 
-const EnhancedPhotoUpload = ({ 
+const PhotoUpload = ({ 
   onPhotosChange, 
   maxPhotos = 24, 
   initialPhotos = [],
   showEditor = true 
-}: EnhancedPhotoUploadProps) => {
+}: PhotoUploadProps) => {
   const [photoItems, setPhotoItems] = useState<PhotoItem[]>([]);
 
   // Convert initial photos to PhotoItems
@@ -90,4 +90,4 @@ const EnhancedPhotoUpload = ({
   );
 };
 
-export default EnhancedPhotoUpload;
+export default PhotoUpload;

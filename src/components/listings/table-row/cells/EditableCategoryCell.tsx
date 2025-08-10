@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TableCell } from '@/components/ui/table';
-import EbayCategorySelector from './EbayCategorySelector';
+import PlatformCategorySelector from '@/components/platforms/PlatformCategorySelector';
 
 interface EditableCategoryCellProps {
   category: string | null;
@@ -24,11 +24,14 @@ const EditableCategoryCell = ({
 
   return (
     <div className="space-y-2">
-      <EbayCategorySelector
+      <PlatformCategorySelector
+        platformId="ebay"
         value={ebayCategory}
         onChange={handleCategoryChange}
         disabled={disabled}
-      />
+        open={false}
+        onOpenChange={() => {}}
+      />  
       {!ebayCategory && (
         <div className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200">
           ⚠️ Category required

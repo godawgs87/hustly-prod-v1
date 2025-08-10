@@ -33,7 +33,7 @@ interface ValidationSummary {
   totalRules: number;
 }
 
-interface EnhancedValidationSystemProps {
+interface ValidationSystemProps {
   data: ListingData;
   onChange?: (field: string, value: any) => void;
   onValidationChange?: (summary: ValidationSummary) => void;
@@ -212,13 +212,13 @@ const VALIDATION_RULES: ValidationRule[] = [
   }
 ];
 
-const EnhancedValidationSystem = ({ 
+const ValidationSystem = ({ 
   data, 
   onChange, 
   onValidationChange, 
   mode = 'full',
   autoValidate = true 
-}: EnhancedValidationSystemProps) => {
+}: ValidationSystemProps) => {
   const [validationResults, setValidationResults] = useState<{ [key: string]: ValidationResult }>({});
   const [summary, setSummary] = useState<ValidationSummary>({
     isValid: false,
@@ -505,4 +505,4 @@ const EnhancedValidationSystem = ({
   );
 };
 
-export default EnhancedValidationSystem;
+export default ValidationSystem;

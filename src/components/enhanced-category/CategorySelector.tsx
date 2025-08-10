@@ -40,7 +40,7 @@ interface CategorySuggestion {
   reasoning?: string;
 }
 
-interface EnhancedCategorySelectorProps {
+interface CategorySelectorProps {
   value?: string | null;
   categoryPath?: string | null;
   onChange: (categoryId: string, categoryPath: string, category?: EbayCategory) => void;
@@ -52,7 +52,7 @@ interface EnhancedCategorySelectorProps {
   placeholder?: string;
 }
 
-const EnhancedCategorySelector = ({ 
+const CategorySelector = ({ 
   value, 
   categoryPath,
   onChange, 
@@ -62,7 +62,7 @@ const EnhancedCategorySelector = ({
   itemDescription,
   compact = false,
   placeholder = "Select eBay Category"
-}: EnhancedCategorySelectorProps) => {
+}: CategorySelectorProps) => {
   const [categories, setCategories] = useState<EbayCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPath, setSelectedPath] = useState<EbayCategory[]>([]);
@@ -420,4 +420,4 @@ const EnhancedCategorySelector = ({
   );
 };
 
-export default EnhancedCategorySelector;
+export default CategorySelector;

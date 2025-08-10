@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import EnhancedPreviewDialog from './components/EnhancedPreviewDialog';
+import PreviewDialog from './components/PreviewDialog';
 import AIDetailsTableView from './components/AIDetailsTableView';
 import type { PhotoGroup } from './BulkUploadManager';
 
@@ -220,7 +220,7 @@ const BulkReviewDashboard = ({
         isAnalyzing={isAnalyzing}
       />
 
-      <EnhancedPreviewDialog
+      <PreviewDialog
         group={previewGroup}
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}

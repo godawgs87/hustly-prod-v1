@@ -19,7 +19,7 @@ interface PricingData {
   confidence: 'high' | 'medium' | 'low';
 }
 
-interface EnhancedPricingAssistantProps {
+interface PricingAssistantProps {
   productTitle: string;
   condition: string;
   category?: string;
@@ -28,14 +28,14 @@ interface EnhancedPricingAssistantProps {
   autoTrigger?: boolean;
 }
 
-const EnhancedPricingAssistant = ({ 
+const PricingAssistant = ({ 
   productTitle, 
   condition, 
   category,
   currentPrice,
   onPriceSelect,
   autoTrigger = false
-}: EnhancedPricingAssistantProps) => {
+}: PricingAssistantProps) => {
   const [isResearching, setIsResearching] = useState(false);
   const [pricingData, setPricingData] = useState<PricingData | null>(null);
   const [customSearch, setCustomSearch] = useState('');
@@ -333,4 +333,4 @@ const EnhancedPricingAssistant = ({
   );
 };
 
-export default EnhancedPricingAssistant;
+export default PricingAssistant;

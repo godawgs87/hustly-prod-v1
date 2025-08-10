@@ -10,14 +10,14 @@ import { Badge } from '@/components/ui/badge';
 import { Edit, Save, X } from 'lucide-react';
 import type { PhotoGroup } from '../BulkUploadManager';
 
-interface EnhancedPreviewDialogProps {
+interface PreviewDialogProps {
   group: PhotoGroup | null;
   isOpen: boolean;
   onClose: () => void;
   onSave: (updatedGroup: PhotoGroup) => void;
 }
 
-const EnhancedPreviewDialog = ({ group, isOpen, onClose, onSave }: EnhancedPreviewDialogProps) => {
+const PreviewDialog = ({ group, isOpen, onClose, onSave }: PreviewDialogProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedGroup, setEditedGroup] = useState<PhotoGroup | null>(null);
 
@@ -245,4 +245,4 @@ const EnhancedPreviewDialog = ({ group, isOpen, onClose, onSave }: EnhancedPrevi
   );
 };
 
-export default EnhancedPreviewDialog;
+export default PreviewDialog;

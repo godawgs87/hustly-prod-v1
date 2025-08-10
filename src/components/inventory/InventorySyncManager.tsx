@@ -7,7 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-import BulkEbaySyncManager from './BulkEbaySyncManager';
+import BulkPlatformSyncManager from '@/components/platforms/BulkPlatformSyncManager';
 import type { Listing } from '@/types/Listing';
 
 interface InventorySyncManagerProps {
@@ -37,7 +37,8 @@ const InventorySyncManager = ({ selectedItems, selectedListings, onSyncComplete 
   return (
     <div className="flex gap-2">
       {/* Enhanced Bulk Sync Component */}
-      <BulkEbaySyncManager 
+      <BulkPlatformSyncManager 
+        platformId="ebay"
         selectedListings={selectedListings}
         onSyncComplete={onSyncComplete}
       />

@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Eye, Edit, Trash2, Copy, MoreVertical, Check, X, Settings } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import EbaySyncButton from '../EbaySyncButton';
+import { PlatformSyncButton } from '@/components/platform/PlatformSyncButton';
 import InventoryDebugActions from '../InventoryDebugActions';
 
-import type { Listing } from '@/types/Listing';
+import type { Listing } from '@/types/listing';
 
 interface TableCellActionsProps {
   listing: Listing;
@@ -94,7 +94,13 @@ const TableCellActions = ({
               )}
               <DropdownMenuItem asChild>
                 <div className="px-2 py-1.5">
-                  <EbaySyncButton listing={listing} onSyncComplete={onSyncComplete} />
+                  <PlatformSyncButton 
+                    platformId="ebay" 
+                    listingId={listing.id} 
+                    onSync={() => onSyncComplete?.()} 
+                    variant="ghost"
+                    size="sm"
+                  />
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

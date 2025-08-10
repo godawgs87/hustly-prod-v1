@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 import EbayOAuthConnection from './connections/EbayOAuthConnection';
 import EbayPolicyStatusCard from './connections/EbayPolicyStatusCard';
-import EbayCategorySync from './connections/EbayCategorySync';
+import PlatformCategorySync from '@/components/platforms/PlatformCategorySync';
 import { GenericPlatformCard } from './connections/GenericPlatformCard';
 import { PlatformSettingsSection } from './connections/PlatformSettingsSection';
 interface Platform {
@@ -113,7 +113,7 @@ const UserConnectionsTab = () => {
             </>
           )}
           
-          <EbayCategorySync />
+          <PlatformCategorySync platformId="ebay" />
           <Separator className="mt-6" />
         </div>
 

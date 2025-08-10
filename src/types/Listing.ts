@@ -1,62 +1,60 @@
 
-export interface Listing {
-  id: string;
-  user_id: string;
+export interface EnhancedListingData {
   title: string;
-  description: string | null;
+  description: string;
   price: number;
-  category: string | null;
-  condition: string | null;
+  purchase_price?: number;
+  purchase_date?: string;
+  is_consignment?: boolean;
+  consignment_percentage?: number;
+  consignor_name?: string;
+  consignor_contact?: string;
+  source_location?: string;
+  source_type?: string;
+  category: string;
+  condition: string;
   measurements: {
     length?: string;
     width?: string;
     height?: string;
     weight?: string;
-    chest?: string;
-    waist?: string;
-    inseam?: string;
-    sleeve?: string;
-    shoulder?: string;
   };
-  keywords: string[] | null;
-  photos: string[] | null;
-  price_research: string | null;
-  shipping_cost: number | null;
-  status: string | null;
-  created_at: string;
-  updated_at: string;
-  purchase_price?: number | null;
-  purchase_date?: string | null;
-  is_consignment?: boolean | null;
-  consignment_percentage?: number | null;
-  consignor_name?: string | null;
-  consignor_contact?: string | null;
-  source_location?: string | null;
-  source_type?: string | null;
-  cost_basis?: number | null;
-  fees_paid?: number | null;
-  net_profit?: number | null;
-  profit_margin?: number | null;
-  listed_date?: string | null;
-  sold_date?: string | null;
-  sold_price?: number | null;
-  days_to_sell?: number | null;
-  performance_notes?: string | null;
-  clothing_size?: string | null;
-  shoe_size?: string | null;
-  gender?: 'Men' | 'Women' | 'Kids' | 'Unisex' | null;
-  age_group?: 'Adult' | 'Youth' | 'Toddler' | 'Baby' | null;
-  sku?: string | null;
-  auto_generate_sku?: boolean | null;
-  sku_prefix?: string | null;
-  ebay_category_id?: string | null;
-  ebay_category_path?: string | null;
-  mercari_category_id?: string | null;
-  mercari_category_path?: string | null;
-  poshmark_category_id?: string | null;
-  poshmark_category_path?: string | null;
-  depop_category_id?: string | null;
-  depop_category_path?: string | null;
-  facebook_category_id?: string | null;
-  facebook_category_path?: string | null;
+  keywords?: string[];
+  photos: string[];
+  priceResearch?: string;
+  shipping_cost?: number;
+  status?: string;
+  cost_basis?: number;
+  fees_paid?: number;
+  net_profit?: number;
+  profit_margin?: number;
+  listed_date?: string;
+  sold_date?: string;
+  sold_price?: number;
+  days_to_sell?: number;
+  performance_notes?: string;
 }
+
+export interface PurchaseInfo {
+  purchase_price?: number;
+  purchase_date?: string;
+  source_location?: string;
+  source_type?: 'thrift_store' | 'estate_sale' | 'garage_sale' | 'consignment' | 'wholesale' | 'online' | 'other';
+}
+
+export interface ConsignmentInfo {
+  is_consignment: boolean;
+  consignment_percentage?: number;
+  consignor_name?: string;
+  consignor_contact?: string;
+}
+
+// Type alias for compatibility with existing code
+export type Listing = EnhancedListingData & {
+  id?: string;
+  brand?: string;
+  size?: string;
+  color?: string;
+  material?: string;
+  quantity?: number;
+};

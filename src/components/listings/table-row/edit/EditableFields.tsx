@@ -2,7 +2,7 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import EbayCategorySelector from '../cells/EbayCategorySelector';
+import PlatformCategorySelector from '@/components/platforms/PlatformCategorySelector';
 
 interface EditableFieldsProps {
   editData: {
@@ -59,7 +59,8 @@ const EditableFields = ({ editData, onUpdate }: EditableFieldsProps) => {
       </Select>
 
       <div className="mb-2">
-        <EbayCategorySelector
+        <PlatformCategorySelector
+          platformId="ebay"
           value={editData.ebay_category_id || null}
           onChange={handleEbayCategoryChange}
         />

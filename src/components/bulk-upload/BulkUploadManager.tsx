@@ -6,7 +6,9 @@ import type { StepType } from './components/BulkUploadStepRenderer';
 import BulkUploadStepRenderer from './components/BulkUploadStepRenderer';
 import { useBulkUploadState } from './hooks/useBulkUploadState';
 import { useBulkUploadHandlers } from './hooks/useBulkUploadHandlers';
-import EnhancedPreviewDialog from './components/EnhancedPreviewDialog';
+import PreviewDialog from './components/PreviewDialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Loader2 } from 'lucide-react';
 
 export interface PhotoGroup {
   id: string;
@@ -81,6 +83,7 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
   // Preview dialog state
   const [previewGroup, setPreviewGroup] = useState<PhotoGroup | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
   
   // Price research state
   const [isPriceResearching, setIsPriceResearching] = useState(false);
@@ -185,6 +188,24 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     handlePreviewItem
   );
 
+  // Wrapper to show loading modal during bulk post
+  const handlePostAllWithLoading = useCallback(async () => {
+    // Determine if there are ready items before showing modal
+    const readyCount = state.photoGroups.filter(g => g.status === 'completed' && g.listingData && !g.isPosted).length;
+    const shouldShowModal = readyCount > 0;
+    if (shouldShowModal) setIsPosting(true);
+    try {
+      await handlers.handlePostAll();
+      // On success, keep the modal open until redirect occurs inside handler
+    } catch (e) {
+      // If something fails early, allow user to try again
+      setIsPosting(false);
+    } finally {
+      // If there were no items, ensure modal is not shown
+      if (!shouldShowModal) setIsPosting(false);
+    }
+  }, [state.photoGroups, handlers.handlePostAll]);
+
   useEffect(() => {
     const toastElements = document.querySelectorAll('[data-sonner-toast]');
     toastElements.forEach(el => el.remove());
@@ -196,13 +217,14 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     photoGroups: state.photoGroups,
     isGrouping: state.isGrouping,
     isAnalyzing: handlers.isAnalyzing,
+    isPosting,
     onPhotosUploaded: handlePhotosUploaded,
     onStartGrouping: handlers.handleStartGrouping,
     onGroupsConfirmed: handlers.handleGroupsConfirmed,
     onEditItem: handlers.handleEditItem,
     onPreviewItem: handlePreviewItem,
     onPostItem: handlers.handlePostItem,
-    onPostAll: handlers.handlePostAll,
+    onPostAll: handlePostAllWithLoading,
     onUpdateGroup: handlers.handleUpdateGroup,
     onRetryAnalysis: handlers.handleRetryAnalysis,
     onRunAI: handlers.handleRetryAnalysis,
@@ -223,6 +245,7 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
     state.photoGroups,
     state.isGrouping,
     handlers.isAnalyzing,
+    isPosting,
     handlePhotosUploaded,
     handlers.handleStartGrouping,
     handlers.handleGroupsConfirmed,
@@ -258,12 +281,23 @@ const BulkUploadManager = ({ onComplete, onBack, onViewInventory }: BulkUploadMa
       <BulkUploadStepRenderer {...stepRendererProps} />
       
       {/* Preview Dialog */}
-      <EnhancedPreviewDialog
+      <PreviewDialog
         group={previewGroup}
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
         onSave={handlePreviewSave}
       />
+
+      {/* Posting Loading Modal */}
+      <Dialog open={isPosting} onOpenChange={() => {}}>
+        <DialogContent className="max-w-sm">
+          <div className="flex flex-col items-center gap-3 py-2">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            <p className="text-sm text-gray-700">Uploading your items to inventory...</p>
+            <p className="text-xs text-gray-500">This may take a few seconds. You will be redirected when complete.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

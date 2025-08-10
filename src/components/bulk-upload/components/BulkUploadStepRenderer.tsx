@@ -18,6 +18,7 @@ interface BulkUploadStepRendererProps {
   photoGroups: PhotoGroup[];
   isGrouping: boolean;
   isAnalyzing?: boolean;
+  isPosting?: boolean;
   onPhotosUploaded: (photos: File[]) => void;
   onStartGrouping: () => void;
   onGroupsConfirmed: (groups: PhotoGroup[]) => void;
@@ -98,6 +99,7 @@ const BulkUploadStepRenderer = memo((props: BulkUploadStepRendererProps) => {
           onEditItem={props.onEditItem}
           onPreviewItem={props.onPreviewItem}
           onPostAll={props.onPostAll}
+          isPosting={props.isPosting}
           onBackToShipping={() => props.onStepChange('shipping')}
         />
       );

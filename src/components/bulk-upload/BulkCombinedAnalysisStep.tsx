@@ -26,7 +26,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/AuthProvider';
 import { useListingSave } from '@/hooks/useListingSave';
 import { supabase } from '@/integrations/supabase/client';
-import EnhancedPreviewDialog from './components/EnhancedPreviewDialog';
+import PreviewDialog from './components/PreviewDialog';
 
 interface BulkCombinedAnalysisStepProps {
   photoGroups: PhotoGroup[];
@@ -850,7 +850,7 @@ export const BulkCombinedAnalysisStep: React.FC<BulkCombinedAnalysisStepProps> =
       )}
 
       {/* Preview Dialog */}
-      <EnhancedPreviewDialog
+      <PreviewDialog
         group={previewGroup}
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}

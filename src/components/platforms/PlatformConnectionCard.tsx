@@ -5,28 +5,53 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import EbayOAuthConnection from './EbayOAuthConnection';
-import EbayPolicyManager from './EbayPolicyManager';
+import { platformRegistry } from '@/services/platforms/PlatformRegistry';
 
-interface EbayAccount {
+interface PlatformAccount {
   id: string;
+  platform: string;
   account_username?: string;
   account_email?: string;
   is_connected: boolean;
-  oauth_expires_at?: string;
+  oauth_token?: string;
+  refresh_token?: string;
+  token_expires_at?: string;
   last_sync_at?: string;
 }
 
-const EbayConnectionCard = () => {
-  const [ebayAccount, setEbayAccount] = useState<EbayAccount | null>(null);
+interface PlatformConnectionCardProps {
+  platformId: string;
+  onConnectionChange?: () => void;
+  children?: React.ReactNode; // For platform-specific components like OAuth connection
+  showPolicyManager?: boolean;
+  PolicyManagerComponent?: React.ComponentType; // Platform-specific policy manager
+}
+
+const PlatformConnectionCard: React.FC<PlatformConnectionCardProps> = ({ 
+  platformId, 
+  onConnectionChange,
+  children,
+  showPolicyManager = false,
+  PolicyManagerComponent
+}) => {
+  const [account, setAccount] = useState<PlatformAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadEbayAccount();
-  }, []);
+  const platform = platformRegistry.get(platformId);
+  const platformName = platform?.name || platformId;
+  const platformUrls: Record<string, string> = {
+    ebay: 'https://www.ebay.com/mys/summary',
+    poshmark: 'https://poshmark.com/closet',
+    mercari: 'https://www.mercari.com/mypage/',
+    depop: 'https://www.depop.com/user/'
+  };
 
-  const loadEbayAccount = async () => {
+  useEffect(() => {
+    loadPlatformAccount();
+  }, [platformId]);
+
+  const loadPlatformAccount = async () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -36,36 +61,37 @@ const EbayConnectionCard = () => {
         .from('marketplace_accounts')
         .select('*')
         .eq('user_id', user.id)
-        .eq('platform', 'ebay')
+        .eq('platform', platformId)
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
 
-      setEbayAccount(accounts?.[0] || null);
+      setAccount(accounts?.[0] || null);
     } catch (error) {
-      console.error('Error loading eBay account:', error);
+      console.error(`Error loading ${platformName} account:`, error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDisconnect = async () => {
-    if (!ebayAccount) return;
+    if (!account) return;
 
     try {
       const { error } = await supabase
         .from('marketplace_accounts')
         .update({ is_connected: false, is_active: false })
-        .eq('id', ebayAccount.id);
+        .eq('id', account.id);
 
       if (error) throw error;
 
       toast({
-        title: "eBay Disconnected",
-        description: "Your eBay account has been disconnected successfully"
+        title: `${platformName} Disconnected`,
+        description: `Your ${platformName} account has been disconnected successfully`
       });
 
-      setEbayAccount(null);
+      setAccount(null);
+      onConnectionChange?.();
     } catch (error: any) {
       toast({
         title: "Disconnection Failed",
@@ -76,12 +102,12 @@ const EbayConnectionCard = () => {
   };
 
   const isTokenExpired = () => {
-    if (!ebayAccount?.oauth_expires_at) return false;
-    return new Date(ebayAccount.oauth_expires_at) < new Date();
+    if (!account?.token_expires_at) return false;
+    return new Date(account.token_expires_at) < new Date();
   };
 
   const getConnectionStatus = () => {
-    if (!ebayAccount?.is_connected) return { status: 'disconnected', color: 'destructive' };
+    if (!account?.is_connected) return { status: 'disconnected', color: 'destructive' };
     if (isTokenExpired()) return { status: 'expired', color: 'destructive' };
     return { status: 'connected', color: 'default' };
   };
@@ -93,7 +119,7 @@ const EbayConnectionCard = () => {
       <Card>
         <CardContent className="flex items-center justify-center py-8">
           <RefreshCw className="w-6 h-6 animate-spin" />
-          <span className="ml-2">Loading eBay connection...</span>
+          <span className="ml-2">Loading {platformName} connection...</span>
         </CardContent>
       </Card>
     );
@@ -104,21 +130,23 @@ const EbayConnectionCard = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {ebayAccount?.is_connected && !isTokenExpired() ? (
+            {account?.is_connected && !isTokenExpired() ? (
               <CheckCircle className="w-5 h-5 text-green-600" />
             ) : (
               <AlertTriangle className="w-5 h-5 text-yellow-600" />
             )}
-            eBay Connection
+            {platformName} Connection
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {ebayAccount?.is_connected ? (
+          {account?.is_connected ? (
             <>
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-medium">Connected Account</h4>
-                  <p className="text-sm text-gray-600">{ebayAccount.account_username || ebayAccount.account_email}</p>
+                  <p className="text-sm text-gray-600">
+                    {account.account_username || account.account_email || 'Connected'}
+                  </p>
                 </div>
                 <Badge variant={connectionStatus.color as any}>
                   {connectionStatus.status === 'connected' ? 'Connected' : 
@@ -130,7 +158,7 @@ const EbayConnectionCard = () => {
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <h5 className="font-medium text-yellow-800">Token Expired</h5>
                   <p className="text-sm text-yellow-700 mt-1">
-                    Your eBay connection has expired. Please reconnect to continue listing items.
+                    Your {platformName} connection has expired. Please reconnect to continue listing items.
                   </p>
                 </div>
               )}
@@ -139,27 +167,39 @@ const EbayConnectionCard = () => {
                 <Button variant="outline" onClick={handleDisconnect}>
                   Disconnect
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => window.open('https://www.ebay.com/mys/summary', '_blank')}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  View on eBay
-                </Button>
+                {platformUrls[platformId] && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => window.open(platformUrls[platformId], '_blank')}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View on {platformName}
+                  </Button>
+                )}
               </div>
             </>
           ) : (
-            <EbayOAuthConnection onConnectionSuccess={loadEbayAccount} />
+            // Render platform-specific connection component (e.g., OAuth flow)
+            children || (
+              <div className="text-center py-4">
+                <p className="text-gray-600 mb-4">
+                  Connect your {platformName} account to start listing items
+                </p>
+                <Button onClick={() => onConnectionChange?.()}>
+                  Connect {platformName}
+                </Button>
+              </div>
+            )
           )}
         </CardContent>
       </Card>
 
-      {/* Show policy manager only if connected */}
-      {ebayAccount?.is_connected && !isTokenExpired() && (
-        <EbayPolicyManager />
+      {/* Show platform-specific policy manager if connected and component provided */}
+      {account?.is_connected && !isTokenExpired() && showPolicyManager && PolicyManagerComponent && (
+        <PolicyManagerComponent />
       )}
     </div>
   );
 };
 
-export default EbayConnectionCard;
+export default PlatformConnectionCard;

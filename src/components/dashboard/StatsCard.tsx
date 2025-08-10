@@ -3,7 +3,7 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
-interface EnhancedStatsCardProps {
+interface StatsCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
@@ -19,14 +19,14 @@ interface EnhancedStatsCardProps {
   className?: string;
 }
 
-const EnhancedStatsCard = ({ 
+const StatsCard = ({ 
   title, 
   value, 
   subtitle, 
   trend, 
   badge, 
   className = '' 
-}: EnhancedStatsCardProps) => {
+}: StatsCardProps) => {
   return (
     <Card className={`p-4 hover:shadow-md transition-shadow duration-200 ${className}`}>
       <div className="space-y-2">
@@ -58,4 +58,4 @@ const EnhancedStatsCard = ({
   );
 };
 
-export default EnhancedStatsCard;
+export default StatsCard;

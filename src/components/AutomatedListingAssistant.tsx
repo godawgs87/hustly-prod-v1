@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Zap, Brain, Wand2 } from 'lucide-react';
-import EnhancedPricingAssistant from './create-listing/EnhancedPricingAssistant';
+import PricingAssistant from './create-listing/PricingAssistant';
 import ListingTemplates from './ListingTemplates';
 import { ListingData } from '@/types/CreateListing';
 
@@ -113,7 +113,7 @@ const AutomatedListingAssistant = ({
         </TabsContent>
 
         <TabsContent value="pricing" className="space-y-4">
-          <EnhancedPricingAssistant
+          <PricingAssistant
             productTitle={currentListing?.title || ''}
             condition={currentListing?.condition || 'Used'}
             category={currentListing?.category}

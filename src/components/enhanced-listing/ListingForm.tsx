@@ -10,10 +10,10 @@ import { Separator } from '@/components/ui/separator';
 import { AlertCircle, CheckCircle2, Loader2, Save, Eye, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ListingData } from '@/types/CreateListing';
-import EnhancedCategorySelector from '../enhanced-category/EnhancedCategorySelector';
-import EnhancedValidationSystem from '../validation/EnhancedValidationSystem';
+import CategorySelector from '../enhanced-category/CategorySelector';
+import ValidationSystem from '../validation/ValidationSystem';
 
-interface EnhancedListingFormProps {
+interface ListingFormProps {
   listingData: ListingData;
   onUpdate: (updates: Partial<ListingData>) => void;
   onSave?: () => Promise<void>;
@@ -25,7 +25,7 @@ interface EnhancedListingFormProps {
   showValidation?: boolean;
 }
 
-const EnhancedListingForm = ({
+const ListingForm = ({
   listingData,
   onUpdate,
   onSave,
@@ -35,7 +35,7 @@ const EnhancedListingForm = ({
   isPublishing = false,
   mode = 'create',
   showValidation = true
-}: EnhancedListingFormProps) => {
+}: ListingFormProps) => {
   const [activeTab, setActiveTab] = useState('basic');
   const [validationSummary, setValidationSummary] = useState({
     isValid: false,
@@ -320,7 +320,7 @@ const EnhancedListingForm = ({
               <div>
                 <Label>eBay Category *</Label>
                 <div className="mt-1">
-                  <EnhancedCategorySelector
+                  <CategorySelector
                     value={listingData.ebay_category_id}
                     categoryPath={listingData.ebay_category_path}
                     onChange={handleCategoryChange}
@@ -414,7 +414,7 @@ const EnhancedListingForm = ({
         {/* Validation */}
         <TabsContent value="validation">
           {showValidation && (
-            <EnhancedValidationSystem
+            <ValidationSystem
               data={listingData}
               onChange={handleFieldChange}
               onValidationChange={setValidationSummary}
@@ -473,4 +473,4 @@ const EnhancedListingForm = ({
   );
 };
 
-export default EnhancedListingForm;
+export default ListingForm;

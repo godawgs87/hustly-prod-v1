@@ -11,6 +11,7 @@ interface BulkFinalReviewStepProps {
   onPreviewItem: (groupId: string) => void;
   onPostAll: () => void;
   onBackToShipping: () => void;
+  isPosting?: boolean;
 }
 
 const BulkFinalReviewStep = ({
@@ -18,7 +19,8 @@ const BulkFinalReviewStep = ({
   onEditItem,
   onPreviewItem,
   onPostAll,
-  onBackToShipping
+  onBackToShipping,
+  isPosting = false
 }: BulkFinalReviewStepProps) => {
   
   // Calculate ready items (items with AI analysis completed)
@@ -30,6 +32,14 @@ const BulkFinalReviewStep = ({
   const totalEstimatedValue = readyItems.reduce((sum, group) => 
     sum + (group.listingData?.price || 0), 0
   );
+
+  // Format currency with 2 decimals (USD)
+  const formattedTotalValue = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(totalEstimatedValue);
 
   // Platform fee calculations (rough estimates)
   const ebayPayout = totalEstimatedValue * 0.87; // ~13% fees
@@ -52,10 +62,10 @@ const BulkFinalReviewStep = ({
         </div>
         <Button
           onClick={onPostAll}
-          disabled={readyItems.length === 0}
+          disabled={readyItems.length === 0 || isPosting}
           className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 text-lg font-semibold"
         >
-          📦 Upload All to Inventory ({readyItems.length})
+          {isPosting ? 'Uploading...' : `📦 Upload All to Inventory (${readyItems.length})`}
         </Button>
       </div>
 
@@ -78,7 +88,7 @@ const BulkFinalReviewStep = ({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Value</p>
-                <p className="text-2xl font-bold text-blue-600">${totalEstimatedValue}</p>
+                <p className="text-2xl font-bold text-blue-600">{formattedTotalValue}</p>
               </div>
               <DollarSign className="w-8 h-8 text-blue-600" />
             </div>
