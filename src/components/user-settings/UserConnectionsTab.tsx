@@ -5,7 +5,7 @@ import { Link } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 import EbayOAuthConnection from './connections/EbayOAuthConnection';
-import EbayPolicyStatusCard from './connections/EbayPolicyStatusCard';
+import PlatformPolicyStatusCard from '@/components/platforms/PlatformPolicyStatusCard';
 import PlatformCategorySync from '@/components/platforms/PlatformCategorySync';
 import { GenericPlatformCard } from './connections/GenericPlatformCard';
 import { PlatformSettingsSection } from './connections/PlatformSettingsSection';
@@ -108,7 +108,7 @@ const UserConnectionsTab = () => {
           
           {ebayAccountType === 'business' && (
             <>
-              <EbayPolicyStatusCard />
+              <PlatformPolicyStatusCard platformId="ebay" />
               <Separator className="mt-6" />
             </>
           )}

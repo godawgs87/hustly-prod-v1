@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MapPin, ExternalLink, Info, CheckCircle } from 'lucide-react';
-import OnboardingEbayConnection from './OnboardingEbayConnection';
+import OnboardingPlatformConnection from './OnboardingPlatformConnection';
 
 interface OnboardingPlatformSetupProps {
   selectedPlatforms: string[];
@@ -62,7 +62,8 @@ const OnboardingPlatformSetup = ({ selectedPlatforms, businessData, ebayConnecte
               </>
             )}
 
-            <OnboardingEbayConnection 
+            <OnboardingPlatformConnection 
+              platformId="ebay"
               isConnected={ebayConnected}
               onConnectionChange={onEbayConnect || (() => {})}
             />

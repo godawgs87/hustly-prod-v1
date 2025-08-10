@@ -48,9 +48,10 @@ const EbayCallback = () => {
           throw new Error('No authorization code received from eBay');
         }
 
-        // If we've already handled a recent OAuth completion, avoid re-processing
-        if (localStorage.getItem(OAUTH_HANDLED_KEY) === 'true') {
-          console.log('🔁 OAuth already handled, redirecting to settings');
+        // Check if this is the same OAuth attempt (same code)
+        const lastHandledCode = localStorage.getItem('ebay_last_handled_code');
+        if (lastHandledCode === code) {
+          console.log('🔁 OAuth code already processed, redirecting to settings');
           localStorage.removeItem('ebay_oauth_pending');
           navigate('/settings', { replace: true });
           return;
@@ -114,7 +115,8 @@ const EbayCallback = () => {
             if (accounts && accounts.length > 0) {
               console.log('✅ Connection already established, proceeding');
               localStorage.removeItem('ebay_oauth_pending');
-              localStorage.setItem(OAUTH_HANDLED_KEY, 'true');
+              localStorage.setItem('ebay_last_handled_code', code);
+              localStorage.removeItem(OAUTH_HANDLED_KEY);
               queryClient.invalidateQueries({ queryKey: ['ebay-connection-status', user!.id] });
               toast({
                 title: "eBay Connection Confirmed",
@@ -135,9 +137,11 @@ const EbayCallback = () => {
         console.log('📊 Token exchange response:', responseData);
         
         if (responseData?.success || responseData?.status === 'success') {
-          // Clear any pending OAuth data
+          // Clear any pending OAuth data and store the handled code
           localStorage.removeItem('ebay_oauth_pending');
-          localStorage.setItem(OAUTH_HANDLED_KEY, 'true');
+          localStorage.setItem('ebay_last_handled_code', code);
+          // Remove the old OAUTH_HANDLED_KEY to prevent blocking future attempts
+          localStorage.removeItem(OAUTH_HANDLED_KEY);
           queryClient.invalidateQueries({ queryKey: ['ebay-connection-status', user!.id] });
           
           toast({

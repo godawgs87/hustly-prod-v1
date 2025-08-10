@@ -294,8 +294,16 @@ const EbayOAuthConnection: React.FC<EbayOAuthConnectionProps> = ({ onConnectionS
 
   const handleForceCleanup = async () => {
     try {
+      // Clear all OAuth-related localStorage items
+      localStorage.removeItem('ebay_oauth_pending');
+      localStorage.removeItem('ebay_oauth_handled');
+      localStorage.removeItem('ebay_last_handled_code');
+      localStorage.removeItem('OAUTH_HANDLED_KEY');
+      
+      // Clear database connections
       await forceCleanupEbayConnection();
       await checkExistingConnection();
+      
       toast({
         title: "eBay Connection Reset",
         description: "All eBay connections have been cleared. You can now connect fresh."
