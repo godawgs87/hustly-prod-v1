@@ -277,6 +277,12 @@ export class EbayService {
     if (yearMatch) {
       searchTerms.push(yearMatch[0]);
     }
+
+    // Enhanced automotive part number detection and vehicle model identification
+    const automotiveEnhancement = this.enhanceAutomotiveQuery(title, brand, searchTerms);
+    if (automotiveEnhancement.vehicleModel) {
+      searchTerms.push(...automotiveEnhancement.additionalTerms);
+    }
     
     // Remove duplicates and create focused query (case-insensitive deduplication)
     const uniqueTerms = searchTerms
@@ -325,6 +331,96 @@ export class EbayService {
       query,
       brand: brand || undefined,
       condition: listingData.condition || undefined
+    };
+  }
+
+  private static enhanceAutomotiveQuery(title: string, brand: string, existingTerms: string[]): {
+    vehicleModel: string | null;
+    additionalTerms: string[];
+  } {
+    const titleLower = title.toLowerCase();
+    const additionalTerms: string[] = [];
+    let vehicleModel: string | null = null;
+
+    // Ford part number patterns and vehicle identification
+    if (brand?.toLowerCase() === 'ford') {
+      // Ford F-150 Lightning (Electric Truck) - NL3T prefix
+      if (title.match(/NL3T-?15K601/i)) {
+        vehicleModel = 'F-150 Lightning';
+        additionalTerms.push('F-150', 'Lightning', 'Electric', 'Truck', '2022', '2023', '2024');
+      }
+      // Ford F-150 (Regular) - FL3T prefix
+      else if (title.match(/FL3T-?15K601/i)) {
+        vehicleModel = 'F-150';
+        additionalTerms.push('F-150', 'Truck', '2021', '2022', '2023', '2024');
+      }
+      // Ford Mustang - DS7T prefix
+      else if (title.match(/DS7T-?15K601/i)) {
+        vehicleModel = 'Mustang';
+        additionalTerms.push('Mustang', 'Sports Car', '2015', '2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023');
+      }
+      // Ford Explorer - BB5T prefix
+      else if (title.match(/BB5T-?15K601/i)) {
+        vehicleModel = 'Explorer';
+        additionalTerms.push('Explorer', 'SUV', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019');
+      }
+      // Ford Escape - CJ5T prefix
+      else if (title.match(/CJ5T-?15K601/i)) {
+        vehicleModel = 'Escape';
+        additionalTerms.push('Escape', 'SUV', 'Crossover', '2013', '2014', '2015', '2016', '2017', '2018', '2019');
+      }
+    }
+
+    // GM/Chevrolet part number patterns
+    else if (brand?.toLowerCase().includes('gm') || brand?.toLowerCase().includes('chevrolet')) {
+      // Corvette - specific part number patterns
+      if (title.match(/1364[0-9]/i)) {
+        vehicleModel = 'Corvette';
+        additionalTerms.push('Corvette', 'Sports Car', 'C7', 'C8');
+      }
+      // Camaro - specific patterns
+      else if (title.match(/2323[0-9]/i)) {
+        vehicleModel = 'Camaro';
+        additionalTerms.push('Camaro', 'Sports Car', 'SS', 'ZL1');
+      }
+    }
+
+    // BMW part number patterns
+    else if (brand?.toLowerCase() === 'bmw') {
+      // 3 Series - 6135 prefix
+      if (title.match(/6135[0-9]/i)) {
+        vehicleModel = '3 Series';
+        additionalTerms.push('3 Series', 'Sedan', 'BMW');
+      }
+    }
+
+    // Generic automotive keywords enhancement
+    if (titleLower.includes('key fob') || titleLower.includes('remote') || titleLower.includes('keyless')) {
+      additionalTerms.push('Key Fob', 'Remote Entry', 'Keyless Entry');
+      
+      // Add frequency-specific terms for key fobs
+      if (title.match(/315\s?mhz/i)) {
+        additionalTerms.push('315MHz');
+      }
+      if (title.match(/433\s?mhz/i)) {
+        additionalTerms.push('433MHz');
+      }
+    }
+
+    // Filter out terms that already exist (case-insensitive)
+    const filteredTerms = additionalTerms.filter(term => 
+      !existingTerms.some(existing => existing.toLowerCase() === term.toLowerCase())
+    );
+
+    console.log('🚗 [EbayService] Automotive enhancement:', {
+      vehicleModel,
+      additionalTerms: filteredTerms,
+      originalTitle: title
+    });
+
+    return {
+      vehicleModel,
+      additionalTerms: filteredTerms
     };
   }
 }

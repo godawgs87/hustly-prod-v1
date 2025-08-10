@@ -6,7 +6,7 @@ Analyze the provided images and return ONLY valid JSON with this exact structure
 
 {
   "title": "Highly specific title with brand, model number, year, part numbers, and compatibility info (max 80 chars for eBay)",
-  "description": "Detailed 3-4 sentence description including condition, features, compatibility, and appeal",
+  "description": "Detailed 3-4 sentence description including condition, features, SPECIFIC vehicle/model compatibility (not generic), and appeal",
   "category": {
     "primary": "Main category (e.g., Home & Garden, Clothing, Automotive, Tools)",
     "subcategory": "Specific subcategory (e.g., Kitchen Appliances, Women's Tops, Car Parts, Hand Tools)"
@@ -35,13 +35,21 @@ Analyze the provided images and return ONLY valid JSON with this exact structure
 
 TITLE REQUIREMENTS (CRITICAL):
 - Include specific model numbers, part numbers, years when visible
-- For automotive: include year, make, model, part name, OEM numbers
+- For automotive: IDENTIFY SPECIFIC VEHICLE MODELS from part numbers (e.g., NL3T-15K601-EC = Ford F-150 Lightning), include year, make, model, part name, OEM numbers
 - For electronics: include brand, model number, generation, key specs
 - For tools: include brand, model, size/capacity, type
 - For clothing: include brand, style name, size, color, material
 - Stay within 80 characters for eBay compatibility
 - Be universally applicable across all marketplace platforms
 - Include compatibility info when relevant (fits, works with, etc.)
+
+AUTOMOTIVE PART NUMBER RECOGNITION (CRITICAL):
+- Ford part numbers starting with NL3T = F-150 Lightning (2022-2024)
+- Ford part numbers starting with DS7T = Mustang (2015-2023)
+- Ford part numbers starting with FL3T = F-150 (2021-2024)
+- GM part numbers starting with 1364 = Corvette
+- BMW part numbers starting with 6135 = 3 Series
+- When you see automotive part numbers, research the specific vehicle model and include it in the title and description
 
 TITLE REQUIREMENTS (ADDITIONAL GUIDANCE):
 - For electronics: include brand, model number, generation, key specs
