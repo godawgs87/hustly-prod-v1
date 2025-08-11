@@ -170,6 +170,7 @@ TITLE OPTIMIZATION BY CATEGORY:
 - Antiques: [Era] [Type] [Maker] [Material] [Style]
 - Toys: [Brand] [Line] [Character] [Year] [Complete/Sealed]
 - Tools: [Brand] [Type] [Model] [Size/Capacity] [Power]
+- Automotive: [OEM/Aftermarket] [Year Range] [Make] [Model] [Part Type] [Part Number]
 
 CONDITION TERMINOLOGY BY CATEGORY:
 - Cards: Mint/NM/EX/VG/G/Fair/Poor (note centering, corners, edges, surface)
@@ -200,6 +201,12 @@ AUTOMOTIVE PART NUMBER EXPERTISE:
 - Include frequency (315MHz/433MHz), part type, and fitment years in analysis
 - Research actual market value ranges for specific OEM parts vs generic alternatives
 - Identify vehicle-specific features that affect pricing (smart keys, proximity, etc.)
+
+AUTOMOTIVE TITLE EXAMPLES (follow these patterns for better sales):
+- "OEM 2022-2025 FORD F-150 LIGHTNING Smart Key Fob NL3T-15K601-EC"
+- "OEM 2018-2021 BMW X5 Keyless Entry Remote FCC ID: YGOHUF5662"  
+- "Genuine 2019-2023 MERCEDES C-CLASS Key Fob Remote A2229050800"
+- "OEM 2020-2024 TOYOTA CAMRY Smart Key Proximity Fob 89904-06140"
 
 SPECIAL FLAGS:
 - Potential high value: Flag items with luxury brands or rare indicators
