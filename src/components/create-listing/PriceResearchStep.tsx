@@ -62,6 +62,36 @@ export const PriceResearchStep: React.FC<PriceResearchStepProps> = ({
         // Mark this price as processed for callback
         callbackProcessedRef.current = suggestedPrice;
         
+        // NEW: Enhance title and description based on eBay comparables
+        if (priceData?.searchResults?.items && listingData?.title) {
+          console.log('✨ [PriceResearchStep] Enhancing title from comparables...');
+          const enhancement = EbayService.enhanceTitleFromComparables(
+            listingData.title,
+            priceData.searchResults.items
+          );
+          
+          if (enhancement.enhancedTitle !== listingData.title) {
+            console.log('✨ [PriceResearchStep] Title enhanced:', {
+              original: listingData.title,
+              enhanced: enhancement.enhancedTitle,
+              extracted: enhancement.extractedInfo
+            });
+            
+            // Update the listing data with enhanced title and description
+            const enhancedPriceData = {
+              ...priceData,
+              enhancedTitle: enhancement.enhancedTitle,
+              enhancedDescription: enhancement.enhancedDescription,
+              extractedInfo: enhancement.extractedInfo
+            };
+            
+            if (onPriceResearchComplete) {
+              onPriceResearchComplete(enhancedPriceData, suggestedPrice);
+            }
+            return;
+          }
+        }
+        
         // Update the main listing data with suggested price
         if (onPriceResearchComplete) {
           onPriceResearchComplete(priceData, suggestedPrice);
@@ -70,7 +100,7 @@ export const PriceResearchStep: React.FC<PriceResearchStepProps> = ({
         console.log('💰 [PriceResearchStep] Skipping callback for already processed price:', suggestedPrice);
       }
     }
-  }, [priceData?.priceAnalysis?.suggestedPrice]); // 🚫 Removed problematic dependencies
+  }, [priceData?.priceAnalysis?.suggestedPrice]); // 
 
   useEffect(() => {
     console.log('🔬 PriceResearchStep mounted');

@@ -134,7 +134,6 @@ export class EbayService {
 
   static async researchItemPrice(params: {
     query: string;
-    category?: string;
     brand?: string;
     condition?: string;
     limit?: number;
@@ -152,6 +151,167 @@ export class EbayService {
       console.error('❌ [EbayService] Price research failed:', error);
       throw error;
     }
+  }
+
+  // NEW: Smart title enhancement based on eBay comparables
+  static enhanceTitleFromComparables(originalTitle: string, comparables: any[]): {
+    enhancedTitle: string;
+    enhancedDescription: string;
+    extractedInfo: any;
+  } {
+    if (!comparables || comparables.length === 0) {
+      return {
+        enhancedTitle: originalTitle,
+        enhancedDescription: '',
+        extractedInfo: {}
+      };
+    }
+
+    console.log('🔍 [EbayService] Analyzing comparables for title enhancement:', comparables.length);
+
+    // Extract information from top 10 comparable titles
+    const topComparables = comparables.slice(0, 10);
+    const titleAnalysis = {
+      yearRanges: new Set<string>(),
+      vehicleModels: new Set<string>(),
+      partTypes: new Set<string>(),
+      features: new Set<string>(),
+      brands: new Set<string>()
+    };
+
+    topComparables.forEach(comp => {
+      const title = comp.title?.toLowerCase() || '';
+      
+      // Extract year ranges (2022-2025, 2018-2021, etc.)
+      const yearRange = title.match(/20\d{2}[-–]20\d{2}/);
+      if (yearRange) titleAnalysis.yearRanges.add(yearRange[0]);
+
+      // Extract single years (2022, 2023, etc.)
+      const singleYears = title.match(/20\d{2}/g);
+      if (singleYears && singleYears.length >= 2) {
+        const sortedYears = singleYears.sort();
+        if (sortedYears.length >= 2) {
+          titleAnalysis.yearRanges.add(`${sortedYears[0]}-${sortedYears[sortedYears.length - 1]}`);
+        }
+      }
+
+      // Extract vehicle models (F-150 Lightning, Mustang, 3 Series, etc.)
+      const vehiclePatterns = [
+        /f-?150\s+lightning/i,
+        /f-?150/i,
+        /mustang/i,
+        /explorer/i,
+        /escape/i,
+        /corvette/i,
+        /camaro/i,
+        /3\s+series/i,
+        /c-?class/i,
+        /e-?class/i,
+        /camry/i,
+        /accord/i,
+        /altima/i
+      ];
+
+      vehiclePatterns.forEach(pattern => {
+        const match = title.match(pattern);
+        if (match) {
+          titleAnalysis.vehicleModels.add(match[0].replace(/[-\s]+/g, ' ').trim());
+        }
+      });
+
+      // Extract part types
+      const partPatterns = [
+        /smart\s+key\s+fob/i,
+        /key\s+fob/i,
+        /keyless\s+entry/i,
+        /remote/i,
+        /proximity/i,
+        /smart\s+key/i
+      ];
+
+      partPatterns.forEach(pattern => {
+        const match = title.match(pattern);
+        if (match) {
+          titleAnalysis.partTypes.add(match[0].replace(/\s+/g, ' ').trim());
+        }
+      });
+
+      // Extract features
+      const featurePatterns = [
+        /oem/i,
+        /genuine/i,
+        /original/i,
+        /proximity/i,
+        /smart/i,
+        /keyless/i,
+        /315mhz/i,
+        /433mhz/i
+      ];
+
+      featurePatterns.forEach(pattern => {
+        const match = title.match(pattern);
+        if (match) {
+          titleAnalysis.features.add(match[0].toUpperCase());
+        }
+      });
+    });
+
+    // Build enhanced title from most common elements
+    const mostCommonYearRange = Array.from(titleAnalysis.yearRanges)[0];
+    const mostCommonVehicle = Array.from(titleAnalysis.vehicleModels)[0];
+    const mostCommonPartType = Array.from(titleAnalysis.partTypes)[0];
+    const topFeatures = Array.from(titleAnalysis.features).slice(0, 2);
+
+    // Extract part number from original title
+    const partNumber = originalTitle.match(/[A-Z0-9]{2,4}-[A-Z0-9]{5,}[A-Z0-9]*/i)?.[0];
+    const brand = originalTitle.match(/(Ford|GM|BMW|Mercedes|Toyota|Honda|Nissan)/i)?.[0];
+
+    // Build enhanced title
+    let enhancedTitle = originalTitle;
+    if (mostCommonVehicle && brand) {
+      const titleParts = [
+        topFeatures.includes('OEM') ? 'OEM' : '',
+        mostCommonYearRange,
+        brand,
+        mostCommonVehicle,
+        mostCommonPartType || 'Key Fob',
+        partNumber
+      ].filter(Boolean);
+
+      enhancedTitle = titleParts.join(' ').replace(/\s+/g, ' ').trim();
+      
+      // Ensure title stays under 80 characters for eBay
+      if (enhancedTitle.length > 80) {
+        enhancedTitle = titleParts.slice(0, -1).join(' ').replace(/\s+/g, ' ').trim();
+      }
+    }
+
+    // Build enhanced description
+    let enhancedDescription = '';
+    if (mostCommonVehicle && brand) {
+      enhancedDescription = `This ${topFeatures.includes('OEM') ? 'OEM' : 'genuine'} ${brand} ${mostCommonPartType || 'key fob'} is specifically designed for ${mostCommonYearRange ? mostCommonYearRange + ' ' : ''}${brand} ${mostCommonVehicle} vehicles. ${partNumber ? `Part number ${partNumber}. ` : ''}Features ${topFeatures.filter(f => f !== 'OEM').join(', ').toLowerCase()} functionality for reliable performance and seamless integration with your vehicle's security system.`;
+    }
+
+    const extractedInfo = {
+      yearRange: mostCommonYearRange,
+      vehicleModel: mostCommonVehicle,
+      partType: mostCommonPartType,
+      features: Array.from(titleAnalysis.features),
+      partNumber,
+      brand
+    };
+
+    console.log('✨ [EbayService] Title enhancement complete:', {
+      original: originalTitle,
+      enhanced: enhancedTitle,
+      extracted: extractedInfo
+    });
+
+    return {
+      enhancedTitle,
+      enhancedDescription,
+      extractedInfo
+    };
   }
 
   private static extractPriceResearchParams(listingData: any) {
@@ -286,6 +446,4 @@ export class EbayService {
       condition: listingData.condition || undefined
     };
   }
-
-
 }

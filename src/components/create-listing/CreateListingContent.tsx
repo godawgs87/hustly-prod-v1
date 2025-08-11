@@ -183,18 +183,38 @@ const CreateListingContent = ({
                   console.log('💰 [CreateListingContent] Price research completed with price:', suggestedPrice);
                   console.log('💰 [CreateListingContent] Current listingData.price before update:', listingData.price);
                   
+                  // Prepare updates object
+                  const updates: any = {};
+                  
                   if (suggestedPrice && suggestedPrice > 0) {
                     console.log('💰 [CreateListingContent] Calling onListingDataChange with price:', suggestedPrice);
-                    
-                    // Update the listing data in the parent component
-                    if (onListingDataChange) {
-                      onListingDataChange({ price: suggestedPrice });
-                      console.log('💰 [CreateListingContent] onListingDataChange called successfully');
-                    } else {
-                      console.error('💰 [CreateListingContent] onListingDataChange callback is missing!');
-                    }
+                    updates.price = suggestedPrice;
                   } else {
                     console.warn('💰 [CreateListingContent] Invalid suggested price received:', suggestedPrice);
+                  }
+                  
+                  // NEW: Apply enhanced title and description if available
+                  if (priceData?.enhancedTitle && priceData.enhancedTitle !== listingData.title) {
+                    console.log('✨ [CreateListingContent] Applying enhanced title:', {
+                      original: listingData.title,
+                      enhanced: priceData.enhancedTitle
+                    });
+                    updates.title = priceData.enhancedTitle;
+                  }
+                  
+                  if (priceData?.enhancedDescription && priceData.enhancedDescription !== listingData.description) {
+                    console.log('✨ [CreateListingContent] Applying enhanced description');
+                    updates.description = priceData.enhancedDescription;
+                  }
+                  
+                  // Update the listing data in the parent component
+                  if (Object.keys(updates).length > 0 && onListingDataChange) {
+                    onListingDataChange(updates);
+                    console.log('💰 [CreateListingContent] onListingDataChange called with updates:', Object.keys(updates));
+                  } else if (Object.keys(updates).length === 0) {
+                    console.warn('💰 [CreateListingContent] No updates to apply');
+                  } else {
+                    console.error('💰 [CreateListingContent] onListingDataChange callback is missing!');
                   }
                 }}
                 onComplete={() => {

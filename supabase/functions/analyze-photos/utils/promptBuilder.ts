@@ -194,13 +194,17 @@ VALUE RECOGNITION PATTERNS:
 - Antiques: Sterling, 14k/18k, signed, numbered, documented
 - Automotive OEM: Ford part numbers (NL3T, ML3T, etc.), GM (ACDelco), Mopar, BMW, Mercedes
 
-AUTOMOTIVE PART NUMBER EXPERTISE:
-- Extract vehicle-specific compatibility from OEM part numbers and visible text
-- OEM vs Aftermarket: OEM parts command premium pricing, aftermarket are budget alternatives  
-- Part number patterns indicate specific vehicle make/model/year compatibility
-- Include frequency (315MHz/433MHz), part type, and fitment years in analysis
-- Research actual market value ranges for specific OEM parts vs generic alternatives
-- Identify vehicle-specific features that affect pricing (smart keys, proximity, etc.)
+AUTOMOTIVE VISUAL ANALYSIS EXPERTISE:
+- CRITICAL: Read ALL visible text, part numbers, FCC IDs, and markings with precision
+- Analyze design sophistication: modern smart keys = newer vehicles (2020+), basic remotes = older vehicles
+- Research part number patterns contextually - don't guess, use your knowledge of automotive systems
+- Cross-reference multiple visual clues: logo + part number + design style + button layout
+- For Ford parts: NL3T prefix typically indicates F-150 Lightning, DS7T indicates Mustang, etc.
+- For BMW parts: Look for series indicators (3, 5, 7 series) in part numbers or design
+- For Mercedes: Look for class indicators (C-Class, E-Class) and year ranges
+- Smart key features (proximity, push-button start) indicate premium vehicles and newer years
+- Include specific vehicle model, year range, and all visible part numbers in title
+- Research frequency bands (315MHz/433MHz) and include in technical specifications
 
 AUTOMOTIVE TITLE EXAMPLES (follow these patterns for better sales):
 - "OEM 2022-2025 FORD F-150 LIGHTNING Smart Key Fob NL3T-15K601-EC"
