@@ -305,10 +305,13 @@ export class EbayService {
       // For specific vehicle model parts, create highly targeted query
       const partNumber = title.match(/[A-Z0-9]{2,4}-?[A-Z0-9]{5,8}/i)?.[0];
       if (partNumber) {
-        queryParts = [brand, automotiveEnhancement.vehicleModel, partNumber, 'OEM'].filter(Boolean);
-        console.log('🚗 [EbayService] Using specialized automotive query for vehicle-specific part:', automotiveEnhancement.vehicleModel);
+        // Extract just the core part number (e.g., NL3T-15K601 from NL3T-15K601-EC)
+        const corePartNumber = partNumber.replace(/-[A-Z0-9]{1,3}$/i, '');
+        queryParts = [brand, automotiveEnhancement.vehicleModel, corePartNumber, 'OEM'].filter(Boolean);
+        console.log('🚗 [EbayService] Using specialized automotive query with part number:', corePartNumber);
       } else {
         queryParts = [brand, automotiveEnhancement.vehicleModel, 'OEM'].filter(Boolean);
+        console.log('🚗 [EbayService] Using specialized automotive query without part number');
       }
     } else {
       // Add core product terms (prioritize meaningful words, avoid duplicates)
