@@ -163,279 +163,129 @@ export class EbayService {
     
     console.log('🔍 [EbayService] Extracting params from:', { title, brand, category, condition });
     
-    // For better price accuracy, use a more comprehensive approach
-    let searchTerms = [];
+    // Smart reseller approach: Preserve valuable specificity from AI-generated titles
+    let queryParts = [];
     
-    // Always include brand if available and meaningful
-    if (brand && brand.toLowerCase() !== 'unknown' && brand.length > 2) {
-      searchTerms.push(brand);
-    }
-    
-    // Extract core product name from title (first few meaningful words)
-    const titleWords = title.split(' ').filter(word => 
-      word.length > 2 && 
-      !['the', 'and', 'for', 'with', 'size', 'color'].includes(word.toLowerCase())
-    );
-    
-    // Add first 2-3 key product words (after brand if present)
-    const productWords = titleWords.slice(brand ? 1 : 0, 4);
-    searchTerms.push(...productWords);
-    
-    // Extract model numbers and part numbers from title (more comprehensive patterns)
-    const modelPatterns = [
-      /([A-Z]{2,}[0-9]{3,}[A-Z]*)/g,  // DCF888B, XR20V, etc.
-      /([0-9]{1,2}V\s*MAX)/gi,        // 20V MAX, 18V MAX
-      /([A-Z0-9]{3,}-[A-Z0-9]{3,})/g, // ABC-123, XYZ-456
-      /(Model\s*[:#]?\s*([A-Z0-9-]+))/gi // Model: ABC123
-    ];
-    
-    modelPatterns.forEach(pattern => {
-      const matches = title.match(pattern);
-      if (matches) {
-        matches.forEach(match => {
-          const cleanMatch = match.replace(/Model\s*[:#]?\s*/gi, '').trim();
-          if (cleanMatch.length >= 3) {
-            searchTerms.push(cleanMatch);
-          }
+    // 1. For automotive parts, preserve the full context that buyers search for
+    if (title.match(/OEM|Genuine|Original/i) && 
+        (title.match(/Ford|GM|BMW|Mercedes|Toyota|Honda|Nissan|Volkswagen/i) || 
+         title.match(/[A-Z0-9]{2,4}-[A-Z0-9]{5,}/i))) {
+      
+      // Extract year range (e.g., "2022-2025")
+      const yearRange = title.match(/20\d{2}[-–]20\d{2}/)?.[0];
+      
+      // Extract make (Ford, BMW, etc.)
+      const make = title.match(/(Ford|GM|Chevrolet|BMW|Mercedes|Toyota|Honda|Nissan|Volkswagen|Audi|Lexus)/i)?.[0];
+      
+      // Extract model (F-150 Lightning, Mustang, 3 Series, etc.)
+      const modelMatch = title.match(/(F-150 Lightning|F-150|Mustang|Explorer|Escape|Corvette|Camaro|3 Series|C-Class|Camry|Accord|Altima)/i)?.[0];
+      
+      // Extract part type (Smart Key Fob, Remote, etc.)
+      const partType = title.match(/(Smart Key Fob|Key Fob|Remote|Keyless Entry|Smart Key)/i)?.[0];
+      
+      // Extract part number (NL3T-15K601-EC, etc.)
+      const partNumber = title.match(/[A-Z0-9]{2,4}-[A-Z0-9]{5,}[A-Z0-9]*/i)?.[0];
+      
+      // Build automotive query with the components that matter
+      if (make && partNumber) {
+        queryParts = [
+          'OEM',
+          yearRange,
+          make,
+          modelMatch,
+          partType,
+          partNumber
+        ].filter(Boolean);
+        
+        console.log('🚗 [EbayService] Automotive query components:', {
+          yearRange, make, model: modelMatch, partType, partNumber
         });
       }
-    });
+    }
     
-    // Add specific product identifiers for common categories
-    const categorySpecificTerms = {
-      'Clothing': {
-        'shoes': ['slides', 'sandals', 'sneakers', 'boots', 'loafers'],
-        'apparel': ['shirt', 'pants', 'dress', 'jacket', 'coat']
-      },
-      'Toys': {
-        'nerf': ['blaster', 'gun', 'dart', 'elite', 'disruptor'],
-        'action': ['figure', 'toy', 'collectible']
-      },
-      'Electronics': ['phone', 'tablet', 'laptop', 'headphones', 'speaker'],
-      'Tools': ['drill', 'driver', 'impact', 'saw', 'grinder']
-    };
-    
-    // Add category-specific terms if they match
-    const titleLower = title.toLowerCase();
-    Object.entries(categorySpecificTerms).forEach(([cat, terms]) => {
-      if (category.toLowerCase().includes(cat.toLowerCase())) {
-        if (Array.isArray(terms)) {
-          // Handle array of strings
-          terms.forEach(keyword => {
-            if (titleLower.includes(keyword.toLowerCase())) {
-              searchTerms.push(keyword);
+    // 2. For non-automotive items, use smart extraction
+    if (queryParts.length === 0) {
+      // Extract brand if meaningful
+      if (brand && brand.toLowerCase() !== 'unknown' && brand.toLowerCase() !== 'unbranded') {
+        queryParts.push(brand);
+      }
+      
+      // Extract model/part numbers (universal patterns)
+      const identifierPatterns = [
+        /\b([A-Z0-9]{2,}-[A-Z0-9]{3,})\b/g,     // ABC-123 style
+        /\b([A-Z]{2,}[0-9]{3,}[A-Z0-9]*)\b/g,   // ABC123X style
+        /\b(Model\s*[:#]?\s*([A-Z0-9-]+))\b/gi  // Model: ABC123
+      ];
+      
+      const foundIdentifiers = new Set();
+      identifierPatterns.forEach(pattern => {
+        const matches = title.match(pattern);
+        if (matches) {
+          matches.forEach(match => {
+            const clean = match.replace(/Model\s*[:#]?\s*/gi, '').trim();
+            if (clean.length >= 3 && clean.length <= 20) {
+              foundIdentifiers.add(clean);
             }
           });
-        } else if (typeof terms === 'object' && terms !== null) {
-          // Handle nested object structure
-          Object.values(terms).forEach((keywords: any) => {
-            if (Array.isArray(keywords)) {
-              keywords.forEach(keyword => {
-                if (titleLower.includes(keyword.toLowerCase())) {
-                  searchTerms.push(keyword);
-                }
-              });
-            }
-          });
+        }
+      });
+      
+      // Add the most specific identifier
+      if (foundIdentifiers.size > 0) {
+        const bestIdentifier = Array.from(foundIdentifiers)
+          .sort((a: string, b: string) => b.length - a.length)[0];
+        queryParts.push(bestIdentifier);
+      }
+      
+      // Add 2-3 key descriptive words
+      const titleWords = title.split(/\s+/)
+        .filter(word => {
+          const skip = ['the', 'and', 'for', 'with', 'new', 'used', 'oem', 'genuine', 'original'];
+          return word.length > 2 && !skip.includes(word.toLowerCase());
+        })
+        .filter(word => !/^[0-9]+$/.test(word) && !/^[A-Z]$/.test(word));
+      
+      const descriptiveWords = titleWords
+        .filter(word => {
+          const wordLower = word.toLowerCase();
+          return wordLower !== brand?.toLowerCase() && 
+                 !foundIdentifiers.has(word) &&
+                 !queryParts.some(part => typeof part === 'string' && part.toLowerCase() === wordLower);
+        })
+        .slice(0, 3);
+      
+      queryParts.push(...descriptiveWords);
+    }
+    
+    // 3. Remove duplicates and limit to 6 terms max
+    const uniqueQueryParts = [];
+    const seen = new Set();
+    queryParts.forEach(part => {
+      if (part && typeof part === 'string') {
+        const lower = part.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          uniqueQueryParts.push(part);
         }
       }
     });
     
-    // Extract size and quantity descriptors
-    const sizeDescriptors = [
-      /\b(\d+)[-\s]?(slice|cup|quart|gallon|inch|ft|piece|pack|set)s?\b/gi,
-      /\b(small|medium|large|extra large|xl|mini|compact|full size)\b/gi,
-      /\b(single|double|triple|quad)\b/gi
-    ];
+    const query = uniqueQueryParts.slice(0, 6).join(' ').trim();
     
-    sizeDescriptors.forEach(pattern => {
-      const matches = title.match(pattern);
-      if (matches) {
-        matches.forEach(match => {
-          searchTerms.push(match.trim());
-        });
-      }
-    });
-    
-    // Extract feature descriptors (avoid duplicates)
-    const featureKeywords = [
-      'brushless', 'cordless', 'battery', 'rechargeable', 'wireless', 'bluetooth',
-      'digital', 'analog', 'automatic', 'manual', 'programmable', 'smart',
-      'stainless steel', 'black', 'white', 'red', 'blue', 'silver',
-      'led', 'lcd', 'touch', 'voice', 'remote control'
-    ];
-    
-    featureKeywords.forEach(keyword => {
-      if (titleLower.includes(keyword.toLowerCase()) && 
-          !searchTerms.some(term => term.toLowerCase() === keyword.toLowerCase())) {
-        searchTerms.push(keyword);
-      }
-    });
-    
-    // Extract year if present (for better matching)
-    const yearMatch = title.match(/(20[0-9]{2})/);
-    if (yearMatch) {
-      searchTerms.push(yearMatch[0]);
-    }
-
-    // Enhanced automotive part number detection and vehicle model identification
-    const automotiveEnhancement = this.enhanceAutomotiveQuery(title, brand, searchTerms);
-    if (automotiveEnhancement.vehicleModel) {
-      searchTerms.push(...automotiveEnhancement.additionalTerms);
-    }
-    
-    // Remove duplicates and create focused query (case-insensitive deduplication)
-    const uniqueTerms = searchTerms
-      .map(term => term.trim())
-      .filter(term => term.length > 1)
-      .filter((term, index, arr) => 
-        arr.findIndex(t => t.toLowerCase() === term.toLowerCase()) === index
-      );
-    
-    // Build comprehensive but focused query
-    let queryParts = [];
-    
-    // Start with brand if available
-    if (brand && brand.toLowerCase() !== 'unknown' && brand.length > 2) {
-      queryParts.push(brand);
-    }
-    
-    // Special handling for automotive OEM parts to improve specificity
-    if (automotiveEnhancement.vehicleModel) {
-      // For specific vehicle model parts, create highly targeted query
-      const partNumber = title.match(/[A-Z0-9]{2,4}-?[A-Z0-9]{5,8}/i)?.[0];
-      if (partNumber) {
-        // Extract just the core part number (e.g., NL3T-15K601 from NL3T-15K601-EC)
-        const corePartNumber = partNumber.replace(/-[A-Z0-9]{1,3}$/i, '');
-        queryParts = [brand, automotiveEnhancement.vehicleModel, corePartNumber, 'OEM'].filter(Boolean);
-        console.log('🚗 [EbayService] Using specialized automotive query with part number:', corePartNumber);
-      } else {
-        queryParts = [brand, automotiveEnhancement.vehicleModel, 'OEM'].filter(Boolean);
-        console.log('🚗 [EbayService] Using specialized automotive query without part number');
-      }
-    } else {
-      // Add core product terms (prioritize meaningful words, avoid duplicates)
-      const coreTerms = uniqueTerms
-        .filter(term => 
-          term.toLowerCase() !== brand.toLowerCase() && 
-          term.length > 2 &&
-          !['used', 'new', 'condition', 'item'].includes(term.toLowerCase())
-        )
-        .slice(0, 4); // Keep it focused but comprehensive
-      
-      queryParts.push(...coreTerms);
-    }
-    
-    // Create the final query - remove any remaining duplicates
-    const finalQueryParts = queryParts.filter((part, index, arr) => 
-      arr.findIndex(p => p.toLowerCase() === part.toLowerCase()) === index
-    );
-    const query = finalQueryParts.join(' ').trim();
-    
-    console.log('🎯 [EbayService] Final search query:', query);
-    console.log('📊 [EbayService] Query components:', { brand, condition });
-    
-    console.log('🏷️ [EbayService] Extracted price research params:', {
+    console.log('🎯 [EbayService] Smart query built:', {
       query,
-      brand: brand || undefined,
-      condition: listingData.condition || undefined,
-      extractedTerms: uniqueTerms
+      brand,
+      condition,
+      termCount: uniqueQueryParts.length,
+      isAutomotive: title.match(/OEM|Genuine/i) ? true : false
     });
     
     return {
-      query,
+      query: query || title.split(' ').slice(0, 5).join(' '), // Fallback to first 5 words
       brand: brand || undefined,
       condition: listingData.condition || undefined
     };
   }
 
-  private static enhanceAutomotiveQuery(title: string, brand: string, existingTerms: string[]): {
-    vehicleModel: string | null;
-    additionalTerms: string[];
-  } {
-    const titleLower = title.toLowerCase();
-    const additionalTerms: string[] = [];
-    let vehicleModel: string | null = null;
 
-    // Ford part number patterns and vehicle identification
-    if (brand?.toLowerCase() === 'ford') {
-      // Ford F-150 Lightning (Electric Truck) - NL3T prefix
-      if (title.match(/NL3T-?15K601/i)) {
-        vehicleModel = 'F-150 Lightning';
-        additionalTerms.push('F-150', 'Lightning', 'Electric', 'Truck', '2022', '2023', '2024');
-      }
-      // Ford F-150 (Regular) - FL3T prefix
-      else if (title.match(/FL3T-?15K601/i)) {
-        vehicleModel = 'F-150';
-        additionalTerms.push('F-150', 'Truck', '2021', '2022', '2023', '2024');
-      }
-      // Ford Mustang - DS7T prefix
-      else if (title.match(/DS7T-?15K601/i)) {
-        vehicleModel = 'Mustang';
-        additionalTerms.push('Mustang', 'Sports Car', '2015', '2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023');
-      }
-      // Ford Explorer - BB5T prefix
-      else if (title.match(/BB5T-?15K601/i)) {
-        vehicleModel = 'Explorer';
-        additionalTerms.push('Explorer', 'SUV', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019');
-      }
-      // Ford Escape - CJ5T prefix
-      else if (title.match(/CJ5T-?15K601/i)) {
-        vehicleModel = 'Escape';
-        additionalTerms.push('Escape', 'SUV', 'Crossover', '2013', '2014', '2015', '2016', '2017', '2018', '2019');
-      }
-    }
-
-    // GM/Chevrolet part number patterns
-    else if (brand?.toLowerCase().includes('gm') || brand?.toLowerCase().includes('chevrolet')) {
-      // Corvette - specific part number patterns
-      if (title.match(/1364[0-9]/i)) {
-        vehicleModel = 'Corvette';
-        additionalTerms.push('Corvette', 'Sports Car', 'C7', 'C8');
-      }
-      // Camaro - specific patterns
-      else if (title.match(/2323[0-9]/i)) {
-        vehicleModel = 'Camaro';
-        additionalTerms.push('Camaro', 'Sports Car', 'SS', 'ZL1');
-      }
-    }
-
-    // BMW part number patterns
-    else if (brand?.toLowerCase() === 'bmw') {
-      // 3 Series - 6135 prefix
-      if (title.match(/6135[0-9]/i)) {
-        vehicleModel = '3 Series';
-        additionalTerms.push('3 Series', 'Sedan', 'BMW');
-      }
-    }
-
-    // Generic automotive keywords enhancement
-    if (titleLower.includes('key fob') || titleLower.includes('remote') || titleLower.includes('keyless')) {
-      additionalTerms.push('Key Fob', 'Remote Entry', 'Keyless Entry');
-      
-      // Add frequency-specific terms for key fobs
-      if (title.match(/315\s?mhz/i)) {
-        additionalTerms.push('315MHz');
-      }
-      if (title.match(/433\s?mhz/i)) {
-        additionalTerms.push('433MHz');
-      }
-    }
-
-    // Filter out terms that already exist (case-insensitive)
-    const filteredTerms = additionalTerms.filter(term => 
-      !existingTerms.some(existing => existing.toLowerCase() === term.toLowerCase())
-    );
-
-    console.log('🚗 [EbayService] Automotive enhancement:', {
-      vehicleModel,
-      additionalTerms: filteredTerms,
-      originalTitle: title
-    });
-
-    return {
-      vehicleModel,
-      additionalTerms: filteredTerms
-    };
-  }
 }
