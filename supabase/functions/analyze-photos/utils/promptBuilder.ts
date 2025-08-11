@@ -154,7 +154,7 @@ ADAPTIVE FIELD RULES:
 - Toys: category_specific includes series, character, year, completeness, packaging_status
 - Books: category_specific includes author, publisher, edition, printing, isbn
 - Tools: category_specific includes power_type, capacity, professional_grade, specialty
-- Automotive: category_specific includes part_type, OEM_status, fitment_years, make_model
+- Automotive: category_specific includes part_type, OEM_status, fitment_years, make_model, vehicle_specific_compatibility
 
 MEASUREMENT ADAPTATION:
 - Clothing: Include chest, sleeve, shoulder, waist, inseam in other_measurements
@@ -191,6 +191,15 @@ VALUE RECOGNITION PATTERNS:
 - Collectible toys: First edition, prototype, error variant
 - Trading cards: Rookie, 1st edition, holographic, numbered
 - Antiques: Sterling, 14k/18k, signed, numbered, documented
+- Automotive OEM: Ford part numbers (NL3T, ML3T, etc.), GM (ACDelco), Mopar, BMW, Mercedes
+
+AUTOMOTIVE PART NUMBER EXPERTISE:
+- Extract vehicle-specific compatibility from OEM part numbers and visible text
+- OEM vs Aftermarket: OEM parts command premium pricing, aftermarket are budget alternatives  
+- Part number patterns indicate specific vehicle make/model/year compatibility
+- Include frequency (315MHz/433MHz), part type, and fitment years in analysis
+- Research actual market value ranges for specific OEM parts vs generic alternatives
+- Identify vehicle-specific features that affect pricing (smart keys, proximity, etc.)
 
 SPECIAL FLAGS:
 - Potential high value: Flag items with luxury brands or rare indicators

@@ -300,16 +300,28 @@ export class EbayService {
       queryParts.push(brand);
     }
     
-    // Add core product terms (prioritize meaningful words, avoid duplicates)
-    const coreTerms = uniqueTerms
-      .filter(term => 
-        term.toLowerCase() !== brand.toLowerCase() && 
-        term.length > 2 &&
-        !['used', 'new', 'condition', 'item'].includes(term.toLowerCase())
-      )
-      .slice(0, 4); // Keep it focused but comprehensive
-    
-    queryParts.push(...coreTerms);
+    // Special handling for automotive OEM parts to improve specificity
+    if (automotiveEnhancement.vehicleModel) {
+      // For specific vehicle model parts, create highly targeted query
+      const partNumber = title.match(/[A-Z0-9]{2,4}-?[A-Z0-9]{5,8}/i)?.[0];
+      if (partNumber) {
+        queryParts = [brand, automotiveEnhancement.vehicleModel, partNumber, 'OEM'].filter(Boolean);
+        console.log('🚗 [EbayService] Using specialized automotive query for vehicle-specific part:', automotiveEnhancement.vehicleModel);
+      } else {
+        queryParts = [brand, automotiveEnhancement.vehicleModel, 'OEM'].filter(Boolean);
+      }
+    } else {
+      // Add core product terms (prioritize meaningful words, avoid duplicates)
+      const coreTerms = uniqueTerms
+        .filter(term => 
+          term.toLowerCase() !== brand.toLowerCase() && 
+          term.length > 2 &&
+          !['used', 'new', 'condition', 'item'].includes(term.toLowerCase())
+        )
+        .slice(0, 4); // Keep it focused but comprehensive
+      
+      queryParts.push(...coreTerms);
+    }
     
     // Create the final query - remove any remaining duplicates
     const finalQueryParts = queryParts.filter((part, index, arr) => 
@@ -318,7 +330,7 @@ export class EbayService {
     const query = finalQueryParts.join(' ').trim();
     
     console.log('🎯 [EbayService] Final search query:', query);
-    console.log('📊 [EbayService] Query components:', { brand, coreTerms, condition });
+    console.log('📊 [EbayService] Query components:', { brand, condition });
     
     console.log('🏷️ [EbayService] Extracted price research params:', {
       query,
