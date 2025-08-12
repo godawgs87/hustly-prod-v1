@@ -97,6 +97,22 @@ serve(async (req) => {
       expires_at: account.oauth_expires_at
     });
 
+    // Use the correct token field - oauth_token is the actual access token
+    const accessToken = account.oauth_token || account.access_token;
+    
+    if (!accessToken) {
+      throw new Error('No valid eBay access token found');
+    }
+
+    // Check if token is expired
+    const expiresAt = account.oauth_expires_at ? new Date(account.oauth_expires_at) : null;
+    const now = new Date();
+    
+    if (expiresAt && expiresAt <= now) {
+      console.log('⚠️ Token expired, needs refresh');
+      throw new Error('eBay token expired. Please reconnect your eBay account.');
+    }
+
     const ebayClientId = Deno.env.get('EBAY_CLIENT_ID');
     const ebayClientSecret = Deno.env.get('EBAY_CLIENT_SECRET');
     const credentials = btoa(`${ebayClientId}:${ebayClientSecret}`);
@@ -108,7 +124,7 @@ serve(async (req) => {
         const response = await fetch('https://api.ebay.com/sell/inventory/v1/offer?limit=100', {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${account.oauth_token}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Accept-Language': 'en-US'
@@ -138,10 +154,9 @@ serve(async (req) => {
             const itemResponse = await fetch(`https://api.ebay.com/sell/inventory/v1/inventory_item/${encodeURIComponent(offer.sku)}`, {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${account.oauth_token}`,
+                'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Accept-Language': 'en-US'
+                'Accept': 'application/json'
               }
             });
             
@@ -182,7 +197,7 @@ serve(async (req) => {
           {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${account.oauth_token}`,
+              'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             }
@@ -382,13 +397,13 @@ serve(async (req) => {
               'X-EBAY-API-SITEID': '0',
               'X-EBAY-API-COMPATIBILITY-LEVEL': '1157',
               'X-EBAY-API-CALL-NAME': 'GetMyeBaySelling',
-              'X-EBAY-API-IAF-TOKEN': account.oauth_token,
+              'X-EBAY-API-IAF-TOKEN': accessToken,
               'Content-Type': 'text/xml',
             },
             body: `<?xml version="1.0" encoding="utf-8"?>
               <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
                 <RequesterCredentials>
-                  <eBayAuthToken>${account.oauth_token}</eBayAuthToken>
+                  <eBayAuthToken>${accessToken}</eBayAuthToken>
                 </RequesterCredentials>
                 <ActiveList>
                   <Include>true</Include>
