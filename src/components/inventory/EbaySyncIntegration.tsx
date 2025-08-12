@@ -99,9 +99,12 @@ const EbaySyncIntegration = ({
     try {
       // Step 1: Fetch listings from eBay (30% progress)
       setImportProgress(10);
-      const ebayListings = await EbayService.importInventory();
+      const response = await EbayService.importInventory();
       setImportProgress(30);
 
+      // Extract listings from the response object
+      const ebayListings = response?.listings || [];
+      
       if (!ebayListings || ebayListings.length === 0) {
         setImportResult({
           success: false,

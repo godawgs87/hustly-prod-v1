@@ -74,17 +74,28 @@ serve(async (req) => {
 
     const { action, ...params } = await req.json();
     console.log('🔄 [EBAY-INVENTORY-IMPORT] Action:', action, 'User:', user.id);
+    console.log('🔍 [EBAY-INVENTORY-IMPORT] Checking marketplace_accounts table for eBay connection...');
 
-    // Get user's eBay account
+    // Get user's eBay connection from marketplace_accounts table
     const { data: account, error: accountError } = await supabase
-      .from('ebay_accounts')
+      .from('marketplace_accounts')
       .select('*')
       .eq('user_id', user.id)
+      .eq('platform', 'ebay')
       .single();
 
     if (accountError || !account) {
       throw new Error('No eBay account connected');
     }
+
+    // Debug: Log account fields to see what's available
+    console.log('🔍 [EBAY-INVENTORY-IMPORT] Account fields:', {
+      has_oauth_token: !!account.oauth_token,
+      has_access_token: !!account.access_token,
+      oauth_token_preview: account.oauth_token ? account.oauth_token.substring(0, 20) + '...' : 'null',
+      access_token_preview: account.access_token ? account.access_token.substring(0, 20) + '...' : 'null',
+      expires_at: account.oauth_expires_at
+    });
 
     const ebayClientId = Deno.env.get('EBAY_CLIENT_ID');
     const ebayClientSecret = Deno.env.get('EBAY_CLIENT_SECRET');
@@ -92,31 +103,15 @@ serve(async (req) => {
 
     switch (action) {
       case 'get_active_listings': {
-        // Get active listings from eBay Trading API
-        const response = await fetch('https://api.ebay.com/ws/api.dll', {
-          method: 'POST',
+        // Get active listings from eBay REST API (Inventory API)
+        const response = await fetch('https://api.ebay.com/sell/inventory/v1/inventory_item', {
+          method: 'GET',
           headers: {
-            'X-EBAY-API-SITEID': '0', // US site
-            'X-EBAY-API-COMPATIBILITY-LEVEL': '1157',
-            'X-EBAY-API-CALL-NAME': 'GetMyeBaySelling',
-            'X-EBAY-API-IAF-TOKEN': account.access_token,
-            'Content-Type': 'text/xml',
-          },
-          body: `<?xml version="1.0" encoding="utf-8"?>
-            <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
-              <RequesterCredentials>
-                <eBayAuthToken>${account.access_token}</eBayAuthToken>
-              </RequesterCredentials>
-              <ActiveList>
-                <Include>true</Include>
-                <Pagination>
-                  <EntriesPerPage>${params.limit || 100}</EntriesPerPage>
-                  <PageNumber>${params.page || 1}</PageNumber>
-                </Pagination>
-              </ActiveList>
-              <DetailLevel>ReturnAll</DetailLevel>
-              <OutputSelector>ActiveList.ItemArray.Item</OutputSelector>
-            </GetMyeBaySellingRequest>`
+            'Authorization': `Bearer ${account.oauth_token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Accept-Language': 'en-US'
+          }
         });
 
         if (!response.ok) {
@@ -125,10 +120,10 @@ serve(async (req) => {
           throw new Error(`eBay API Error: ${response.statusText}`);
         }
 
-        const xmlText = await response.text();
+        const jsonResponse = await response.json();
         
-        // Parse XML response (simplified - in production use proper XML parser)
-        const items = parseEbayXmlResponse(xmlText);
+        // Parse REST API response - inventory items
+        const items = jsonResponse.inventoryItems || [];
         
         console.log(`✅ Found ${items.length} active listings`);
         
@@ -151,7 +146,7 @@ serve(async (req) => {
           {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${account.access_token}`,
+              'Authorization': `Bearer ${account.oauth_token}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             }
@@ -313,13 +308,13 @@ serve(async (req) => {
               'X-EBAY-API-SITEID': '0',
               'X-EBAY-API-COMPATIBILITY-LEVEL': '1157',
               'X-EBAY-API-CALL-NAME': 'GetMyeBaySelling',
-              'X-EBAY-API-IAF-TOKEN': account.access_token,
+              'X-EBAY-API-IAF-TOKEN': account.oauth_token,
               'Content-Type': 'text/xml',
             },
             body: `<?xml version="1.0" encoding="utf-8"?>
               <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
                 <RequesterCredentials>
-                  <eBayAuthToken>${account.access_token}</eBayAuthToken>
+                  <eBayAuthToken>${account.oauth_token}</eBayAuthToken>
                 </RequesterCredentials>
                 <ActiveList>
                   <Include>true</Include>

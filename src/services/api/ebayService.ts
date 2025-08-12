@@ -136,7 +136,7 @@ export class EbayService {
   }
 
   static async importToHustly(listings: any[]) {
-    console.log(`📥 [EbayService] Importing ${listings.length} listings to Hustly`);
+    console.log(`📥 [EbayService] Importing ${listings?.length || 0} listings to Hustly`);
     const { data, error } = await supabase.functions.invoke('ebay-inventory-import', {
       body: { 
         action: 'import_to_hustly',

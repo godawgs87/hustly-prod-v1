@@ -32,11 +32,12 @@ serve(async (req) => {
     const { action, ...params } = await req.json();
     console.log('🔧 [EBAY-CRUD] Action:', action, 'User:', user.id);
 
-    // Get user's eBay account
+    // Get user's eBay connection from marketplace_accounts table
     const { data: account, error: accountError } = await supabase
-      .from('ebay_accounts')
+      .from('marketplace_accounts')
       .select('*')
       .eq('user_id', user.id)
+      .eq('platform', 'ebay')
       .single();
 
     if (accountError || !account) {
