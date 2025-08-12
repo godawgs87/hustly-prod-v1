@@ -127,6 +127,11 @@ serve(async (req) => {
         
         console.log(`✅ Found ${items.length} active listings`);
         
+        // Debug: Log full response, first few items, and their keys
+        console.log('🔍 [DEBUG] Full response:', JSON.stringify(jsonResponse, null, 2));
+        console.log('🔍 [DEBUG] First 3 items structure:', JSON.stringify(items.slice(0, 3), null, 2));
+        console.log('🔍 [DEBUG] Sample item keys:', items[0] ? Object.keys(items[0]) : 'No items');
+        
         return new Response(JSON.stringify({
           success: true,
           listings: items,
@@ -183,16 +188,35 @@ serve(async (req) => {
 
         console.log(`📥 Importing ${listings.length} listings to Hustly`);
         
-        const importResults = [];
+        const importResults: any[] = [];
         
-        for (const ebayListing of listings) {
+        for (const inventoryItem of listings) {
           try {
-            // Check if listing already exists
+            // Skip items without product data
+            if (!inventoryItem.product) {
+              console.log(`⚠️ Skipping item ${inventoryItem.sku}: No product data`);
+              continue;
+            }
+
+            // Map Inventory API format to our database format
+            const title = inventoryItem.product?.title || 'Untitled Item';
+            const description = inventoryItem.product?.description || '';
+            const sku = inventoryItem.sku;
+            const condition = inventoryItem.condition || 'USED_GOOD';
+            const quantity = inventoryItem.availability?.shipToLocationAvailability?.quantity || 1;
+            const imageUrls = inventoryItem.product?.imageUrls || [];
+            
+            // Note: Inventory items don't have prices - they're set when creating offers
+            // We'll use a placeholder price of 0 for now
+            const price = 0;
+
+            // Check if listing already exists by SKU (use title as fallback since we might not have ebay_sku column)
             const { data: existingListing } = await supabase
               .from('listings')
               .select('id')
-              .eq('ebay_item_id', ebayListing.itemId)
+              .eq('title', title)
               .eq('user_id', user.id)
+              .eq('platform', 'ebay')
               .single();
 
             if (existingListing) {
@@ -200,12 +224,10 @@ serve(async (req) => {
               const { data: updated, error: updateError } = await supabase
                 .from('listings')
                 .update({
-                  title: ebayListing.title,
-                  price: parseFloat(ebayListing.price.value),
-                  condition: mapEbayCondition(ebayListing.conditionId),
-                  ebay_category_id: ebayListing.categoryId,
-                  quantity: ebayListing.quantity || 1,
-                  status: mapEbayStatus(ebayListing.sellingStatus?.sellingState),
+                  title: title,
+                  description: description,
+                  condition: mapInventoryCondition(condition),
+                  quantity: quantity,
                   updated_at: new Date().toISOString(),
                   ebay_sync_status: 'synced',
                   ebay_last_sync: new Date().toISOString()
@@ -217,7 +239,7 @@ serve(async (req) => {
               if (updateError) throw updateError;
               
               importResults.push({
-                itemId: ebayListing.itemId,
+                sku: sku,
                 listingId: existingListing.id,
                 action: 'updated',
                 success: true
@@ -228,14 +250,13 @@ serve(async (req) => {
                 .from('listings')
                 .insert({
                   user_id: user.id,
-                  title: ebayListing.title,
-                  description: ebayListing.description || '',
-                  price: parseFloat(ebayListing.price.value),
-                  condition: mapEbayCondition(ebayListing.conditionId),
-                  ebay_item_id: ebayListing.itemId,
-                  ebay_category_id: ebayListing.categoryId,
-                  quantity: ebayListing.quantity || 1,
-                  status: mapEbayStatus(ebayListing.sellingStatus?.sellingState),
+                  title: title,
+                  // Store SKU in description since we might not have ebay_sku column
+                  description: description + `\n\n[eBay SKU: ${sku}]`,
+                  price: price, // Placeholder - inventory items don't have prices
+                  condition: mapInventoryCondition(condition),
+                  quantity: quantity,
+                  status: 'draft', // Inventory items are not necessarily active
                   platform: 'ebay',
                   ebay_sync_status: 'synced',
                   ebay_last_sync: new Date().toISOString(),
@@ -248,13 +269,13 @@ serve(async (req) => {
               if (createError) throw createError;
               
               // Import images if available
-              if (ebayListing.pictureURLLarge && ebayListing.pictureURLLarge.length > 0) {
-                for (let i = 0; i < ebayListing.pictureURLLarge.length; i++) {
+              if (imageUrls.length > 0) {
+                for (let i = 0; i < imageUrls.length; i++) {
                   await supabase
                     .from('listing_images')
                     .insert({
                       listing_id: created.id,
-                      image_url: ebayListing.pictureURLLarge[i],
+                      image_url: imageUrls[i],
                       display_order: i,
                       created_at: new Date().toISOString()
                     });
@@ -262,16 +283,16 @@ serve(async (req) => {
               }
               
               importResults.push({
-                itemId: ebayListing.itemId,
+                sku: sku,
                 listingId: created.id,
                 action: 'created',
                 success: true
               });
             }
           } catch (error) {
-            console.error(`❌ Failed to import listing ${ebayListing.itemId}:`, error);
+            console.error(`❌ Failed to import listing ${inventoryItem.sku}:`, error);
             importResults.push({
-              itemId: ebayListing.itemId,
+              sku: inventoryItem.sku,
               action: 'failed',
               success: false,
               error: error.message
@@ -424,6 +445,29 @@ function mapEbayCondition(conditionId: string): string {
   };
   
   return conditionMap[conditionId] || 'used_good';
+}
+
+function mapInventoryCondition(condition: string): string {
+  // Map eBay Inventory API condition values to our database values
+  const conditionMap: Record<string, string> = {
+    'NEW': 'new',
+    'LIKE_NEW': 'used_excellent',
+    'NEW_OTHER': 'new_other',
+    'NEW_WITH_DEFECTS': 'new_with_defects',
+    'MANUFACTURER_REFURBISHED': 'manufacturer_refurbished',
+    'CERTIFIED_REFURBISHED': 'seller_refurbished',
+    'EXCELLENT_REFURBISHED': 'seller_refurbished',
+    'VERY_GOOD_REFURBISHED': 'seller_refurbished',
+    'GOOD_REFURBISHED': 'seller_refurbished',
+    'SELLER_REFURBISHED': 'seller_refurbished',
+    'USED_EXCELLENT': 'used_excellent',
+    'USED_VERY_GOOD': 'used_very_good',
+    'USED_GOOD': 'used_good',
+    'USED_ACCEPTABLE': 'used_acceptable',
+    'FOR_PARTS_OR_NOT_WORKING': 'for_parts'
+  };
+  
+  return conditionMap[condition] || 'used_good';
 }
 
 function mapEbayStatus(sellingState: string): string {
