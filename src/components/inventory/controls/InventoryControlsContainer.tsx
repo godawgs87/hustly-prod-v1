@@ -66,6 +66,8 @@ const InventoryControlsContainer = ({
             loading={loading}
             onRefresh={onRefresh}
             onCreateListing={onCreateListing}
+            selectedListings={selectedListings}
+            onSyncComplete={onSyncComplete}
           />
         </div>
       </div>
