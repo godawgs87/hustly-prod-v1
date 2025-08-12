@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/components/AuthProvider';
@@ -33,6 +33,7 @@ import { Step, ListingData } from '@/types/CreateListing';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { EbayTokenRefreshManager } from '@/utils/ebayTokenRefresh';
 
 // Working CreateListing component that integrates with existing components
 const CreateListingWorking = () => {
@@ -587,6 +588,17 @@ const AppContent = () => {
 };
 
 const App = () => {
+  useEffect(() => {
+    // Initialize eBay token refresh manager when app loads
+    console.log('🚀 Initializing eBay token refresh manager...');
+    EbayTokenRefreshManager.initialize();
+
+    // Cleanup on unmount
+    return () => {
+      EbayTokenRefreshManager.cleanup();
+    };
+  }, []);
+
   return (
     <SafeErrorBoundary>
       <AuthProvider>

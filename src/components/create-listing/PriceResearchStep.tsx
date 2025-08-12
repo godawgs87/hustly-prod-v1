@@ -2,9 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, TrendingUp, TrendingDown, DollarSign, Eye, AlertCircle, CheckCircle } from 'lucide-react';
-import { EbayService } from '@/services/api/ebayService';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2, AlertCircle, CheckCircle, TrendingUp, Package, DollarSign, BarChart3, ChevronDown, ChevronUp, Eye, TrendingDown } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { useEbayStore } from '@/stores/ebayStore';
+import { EbayService } from '@/services/api/ebayService';
+import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import InlineEbayReconnect from '@/components/ebay/InlineEbayReconnect';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -227,20 +233,26 @@ export const PriceResearchStep: React.FC<PriceResearchStepProps> = ({
   if (!isConnected) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="text-center py-12">
-          <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">eBay Connection Required</h2>
-          <p className="text-gray-600 mb-6">
-            Connect your eBay account to research comparable pricing for your item.
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Price Research</h2>
+          <p className="text-gray-600">
+            Research comparable items to find the optimal price for your listing.
           </p>
-          <div className="space-x-4">
-            <Button onClick={onBack} variant="outline">
-              Back to Edit
-            </Button>
-            <Button onClick={handleSkipResearch}>
-              Skip Price Research
-            </Button>
-          </div>
+        </div>
+        
+        <InlineEbayReconnect
+          onConnectionSuccess={() => {
+            // Refresh connection status and retry research
+            checkActualEbayConnection();
+          }}
+          onSkip={handleSkipResearch}
+          message="Connect your eBay account to research comparable pricing and optimize your listing for maximum sales."
+        />
+        
+        <div className="mt-4">
+          <Button onClick={onBack} variant="outline" className="w-full sm:w-auto">
+            ← Back to Edit
+          </Button>
         </div>
       </div>
     );
