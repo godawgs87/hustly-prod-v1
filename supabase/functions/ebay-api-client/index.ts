@@ -219,24 +219,65 @@ export class EbayAPIClient {
         hasItems: !!result.itemSummaries
       });
       
-      // If no results with specific query, try a broader search
-      if (result.total === 0 && params.brand) {
-        console.log('🔄 [Backend] No results with specific query, trying broader search with brand only');
-        const broaderEndpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(params.brand)}&limit=20`;
-        console.log('🌐 [Backend] Broader eBay API endpoint:', broaderEndpoint);
-        const broaderResult = await this.makeRequest(broaderEndpoint);
-        console.log('📊 [Backend] Broader search result:', {
-          total: broaderResult.total,
-          itemCount: broaderResult.itemSummaries?.length || 0
-        });
+      // Progressive fallback search strategy if no results
+      if (result.total === 0) {
+        console.log('🔄 [Backend] No results with specific query, trying progressive fallback searches');
         
-        // Use broader result if it has items
-        if (broaderResult.total > 0) {
+        // Try 1: Remove year range and part numbers, keep core terms
+        const coreTerms = params.query
+          .replace(/\b(OEM|Genuine|Original)\b/gi, '')
+          .replace(/\b\d{4}-?\d{4}\b/g, '') // Remove year ranges
+          .replace(/\b[A-Z0-9]{8,}\b/g, '') // Remove long part numbers
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        if (coreTerms && coreTerms !== params.query) {
+          console.log('🔄 [Backend] Fallback 1: Core terms search -', coreTerms);
+          const fallback1Endpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(coreTerms)}&limit=20`;
+          const fallback1Result = await this.makeRequest(fallback1Endpoint);
+          console.log('📊 [Backend] Fallback 1 result:', { total: fallback1Result.total });
+          
+          if (fallback1Result.total > 0) {
+            return {
+              items: fallback1Result.itemSummaries || [],
+              total: fallback1Result.total,
+              searchQuery: coreTerms,
+              searchType: 'core_terms_fallback'
+            };
+          }
+        }
+        
+        // Try 2: Brand + key product type only
+        if (params.brand) {
+          const brandQuery = `${params.brand} key fob`;
+          console.log('🔄 [Backend] Fallback 2: Brand + product type -', brandQuery);
+          const fallback2Endpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(brandQuery)}&limit=20`;
+          const fallback2Result = await this.makeRequest(fallback2Endpoint);
+          console.log('📊 [Backend] Fallback 2 result:', { total: fallback2Result.total });
+          
+          if (fallback2Result.total > 0) {
+            return {
+              items: fallback2Result.itemSummaries || [],
+              total: fallback2Result.total,
+              searchQuery: brandQuery,
+              searchType: 'brand_product_fallback'
+            };
+          }
+        }
+        
+        // Try 3: Just the product type (last resort)
+        const productType = 'key fob';
+        console.log('🔄 [Backend] Fallback 3: Product type only -', productType);
+        const fallback3Endpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(productType)}&limit=20`;
+        const fallback3Result = await this.makeRequest(fallback3Endpoint);
+        console.log('📊 [Backend] Fallback 3 result:', { total: fallback3Result.total });
+        
+        if (fallback3Result.total > 0) {
           return {
-            items: broaderResult.itemSummaries || [],
-            total: broaderResult.total,
-            searchQuery: params.brand,
-            searchType: 'brand_fallback'
+            items: fallback3Result.itemSummaries || [],
+            total: fallback3Result.total,
+            searchQuery: productType,
+            searchType: 'product_type_fallback'
           };
         }
       }
