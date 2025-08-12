@@ -115,6 +115,125 @@ export class EbayService {
     };
   }
 
+  // ==================== NEW CRUD OPERATIONS ====================
+  
+  // Import eBay inventory into Hustly
+  static async importInventory(options: { limit?: number; page?: number } = {}) {
+    console.log('📥 [EbayService] Importing eBay inventory');
+    const { data, error } = await supabase.functions.invoke('ebay-inventory-import', {
+      body: { 
+        action: 'get_active_listings',
+        limit: options.limit || 100,
+        page: options.page || 1
+      }
+    });
+
+    if (error) {
+      throw new Error(`Import failed: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  static async importToHustly(listings: any[]) {
+    console.log(`📥 [EbayService] Importing ${listings.length} listings to Hustly`);
+    const { data, error } = await supabase.functions.invoke('ebay-inventory-import', {
+      body: { 
+        action: 'import_to_hustly',
+        listings
+      }
+    });
+
+    if (error) {
+      throw new Error(`Import failed: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  static async syncAllInventory() {
+    console.log('🔄 [EbayService] Syncing all eBay inventory');
+    const { data, error } = await supabase.functions.invoke('ebay-inventory-import', {
+      body: { action: 'sync_all' }
+    });
+
+    if (error) {
+      throw new Error(`Sync failed: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  // Update an existing eBay listing
+  static async updateListing(listingId: string, updates: any) {
+    console.log('📝 [EbayService] Updating listing:', listingId);
+    const { data, error } = await supabase.functions.invoke('ebay-crud-operations', {
+      body: { 
+        action: 'update_listing',
+        listingId,
+        updates
+      }
+    });
+
+    if (error) {
+      throw new Error(`Update failed: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  // End/Delete an eBay listing
+  static async endListing(listingId: string, reason: string = 'NotAvailable') {
+    console.log('🗑️ [EbayService] Ending listing:', listingId);
+    const { data, error } = await supabase.functions.invoke('ebay-crud-operations', {
+      body: { 
+        action: 'end_listing',
+        listingId,
+        reason
+      }
+    });
+
+    if (error) {
+      throw new Error(`End listing failed: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  // Get listing status from eBay
+  static async getListingStatus(listingId: string) {
+    console.log('🔍 [EbayService] Getting listing status:', listingId);
+    const { data, error } = await supabase.functions.invoke('ebay-crud-operations', {
+      body: { 
+        action: 'get_listing_status',
+        listingId
+      }
+    });
+
+    if (error) {
+      throw new Error(`Status check failed: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  // Bulk status check for multiple listings
+  static async bulkStatusCheck(listingIds: string[]) {
+    console.log(`🔍 [EbayService] Checking status for ${listingIds.length} listings`);
+    const { data, error } = await supabase.functions.invoke('ebay-crud-operations', {
+      body: { 
+        action: 'bulk_status_check',
+        listingIds
+      }
+    });
+
+    if (error) {
+      throw new Error(`Bulk status check failed: ${error.message}`);
+    }
+
+    return data;
+  }
+
   // Price Research Methods
   static async searchCompletedListings(params: {
     query: string;
