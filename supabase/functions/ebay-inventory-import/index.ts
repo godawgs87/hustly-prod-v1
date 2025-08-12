@@ -103,8 +103,9 @@ serve(async (req) => {
 
     switch (action) {
       case 'get_active_listings': {
-        // Get active listings from eBay REST API (Inventory API)
-        const response = await fetch('https://api.ebay.com/sell/inventory/v1/inventory_item', {
+        // Get ONLY active listings using the Offer API (not all inventory items)
+        // First get offers which represent actual active listings
+        const response = await fetch('https://api.ebay.com/sell/inventory/v1/offer?limit=100', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${account.oauth_token}`,
@@ -122,20 +123,50 @@ serve(async (req) => {
 
         const jsonResponse = await response.json();
         
-        // Parse REST API response - inventory items
-        const items = jsonResponse.inventoryItems || [];
+        // Parse Offer API response - offers represent active listings
+        const offers = jsonResponse.offers || [];
         
-        console.log(`✅ Found ${items.length} active listings`);
+        console.log(`✅ Found ${offers.length} active offers (published listings)`);
         
-        // Debug: Log full response, first few items, and their keys
-        console.log('🔍 [DEBUG] Full response:', JSON.stringify(jsonResponse, null, 2));
-        console.log('🔍 [DEBUG] First 3 items structure:', JSON.stringify(items.slice(0, 3), null, 2));
-        console.log('🔍 [DEBUG] Sample item keys:', items[0] ? Object.keys(items[0]) : 'No items');
+        // Now we need to get the inventory details for each offer
+        // Offers contain SKUs but not full product details
+        const activeListings: any[] = [];
+        
+        for (const offer of offers) {
+          if (offer.sku && offer.status === 'PUBLISHED') {
+            // Get the inventory item details for this SKU
+            const itemResponse = await fetch(`https://api.ebay.com/sell/inventory/v1/inventory_item/${encodeURIComponent(offer.sku)}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${account.oauth_token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Accept-Language': 'en-US'
+              }
+            });
+            
+            if (itemResponse.ok) {
+              const item = await itemResponse.json();
+              // Add offer details to the item
+              activeListings.push({
+                ...item,
+                offerId: offer.offerId,
+                listingId: offer.listing?.listingId,
+                price: offer.pricingSummary?.price?.value,
+                currency: offer.pricingSummary?.price?.currency,
+                quantity: offer.availableQuantity,
+                status: 'active' // This is truly active since it's a published offer
+              });
+            }
+          }
+        }
+        
+        console.log(`✅ Retrieved details for ${activeListings.length} active listings`);
         
         return new Response(JSON.stringify({
           success: true,
-          listings: items,
-          totalCount: items.length
+          listings: activeListings,
+          totalCount: activeListings.length
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -219,15 +250,17 @@ serve(async (req) => {
             }
 
             // Map Inventory API format to our database format
-            const title = inventoryItem.product.title || 'Untitled Item';
-            const description = inventoryItem.product.description || '';
+            const title = inventoryItem.product?.title || 'Untitled Item';
+            const description = inventoryItem.product?.description || '';
             const condition = inventoryItem.condition || 'USED_GOOD';
-            const quantity = inventoryItem.availability?.shipToLocationAvailability?.quantity || 1;
-            const imageUrls = inventoryItem.product.imageUrls || [];
+            const quantity = inventoryItem.quantity || inventoryItem.availability?.shipToLocationAvailability?.quantity || 1;
+            const imageUrls = inventoryItem.product?.imageUrls || [];
             
-            // Note: Inventory items don't have prices - they're set when creating offers
-            // We'll use a placeholder price of 0 for now
-            const price = 0;
+            // Price comes from the offer data we added (for active listings)
+            const price = inventoryItem.price || 0;
+            
+            // Status is 'active' if this came from a published offer, otherwise 'draft'
+            const status = inventoryItem.status || 'draft';
 
             // Check if listing already exists by SKU (use title as fallback since we might not have ebay_sku column)
             const { data: existingListing } = await supabase
@@ -272,10 +305,10 @@ serve(async (req) => {
                   title: title,
                   // Store SKU in description since we might not have ebay_sku column
                   description: description + `\n\n[eBay SKU: ${sku}]`,
-                  price: price, // Placeholder - inventory items don't have prices
+                  price: price,
                   condition: mapInventoryCondition(condition),
                   quantity: quantity,
-                  status: 'draft', // Inventory items are not necessarily active
+                  status: status, // Use the status we determined (active for published offers, draft otherwise)
                   platform: 'ebay',
                   ebay_sync_status: 'synced',
                   ebay_last_sync: new Date().toISOString(),
