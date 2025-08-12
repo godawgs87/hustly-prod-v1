@@ -192,19 +192,38 @@ serve(async (req) => {
         
         for (const inventoryItem of listings) {
           try {
+            // Ensure we have a SKU at minimum
+            if (!inventoryItem || !inventoryItem.sku) {
+              console.log('⚠️ Skipping invalid item: No SKU');
+              importResults.push({
+                sku: 'unknown',
+                action: 'skipped',
+                success: false,
+                error: 'No SKU found'
+              });
+              continue;
+            }
+
+            const sku = inventoryItem.sku;
+
             // Skip items without product data
             if (!inventoryItem.product) {
-              console.log(`⚠️ Skipping item ${inventoryItem.sku}: No product data`);
+              console.log(`⚠️ Skipping item ${sku}: No product data`);
+              importResults.push({
+                sku: sku,
+                action: 'skipped',
+                success: false,
+                error: 'No product data'
+              });
               continue;
             }
 
             // Map Inventory API format to our database format
-            const title = inventoryItem.product?.title || 'Untitled Item';
-            const description = inventoryItem.product?.description || '';
-            const sku = inventoryItem.sku;
+            const title = inventoryItem.product.title || 'Untitled Item';
+            const description = inventoryItem.product.description || '';
             const condition = inventoryItem.condition || 'USED_GOOD';
             const quantity = inventoryItem.availability?.shipToLocationAvailability?.quantity || 1;
-            const imageUrls = inventoryItem.product?.imageUrls || [];
+            const imageUrls = inventoryItem.product.imageUrls || [];
             
             // Note: Inventory items don't have prices - they're set when creating offers
             // We'll use a placeholder price of 0 for now
@@ -290,12 +309,13 @@ serve(async (req) => {
               });
             }
           } catch (error) {
-            console.error(`❌ Failed to import listing ${inventoryItem.sku}:`, error);
+            const errorSku = inventoryItem?.sku || 'unknown';
+            console.error(`❌ Failed to import listing ${errorSku}:`, error);
             importResults.push({
-              sku: inventoryItem.sku,
+              sku: errorSku,
               action: 'failed',
               success: false,
-              error: error.message
+              error: error.message || String(error)
             });
           }
         }
