@@ -216,13 +216,40 @@ const EbaySyncIntegration = ({
           ));
           successCount++;
         } else {
-          // Item not on eBay yet
-          setSyncStatuses(prev => prev.map(s => 
-            s.listingId === listing.id 
-              ? { ...s, status: 'error', message: 'Not listed on eBay' }
-              : s
-          ));
-          failCount++;
+          // Create new eBay listing
+          try {
+            console.log('📤 Creating new eBay listing for:', listing.title);
+            
+            // Use the syncListing method which handles the full creation flow
+            const result = await EbayService.syncListing(listing.id, { dryRun: false });
+            
+            if (result.success) {
+              setSyncStatuses(prev => prev.map(s => 
+                s.listingId === listing.id 
+                  ? { ...s, status: 'success', message: `Created on eBay: ${result.itemId}`, ebayItemId: result.itemId }
+                  : s
+              ));
+              successCount++;
+              
+              // Update the listing with the new eBay item ID
+              if (result.itemId) {
+                await supabase
+                  .from('listings')
+                  .update({ ebay_item_id: result.itemId })
+                  .eq('id', listing.id);
+              }
+            } else {
+              throw new Error(result.error || 'Failed to create eBay listing');
+            }
+          } catch (createError) {
+            console.error('Failed to create eBay listing:', createError);
+            setSyncStatuses(prev => prev.map(s => 
+              s.listingId === listing.id 
+                ? { ...s, status: 'error', message: createError instanceof Error ? createError.message : 'Failed to create listing' }
+                : s
+            ));
+            failCount++;
+          }
         }
       } catch (error) {
         setSyncStatuses(prev => prev.map(s => 
