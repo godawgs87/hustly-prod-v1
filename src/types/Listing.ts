@@ -57,4 +57,11 @@ export type Listing = EnhancedListingData & {
   color?: string;
   material?: string;
   quantity?: number;
+  ebay_item_id?: string;
+  platform?: string;
+  ebay_category_id?: string;
+  ebay_category_path?: string;
+  ebay_listing_id?: string;
+  ebay_sync_status?: string;
+  ebay_last_sync?: string;
 };

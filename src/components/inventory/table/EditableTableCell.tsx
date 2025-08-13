@@ -11,9 +11,10 @@ interface EditableCellProps {
   isEditing: boolean;
   onUpdate: (field: keyof Listing, value: any) => void;
   className?: string;
+  listing?: Listing;
 }
 
-const EditableTableCell = ({ field, value, isEditing, onUpdate, className }: EditableCellProps) => {
+const EditableTableCell = ({ field, value, isEditing, onUpdate, className, listing }: EditableCellProps) => {
   const getStatusBadgeVariant = (status: string | null) => {
     switch (status) {
       case 'active': return 'default';
@@ -79,9 +80,12 @@ const EditableTableCell = ({ field, value, isEditing, onUpdate, className }: Edi
             </SelectContent>
           </Select>
         ) : (
-          value && (
-            <Badge variant={getStatusBadgeVariant(value)}>
-              {value}
+          field === 'status' && (
+            <Badge variant={
+              listing?.ebay_item_id ? 'default' : 
+              value === 'active' ? 'default' : 'secondary'
+            } className={listing?.ebay_item_id ? 'bg-green-500 hover:bg-green-600' : ''}>
+              {listing?.ebay_item_id ? 'Published' : value}
             </Badge>
           )
         );

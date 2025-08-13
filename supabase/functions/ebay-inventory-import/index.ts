@@ -119,16 +119,31 @@ serve(async (req) => {
 
     switch (action) {
       case 'get_active_listings': {
-        // Get ONLY active listings using the Offer API (not all inventory items)
-        // First get offers which represent actual active listings
-        const response = await fetch('https://api.ebay.com/sell/inventory/v1/offer?limit=100', {
-          method: 'GET',
+        // Use the Trading API's GetMyeBaySelling to get active listings
+        // This is the proper way to get a seller's active items
+        const response = await fetch('https://api.ebay.com/ws/api.dll', {
+          method: 'POST',
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Accept-Language': 'en-US'
-          }
+            'X-EBAY-API-SITEID': '0',
+            'X-EBAY-API-COMPATIBILITY-LEVEL': '1157',
+            'X-EBAY-API-CALL-NAME': 'GetMyeBaySelling',
+            'X-EBAY-API-IAF-TOKEN': accessToken,
+            'Content-Type': 'text/xml',
+          },
+          body: `<?xml version="1.0" encoding="utf-8"?>
+            <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+              <RequesterCredentials>
+                <eBayAuthToken>${accessToken}</eBayAuthToken>
+              </RequesterCredentials>
+              <ActiveList>
+                <Include>true</Include>
+                <Pagination>
+                  <EntriesPerPage>100</EntriesPerPage>
+                  <PageNumber>1</PageNumber>
+                </Pagination>
+              </ActiveList>
+              <DetailLevel>ReturnAll</DetailLevel>
+            </GetMyeBaySellingRequest>`
         });
 
         if (!response.ok) {
@@ -137,51 +152,21 @@ serve(async (req) => {
           throw new Error(`eBay API Error: ${response.statusText}`);
         }
 
-        const jsonResponse = await response.json();
+        const xmlResponse = await response.text();
+        console.log('📦 Fetched eBay listings from Trading API');
+        console.log('🔍 Raw XML Response (first 1000 chars):', xmlResponse.substring(0, 1000));
         
-        // Parse Offer API response - offers represent active listings
-        const offers = jsonResponse.offers || [];
+        // Parse the XML response
+        const allListings = parseEbayXmlResponse(xmlResponse);
+        console.log(`📊 Parsed ${allListings.length} listings from XML`);
         
-        console.log(`✅ Found ${offers.length} active offers (published listings)`);
-        
-        // Now we need to get the inventory details for each offer
-        // Offers contain SKUs but not full product details
-        const activeListings: any[] = [];
-        
-        for (const offer of offers) {
-          if (offer.sku && offer.status === 'PUBLISHED') {
-            // Get the inventory item details for this SKU
-            const itemResponse = await fetch(`https://api.ebay.com/sell/inventory/v1/inventory_item/${encodeURIComponent(offer.sku)}`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              }
-            });
-            
-            if (itemResponse.ok) {
-              const item = await itemResponse.json();
-              // Add offer details to the item
-              activeListings.push({
-                ...item,
-                offerId: offer.offerId,
-                listingId: offer.listing?.listingId,
-                price: offer.pricingSummary?.price?.value,
-                currency: offer.pricingSummary?.price?.currency,
-                quantity: offer.availableQuantity,
-                status: 'active' // This is truly active since it's a published offer
-              });
-            }
-          }
-        }
-        
-        console.log(`✅ Retrieved details for ${activeListings.length} active listings`);
+        // All listings from GetMyeBaySelling ActiveList are already active
+        console.log(`✅ Found ${allListings.length} active listings`);
         
         return new Response(JSON.stringify({
           success: true,
-          listings: activeListings,
-          totalCount: activeListings.length
+          listings: allListings,
+          count: allListings.length
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -236,52 +221,54 @@ serve(async (req) => {
         
         const importResults: any[] = [];
         
-        for (const inventoryItem of listings) {
+        for (const listing of listings) {
           try {
-            // Ensure we have a SKU at minimum
-            if (!inventoryItem || !inventoryItem.sku) {
-              console.log('⚠️ Skipping invalid item: No SKU');
+            // Trading API returns itemId, not sku
+            if (!listing || !listing.itemId) {
+              console.log('⚠️ Skipping invalid item: No itemId');
               importResults.push({
-                sku: 'unknown',
+                itemId: listing?.itemId || 'unknown',
                 action: 'skipped',
                 success: false,
-                error: 'No SKU found'
+                error: 'No itemId found'
               });
               continue;
             }
 
-            const sku = inventoryItem.sku;
-
-            // Skip items without product data
-            if (!inventoryItem.product) {
-              console.log(`⚠️ Skipping item ${sku}: No product data`);
-              importResults.push({
-                sku: sku,
-                action: 'skipped',
-                success: false,
-                error: 'No product data'
-              });
-              continue;
-            }
-
-            // Map Inventory API format to our database format
-            const title = inventoryItem.product?.title || 'Untitled Item';
-            const description = inventoryItem.product?.description || '';
-            const condition = inventoryItem.condition || 'USED_GOOD';
-            const quantity = inventoryItem.quantity || inventoryItem.availability?.shipToLocationAvailability?.quantity || 1;
-            const imageUrls = inventoryItem.product?.imageUrls || [];
+            const itemId = listing.itemId;
+            const title = listing.title || 'Untitled Item';
             
-            // Price comes from the offer data we added (for active listings)
-            const price = inventoryItem.price || 0;
+            // Get description from the listing (may be empty from Trading API)
+            const description = listing.description || '';
             
-            // Status is 'active' if this came from a published offer, otherwise 'draft'
-            const status = inventoryItem.status || 'draft';
+            // Map condition from conditionId or use display name
+            const condition = listing.conditionId ? mapEbayCondition(listing.conditionId) : 'used_good';
+            
+            // Get quantity from the listing
+            const quantity = listing.quantity || 1;
+            
+            // Get images from pictureURLLarge array
+            const imageUrls = listing.pictureURLLarge || [];
+            
+            // Debug logging
+            console.log(`📸 Images found for ${itemId}:`, imageUrls.length);
+            console.log(`📝 Description length:`, description.length);
+            console.log(`🏷️ Category: ${listing.categoryId} - ${listing.categoryName}`);
+            
+            // Get price from the price object
+            const price = parseFloat(listing.price?.value || '0');
+            
+            // Map eBay category to Hustly category
+            const category = mapEbayCategory(listing.categoryId);
+            
+            // Trading API listings are active by definition (from GetMyeBaySelling ActiveList)
+            const status = 'active';
 
-            // Check if listing already exists by SKU (use title as fallback since we might not have ebay_sku column)
+            // Check if listing already exists by ebay_item_id or title
             const { data: existingListing } = await supabase
               .from('listings')
               .select('id')
-              .eq('title', title)
+              .or(`ebay_item_id.eq.${itemId},title.eq.${title}`)
               .eq('user_id', user.id)
               .eq('platform', 'ebay')
               .single();
@@ -293,24 +280,35 @@ serve(async (req) => {
                 .update({
                   title: title,
                   description: description,
-                  condition: mapInventoryCondition(condition),
+                  condition: condition,
+                  category: category,
                   quantity: quantity,
+                  photos: imageUrls,
                   updated_at: new Date().toISOString(),
-                  ebay_sync_status: 'synced',
-                  ebay_last_sync: new Date().toISOString()
+                  status: status,
+                  price: price,
+                  ebay_item_id: itemId,
+                  ebay_category_id: listing.categoryId
                 })
-                .eq('id', existingListing.id)
-                .select()
-                .single();
+                .eq('id', existingListing.id);
 
-              if (updateError) throw updateError;
-              
-              importResults.push({
-                sku: sku,
-                listingId: existingListing.id,
-                action: 'updated',
-                success: true
-              });
+              if (updateError) {
+                console.error(` Failed to update listing ${itemId}:`, updateError);
+                importResults.push({
+                  itemId: itemId,
+                  action: 'update_failed',
+                  success: false,
+                  error: updateError.message
+                });
+              } else {
+                console.log(` Updated existing listing: ${title}`);
+                importResults.push({
+                  itemId: itemId,
+                  action: 'updated',
+                  success: true,
+                  listingId: existingListing.id
+                });
+              }
             } else {
               // Create new listing
               const { data: created, error: createError } = await supabase
@@ -318,15 +316,17 @@ serve(async (req) => {
                 .insert({
                   user_id: user.id,
                   title: title,
-                  // Store SKU in description since we might not have ebay_sku column
-                  description: description + `\n\n[eBay SKU: ${sku}]`,
+                  // Store itemId in description
+                  description: description + `\n\n[eBay Item ID: ${itemId}]`,
                   price: price,
-                  condition: mapInventoryCondition(condition),
+                  condition: condition,
+                  category: category,
                   quantity: quantity,
+                  photos: imageUrls,
                   status: status, // Use the status we determined (active for published offers, draft otherwise)
                   platform: 'ebay',
-                  ebay_sync_status: 'synced',
-                  ebay_last_sync: new Date().toISOString(),
+                  ebay_item_id: itemId,
+                  ebay_category_id: listing.categoryId,
                   created_at: new Date().toISOString(),
                   updated_at: new Date().toISOString()
                 })
@@ -350,17 +350,16 @@ serve(async (req) => {
               }
               
               importResults.push({
-                sku: sku,
+                itemId: itemId,
                 listingId: created.id,
                 action: 'created',
                 success: true
               });
             }
           } catch (error) {
-            const errorSku = inventoryItem?.sku || 'unknown';
-            console.error(`❌ Failed to import listing ${errorSku}:`, error);
+            console.error(`❌ Error processing item ${listing?.itemId}:`, error);
             importResults.push({
-              sku: errorSku,
+              itemId: listing?.itemId || 'unknown',
               action: 'failed',
               success: false,
               error: error.message || String(error)
@@ -386,7 +385,7 @@ serve(async (req) => {
         console.log('🔄 Starting full inventory sync...');
         
         // Step 1: Get all active listings from eBay
-        const allListings = [];
+        const allListings: any[] = [];
         let page = 1;
         let hasMore = true;
         
@@ -471,20 +470,33 @@ function parseEbayXmlResponse(xml: string): any[] {
     // Extract basic fields
     item.itemId = extractXmlValue(itemXml, 'ItemID');
     item.title = extractXmlValue(itemXml, 'Title');
+    item.description = extractXmlValue(itemXml, 'Description') || '';
     item.price = {
       value: extractXmlValue(itemXml, 'CurrentPrice'),
       currency: extractXmlValue(itemXml, 'CurrentPrice', 'currencyID')
     };
     item.conditionId = extractXmlValue(itemXml, 'ConditionID');
+    item.conditionDisplayName = extractXmlValue(itemXml, 'ConditionDisplayName');
     item.categoryId = extractXmlValue(itemXml, 'PrimaryCategoryID');
+    item.categoryName = extractXmlValue(itemXml, 'PrimaryCategoryName');
     item.quantity = parseInt(extractXmlValue(itemXml, 'Quantity') || '1');
     item.sellingStatus = {
       sellingState: extractXmlValue(itemXml, 'SellingState')
     };
     
-    // Extract picture URLs
+    // Extract picture URLs - eBay returns multiple PictureURL tags
     const pictureUrls = itemXml.matchAll(/<PictureURL>(.*?)<\/PictureURL>/g);
-    item.pictureURLLarge = Array.from(pictureUrls).map(m => m[1]);
+    item.pictureURLLarge = Array.from(pictureUrls).map(m => m[1]).filter(url => url && url.length > 0);
+    
+    // Also check for PictureDetails which may contain larger images
+    const pictureDetailsMatch = itemXml.match(/<PictureDetails>(.*?)<\/PictureDetails>/s);
+    if (pictureDetailsMatch) {
+      const galleryUrls = pictureDetailsMatch[1].matchAll(/<GalleryURL>(.*?)<\/GalleryURL>/g);
+      const galleryArray = Array.from(galleryUrls).map(m => m[1]).filter(url => url && url.length > 0);
+      if (galleryArray.length > 0) {
+        item.pictureURLLarge = [...item.pictureURLLarge, ...galleryArray];
+      }
+    }
     
     items.push(item);
   }
@@ -536,6 +548,30 @@ function mapInventoryCondition(condition: string): string {
   };
   
   return conditionMap[condition] || 'used_good';
+}
+
+function mapEbayCategory(categoryId: string): string {
+  // Basic eBay category mapping - can be expanded
+  const categoryMap: Record<string, string> = {
+    '11450': 'Clothing, Shoes & Accessories',
+    '58058': 'Cell Phones & Accessories', 
+    '293': 'Consumer Electronics',
+    '1249': 'Video Games & Consoles',
+    '11233': 'Music',
+    '267': 'Books, Movies & Music',
+    '888': 'Collectibles & Art',
+    '12576': 'Business & Industrial',
+    '6000': 'Motors',
+    '1': 'Collectibles',
+    '281': 'Jewelry & Watches',
+    '14339': 'Crafts',
+    '11700': 'Home & Garden',
+    '15032': 'Cameras & Photo',
+    '625': 'Cameras & Photo',
+    '1305': 'Tickets & Experiences'
+  };
+  
+  return categoryMap[categoryId] || 'Other';
 }
 
 function mapEbayStatus(sellingState: string): string {

@@ -4,6 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import ListingImagePreview from '@/components/ListingImagePreview';
 import EditableTableCell from './EditableTableCell';
 import EditableCategoryCell from '@/components/listings/table-row/cells/EditableCategoryCell';
+import PlatformBadge from '../PlatformBadge';
 import type { Listing } from '@/types/Listing';
 
 interface TableRowCellsProps {
@@ -47,13 +48,21 @@ const TableRowCells = ({
       )}
       
       {visibleColumns.title && (
-        <EditableTableCell
-          field="title"
-          value={isEditing ? editData.title : listing.title}
-          isEditing={isEditing}
-          onUpdate={updateEditData}
-          className="max-w-xs"
-        />
+        <TableCell className="max-w-xs">
+          {isEditing ? (
+            <input
+              type="text"
+              value={editData.title || ''}
+              onChange={(e) => updateEditData('title', e.target.value)}
+              className="w-full px-2 py-1 text-sm border rounded"
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="truncate">{listing.title}</span>
+              <PlatformBadge platform={listing.platform} />
+            </div>
+          )}
+        </TableCell>
       )}
       
       {visibleColumns.price && (
@@ -71,6 +80,7 @@ const TableRowCells = ({
           value={isEditing ? editData.status : listing.status}
           isEditing={isEditing}
           onUpdate={updateEditData}
+          listing={listing}
         />
       )}
       
