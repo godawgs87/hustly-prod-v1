@@ -181,6 +181,147 @@ class EbayInventoryAPI {
     return await this.offerManager.handleExistingOffers(token, sku);
   }
 
+  async createOfferData(listing: any, sku: string, userProfile: any, ebayLocationKey: string): Promise<any> {
+    return await this.offerManager.createOfferData(listing, sku, userProfile, ebayLocationKey);
+  }
+
+  async ensureInventoryLocationWithShipping(userProfile: any): Promise<string> {
+    const token = await this.getAccessToken();
+    
+    // First, get existing locations
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/location`, {
+      method: 'GET',
+      headers: this.ebayHeaders(token)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get inventory locations: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const locations = data.locations || [];
+    
+    if (locations.length === 0) {
+      // Create a new location with shipping services for individual accounts
+      return await this.createInventoryLocationWithShipping(userProfile);
+    }
+
+    const defaultLocation = locations.find((loc: any) => loc.locationTypes?.includes('WAREHOUSE')) || locations[0];
+    const locationKey = defaultLocation.merchantLocationKey;
+    
+    // For individual accounts, ensure the location has shipping services configured
+    if (userProfile.ebay_account_type === 'INDIVIDUAL') {
+      logStep('🚢 Updating inventory location with shipping services for individual account', { 
+        locationKey,
+        accountType: 'INDIVIDUAL'
+      });
+      
+      await this.updateLocationWithShipping(locationKey, userProfile);
+    }
+    
+    logStep('Using inventory location', { key: locationKey, name: defaultLocation.name });
+    return locationKey;
+  }
+
+  async createInventoryLocationWithShipping(userProfile: any): Promise<string> {
+    const token = await this.getAccessToken();
+    const locationKey = `warehouse_${Date.now()}`;
+    
+    logStep('📍 Creating new inventory location with shipping services', { locationKey });
+    
+    const locationData: any = {
+      merchantLocationKey: locationKey,
+      name: 'Main Warehouse',
+      locationTypes: ['WAREHOUSE'],
+      address: {
+        addressLine1: userProfile.business_address || '123 Main St',
+        city: userProfile.business_city || 'San Francisco',
+        stateOrProvince: userProfile.business_state || 'CA',
+        postalCode: userProfile.business_zip || '94102',
+        country: 'US'
+      },
+      merchantLocationStatus: 'ENABLED'
+    };
+
+    // Add shipping services for individual accounts
+    if (userProfile.ebay_account_type === 'INDIVIDUAL') {
+      const { EbayShippingServices } = await import('./ebay-shipping-services.ts');
+      const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(
+        userProfile,
+        {
+          domesticCost: 9.95,
+          handlingTimeDays: 1,
+          userId: this.userId
+        }
+      );
+      
+      if (fulfillmentDetails?.shippingOptions?.[0]) {
+        locationData.shippingOptions = fulfillmentDetails.shippingOptions;
+      }
+    }
+
+    const createResponse = await fetch(`${this.baseUrl}/sell/inventory/v1/location/${locationKey}`, {
+      method: 'POST',
+      headers: this.ebayHeaders(token),
+      body: JSON.stringify(locationData)
+    });
+
+    if (!createResponse.ok) {
+      const error = await createResponse.text();
+      throw new Error(`Failed to create inventory location: ${error}`);
+    }
+
+    logStep('✅ Created inventory location with shipping', { locationKey });
+    return locationKey;
+  }
+
+  async updateLocationWithShipping(locationKey: string, userProfile: any): Promise<void> {
+    const token = await this.getAccessToken();
+    
+    // Get current location data
+    const getResponse = await fetch(`${this.baseUrl}/sell/inventory/v1/location/${locationKey}`, {
+      method: 'GET',
+      headers: this.ebayHeaders(token)
+    });
+
+    if (!getResponse.ok) {
+      logStep('⚠️ Could not fetch location details, skipping shipping update', { locationKey });
+      return;
+    }
+
+    const locationData = await getResponse.json();
+    
+    // Add shipping services for individual accounts
+    const { EbayShippingServices } = await import('./ebay-shipping-services.ts');
+    const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(
+      userProfile,
+      {
+        domesticCost: 9.95,
+        handlingTimeDays: 1,
+        userId: this.userId
+      }
+    );
+    
+    if (fulfillmentDetails?.shippingOptions?.[0]) {
+      locationData.shippingOptions = fulfillmentDetails.shippingOptions;
+      
+      // Update the location with shipping services
+      const updateResponse = await fetch(`${this.baseUrl}/sell/inventory/v1/location/${locationKey}/update_shipping_services`, {
+        method: 'POST',
+        headers: this.ebayHeaders(token),
+        body: JSON.stringify({
+          shippingOptions: fulfillmentDetails.shippingOptions
+        })
+      });
+
+      if (updateResponse.ok) {
+        logStep('✅ Updated location with shipping services', { locationKey });
+      } else {
+        logStep('⚠️ Could not update location shipping services, will proceed anyway', { locationKey });
+      }
+    }
+  }
+
   async getUserInventoryLocationKey(): Promise<string> {
     const token = await this.getAccessToken();
     
@@ -358,7 +499,7 @@ async function syncListingToEbay(supabaseClient: any, userId: string, listingId:
 
     // 6. Initialize eBay API
     const ebayApi = new EbayInventoryAPI(false, supabaseClient, userId);
-    const ebayLocationKey = await ebayApi.getUserInventoryLocationKey();
+    const ebayLocationKey = await ebayApi.ensureInventoryLocationWithShipping(userProfile);
 
     // 7. Create inventory item
     const inventoryData = EbayInventoryItemManager.mapListingToEbayInventory(listing, listing.listing_photos);
@@ -381,7 +522,7 @@ async function syncListingToEbay(supabaseClient: any, userId: string, listingId:
       ebayListingId = offerResult.alreadyPublished.listingId;
     } else if (offerResult.shouldCreateNew) {
       // Create new offer with eBay API validated shipping services
-      const offerData = await ebayApi.offerManager.createOfferData(listing, listingId, userProfile, ebayLocationKey);
+      const offerData = await ebayApi.createOfferData(listing, listingId, userProfile, ebayLocationKey);
       
       // Only validate fulfillmentDetails for business accounts
       // Individual accounts use listingPolicies instead
