@@ -65,7 +65,7 @@ export class EbayOfferManager {
     sku: string,
     userProfile: any,
     ebayLocationKey: string,
-    userId: string  // Note: userId parameter no longer needed but kept for compatibility
+    userId: string
   ): Promise<EbayOfferData> {
     EbayOfferManager.logStep('🔍 Building individual account offer WITHOUT policies', {
       sku,
@@ -74,9 +74,18 @@ export class EbayOfferManager {
       note: 'Omitting listingPolicies - eBay will apply account defaults'
     });
 
-    // For individual accounts, we DON'T send listingPolicies at all
-    // eBay will automatically apply the account's default policies
-    // The fake "INDIVIDUAL_DEFAULT_*" IDs were causing error 25709
+    // Create fulfillment details for individual accounts
+    const { EbayShippingServices } = await import('./ebay-shipping-services.ts');
+    const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(
+      userProfile,
+      {
+        domesticCost: listing.shipping_cost || 9.95,
+        handlingTimeDays: listing.handling_time || 1,
+        userId
+      }
+    );
+
+    // For individual accounts, we DON'T send listingPolicies but DO send fulfillmentDetails
     const offerData: EbayOfferData = {
       sku,
       marketplaceId: "EBAY_US",
@@ -90,14 +99,16 @@ export class EbayOfferManager {
           currency: "USD"
         }
       },
-      listingDescription: listing.description || 'Quality item in great condition.'
-      // NO listingPolicies field - let eBay apply defaults!
+      listingDescription: listing.description || 'Quality item in great condition.',
+      fulfillmentDetails  // Include shipping details for individual accounts!
     };
 
-    EbayOfferManager.logStep('✅ Individual account offer created WITHOUT policies', {
+    EbayOfferManager.logStep('✅ Individual account offer created WITHOUT policies but WITH fulfillment', {
       sku,
       categoryId: offerData.categoryId,
       price: offerData.pricingSummary.price.value,
+      hasShipping: !!fulfillmentDetails,
+      shippingService: fulfillmentDetails?.shippingOptions?.[0]?.shippingServices?.[0]?.serviceCode,
       note: 'eBay will apply account default policies automatically'
     });
 
