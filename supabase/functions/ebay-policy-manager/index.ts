@@ -93,24 +93,31 @@ class EbayAccountAPI {
     }
   }
 
-  async getDefaultPolicyIds(): Promise<{payment: string, return: string, fulfillment: string}> {
-    // For individual accounts, they typically can't create custom policies
-    // Return standardized placeholders that the sync system will handle properly
-    logStep('Setting individual account policy placeholders');
+  async getDefaultPolicyIds(): Promise<{payment: string | null, return: string | null, fulfillment: string | null}> {
+    // For individual accounts, return NULL policy IDs
+    // eBay will apply account defaults when policies are omitted
+    const isBusinessAccount = await this.checkBusinessPolicyEligibility();
     
-    const policies = {
-      payment: 'INDIVIDUAL_DEFAULT_PAYMENT',
-      return: 'INDIVIDUAL_DEFAULT_RETURN', 
-      fulfillment: 'INDIVIDUAL_DEFAULT_FULFILLMENT'
-    };
+    if (!isBusinessAccount) {
+      logStep('Individual account detected - returning null policy IDs');
+      return {
+        payment: null,
+        return: null, 
+        fulfillment: null
+      };
+    }
     
-    logStep('Using individual account policy placeholders', {
-      payment: policies.payment,
-      return: policies.return,
-      fulfillment: policies.fulfillment
+    // For business accounts, we should have real policy IDs
+    // This method should not be called for business accounts
+    logStep('WARNING: getDefaultPolicyIds called for business account', {
+      message: 'Business accounts should have real policy IDs'
     });
     
-    return policies;
+    return {
+      payment: null,
+      return: null,
+      fulfillment: null
+    };
   }
 
   async fetchExistingPolicies(): Promise<{payment: string[], return: string[], fulfillment: string[]}> {
@@ -603,9 +610,9 @@ serve(async (req) => {
       logStep('Individual account detected - setting default policies without eBay API calls');
       
       const individualPolicies = {
-        ebay_payment_policy_id: 'INDIVIDUAL_DEFAULT_PAYMENT',
-        ebay_return_policy_id: 'INDIVIDUAL_DEFAULT_RETURN',
-        ebay_fulfillment_policy_id: 'INDIVIDUAL_DEFAULT_FULFILLMENT'
+        ebay_payment_policy_id: null,
+        ebay_return_policy_id: null,
+        ebay_fulfillment_policy_id: null
       };
 
       // Update user profile with individual account defaults
@@ -639,7 +646,7 @@ serve(async (req) => {
     const placeholderValues = [
       'DEFAULT_PAYMENT_POLICY', 'DEFAULT_RETURN_POLICY', 'DEFAULT_FULFILLMENT_POLICY',
       'INDIVIDUAL_PAYMENT_POLICY', 'INDIVIDUAL_RETURN_POLICY', 'INDIVIDUAL_FULFILLMENT_POLICY',
-      'INDIVIDUAL_DEFAULT_PAYMENT', 'INDIVIDUAL_DEFAULT_RETURN', 'INDIVIDUAL_DEFAULT_FULFILLMENT',
+      // Removed fake policy IDs - individual accounts now use NULL
       'MANUAL_ENTRY_REQUIRED_PAYMENT', 'MANUAL_ENTRY_REQUIRED_RETURN', 'MANUAL_ENTRY_REQUIRED_FULFILLMENT'
     ];
     

@@ -57,13 +57,31 @@ const EBAY_ERROR_CODES: Record<number, Partial<ParsedEbayError>> = {
   21916: {
     category: 'policy',
     userMessage: 'Business policies are required but not configured.',
-    actionRequired: 'Go to Settings → Connections → eBay and create business policies',
+    actionRequired: 'Go to Settings → Connections → eBay and refresh your business policies',
     isRetryable: false
   },
   21917: {
     category: 'policy',
     userMessage: 'Your business policies are invalid or expired.',
-    actionRequired: 'Go to Settings → Connections → eBay and update business policies',
+    actionRequired: 'Go to Settings → Connections → eBay and refresh your business policies',
+    isRetryable: false
+  },
+  21919: {
+    category: 'policy',
+    userMessage: 'The specified fulfillment policy ID is invalid or does not exist.',
+    actionRequired: 'Go to Settings → Connections → eBay and refresh your business policies',
+    isRetryable: false
+  },
+  21920: {
+    category: 'policy',
+    userMessage: 'The specified payment policy ID is invalid or does not exist.',
+    actionRequired: 'Go to Settings → Connections → eBay and refresh your business policies',
+    isRetryable: false
+  },
+  21921: {
+    category: 'policy',
+    userMessage: 'The specified return policy ID is invalid or does not exist.',
+    actionRequired: 'Go to Settings → Connections → eBay and refresh your business policies',
     isRetryable: false
   },
   

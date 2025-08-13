@@ -158,25 +158,35 @@ export class EbayOfferManager {
   static isIndividualAccount(userProfile: any): boolean {
     // Individual accounts are identified by:
     // 1. Null/undefined policy IDs
-    // 2. The fake "INDIVIDUAL_DEFAULT_*" strings we were using (for backwards compatibility)
-    // 3. Empty string policy IDs
+    // 2. Empty string policy IDs
+    // 3. Policy IDs that are too short to be real eBay policy IDs (< 15 chars)
     
     const hasNullPolicies = !userProfile.ebay_payment_policy_id || 
                            !userProfile.ebay_fulfillment_policy_id || 
                            !userProfile.ebay_return_policy_id;
     
-    // Check for our old fake policy IDs (for backwards compatibility)
+    // Check for invalid/placeholder policy IDs
+    const hasInvalidPolicies = 
+      (userProfile.ebay_payment_policy_id && userProfile.ebay_payment_policy_id.length < 15) ||
+      (userProfile.ebay_fulfillment_policy_id && userProfile.ebay_fulfillment_policy_id.length < 15) ||
+      (userProfile.ebay_return_policy_id && userProfile.ebay_return_policy_id.length < 15);
+    
+    // Check for known fake policy IDs (for backwards compatibility)
     const fakeIndividualPolicyIds = [
       'INDIVIDUAL_DEFAULT_PAYMENT',
       'INDIVIDUAL_DEFAULT_RETURN',
-      'INDIVIDUAL_DEFAULT_FULFILLMENT'
+      'INDIVIDUAL_DEFAULT_FULFILLMENT',
+      'DEFAULT_PAYMENT_POLICY',
+      'DEFAULT_RETURN_POLICY',
+      'DEFAULT_FULFILLMENT_POLICY'
     ];
     
-    const hasFakePolicy = fakeIndividualPolicyIds.includes(userProfile.ebay_payment_policy_id) ||
-           fakeIndividualPolicyIds.includes(userProfile.ebay_return_policy_id) ||
-           fakeIndividualPolicyIds.includes(userProfile.ebay_fulfillment_policy_id);
+    const hasFakePolicy = 
+      fakeIndividualPolicyIds.includes(userProfile.ebay_payment_policy_id) ||
+      fakeIndividualPolicyIds.includes(userProfile.ebay_return_policy_id) ||
+      fakeIndividualPolicyIds.includes(userProfile.ebay_fulfillment_policy_id);
            
-    const isIndividual = hasNullPolicies || hasFakePolicy;
+    const isIndividual = hasNullPolicies || hasInvalidPolicies || hasFakePolicy;
            
     EbayOfferManager.logStep('Account type check', {
       paymentPolicy: userProfile.ebay_payment_policy_id,

@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { EbayService } from '@/services/api/ebayService';
+import { validateEbayPolicies, cleanupInvalidPolicies } from '@/utils/ebayPolicyValidator';
 import type { Listing } from '@/types/Listing';
 
 export const useEbaySyncOperation = () => {
@@ -88,33 +90,36 @@ export const useEbaySyncOperation = () => {
         return { success: false, error: 'Failed to fetch user profile' };
       }
 
-      // 🔍 FIXED: Use exact same logic as backend EbayOfferManager.isIndividualAccount()
-      const individualPolicyIds = [
-        'INDIVIDUAL_DEFAULT_PAYMENT',
-        'INDIVIDUAL_DEFAULT_RETURN', 
-        'INDIVIDUAL_DEFAULT_FULFILLMENT'
-      ];
+      // Validate eBay policies using the centralized validator
+      const policyValidation = await validateEbayPolicies(user.id);
       
-      const hasNullPolicies = !userProfile.ebay_payment_policy_id || 
-                             !userProfile.ebay_fulfillment_policy_id || 
-                             !userProfile.ebay_return_policy_id;
+      // Clean up any invalid/fake policy IDs
+      if (policyValidation.warnings.some(w => w.includes('placeholder'))) {
+        await cleanupInvalidPolicies(user.id);
+      }
       
-      const hasIndividualPolicy = individualPolicyIds.includes(userProfile.ebay_payment_policy_id) ||
-             individualPolicyIds.includes(userProfile.ebay_return_policy_id) ||
-             individualPolicyIds.includes(userProfile.ebay_fulfillment_policy_id);
-             
-      const isIndividualAccount = hasNullPolicies || hasIndividualPolicy;
+      const isIndividualAccount = policyValidation.isIndividualAccount;
 
-      console.log('🔍 FIXED: Account type detection (consistent with backend):', {
-        paymentPolicy: userProfile.ebay_payment_policy_id,
-        fulfillmentPolicy: userProfile.ebay_fulfillment_policy_id,
-        returnPolicy: userProfile.ebay_return_policy_id,
-        hasNullPolicies,
-        hasIndividualPolicy,
-        isIndividualAccount,
+      console.log('🔍 Policy validation result:', {
+        isValid: policyValidation.isValid,
+        isIndividualAccount: policyValidation.isIndividualAccount,
+        errors: policyValidation.errors,
+        warnings: policyValidation.warnings,
         accountType: isIndividualAccount ? 'Individual' : 'Business',
         syncPath: isIndividualAccount ? 'INDIVIDUAL_INLINE_FULFILLMENT' : 'BUSINESS_POLICIES'
       });
+      
+      // Show any validation errors or warnings
+      if (policyValidation.errors.length > 0) {
+        policyValidation.errors.forEach(error => {
+          console.error('Policy validation error:', error);
+        });
+      }
+      if (policyValidation.warnings.length > 0) {
+        policyValidation.warnings.forEach(warning => {
+          console.warn('Policy validation warning:', warning);
+        });
+      }
 
       // Only verify/create policies for business accounts
       if (!isIndividualAccount) {
