@@ -238,14 +238,42 @@ serve(async (req) => {
             const itemId = listing.itemId;
             const title = listing.title || 'Untitled Item';
             
-            // Get description from the listing (may be empty from Trading API)
-            const description = listing.description || '';
-            
             // Map condition from conditionId or use display name
-            const condition = listing.conditionId ? mapEbayCondition(listing.conditionId) : 'used_good';
-            
-            // Get quantity from the listing
+            const condition = listing.conditionDisplayName || 'Used';
             const quantity = listing.quantity || 1;
+            
+            // GetMyeBaySelling doesn't return full descriptions, so fetch it separately
+            let description = '';
+            try {
+              const itemResponse = await fetch('https://api.ebay.com/ws/api.dll', {
+                method: 'POST',
+                headers: {
+                  'X-EBAY-API-SITEID': '0',
+                  'X-EBAY-API-COMPATIBILITY-LEVEL': '1157',
+                  'X-EBAY-API-CALL-NAME': 'GetItem',
+                  'X-EBAY-API-IAF-TOKEN': accessToken,
+                  'Content-Type': 'text/xml',
+                },
+                body: `<?xml version="1.0" encoding="utf-8"?>
+                  <GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+                    <RequesterCredentials>
+                      <eBayAuthToken>${accessToken}</eBayAuthToken>
+                    </RequesterCredentials>
+                    <ItemID>${itemId}</ItemID>
+                    <DetailLevel>ReturnAll</DetailLevel>
+                  </GetItemRequest>`
+              });
+              
+              if (itemResponse.ok) {
+                const itemXml = await itemResponse.text();
+                description = extractXmlValue(itemXml, 'Description') || '';
+                console.log(` Fetched description for ${itemId}: ${description.substring(0, 100)}...`);
+              } else {
+                console.warn(` Could not fetch description for item ${itemId}`);
+              }
+            } catch (error) {
+              console.warn(` Error fetching description for item ${itemId}:`, error);
+            }
             
             // Get images from pictureURLLarge array
             const imageUrls = listing.pictureURLLarge || [];
