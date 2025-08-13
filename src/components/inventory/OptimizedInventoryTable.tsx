@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import UnifiedListingCard from '@/components/UnifiedListingCard';
+import { DeleteListingDialog } from './DeleteListingDialog';
 import type { Listing } from '@/types/Listing';
 
 interface OptimizedInventoryTableProps {
@@ -10,6 +11,7 @@ interface OptimizedInventoryTableProps {
   onSelect: (listingId: string, checked: boolean) => void;
   selectedListings: Set<string>;
   visibleColumns: any;
+  onRefresh?: () => void;
 }
 
 const OptimizedInventoryTable = ({
@@ -18,8 +20,24 @@ const OptimizedInventoryTable = ({
   onEdit,
   onSelect,
   selectedListings,
-  visibleColumns
+  visibleColumns,
+  onRefresh
 }: OptimizedInventoryTableProps) => {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [listingToDelete, setListingToDelete] = useState<Listing | null>(null);
+
+  const handleDeleteClick = (listing: Listing) => {
+    setListingToDelete(listing);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteComplete = () => {
+    setDeleteDialogOpen(false);
+    setListingToDelete(null);
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
   // Show skeleton loading for better perceived performance
   if (loading && listings.length === 0) {
     return (
@@ -49,20 +67,31 @@ const OptimizedInventoryTable = ({
   }
 
   return (
-    <div className="space-y-2">
-      {listings.map((listing) => (
-        <UnifiedListingCard
-          key={listing.id}
-          listing={listing}
-          isBulkMode={false}
-          onEdit={() => onEdit(listing)}
-          onSelect={(checked) => onSelect(listing.id, checked)}
-          onPreview={() => {}} // No-op for now
-          onDelete={() => {}} // No-op for now
-          isSelected={selectedListings.has(listing.id)}
+    <>
+      <div className="space-y-2">
+        {listings.map((listing) => (
+          <UnifiedListingCard
+            key={listing.id}
+            listing={listing}
+            isBulkMode={false}
+            onEdit={() => onEdit(listing)}
+            onSelect={(checked) => onSelect(listing.id, checked)}
+            onPreview={() => {}} // No-op for now
+            onDelete={() => handleDeleteClick(listing)}
+            isSelected={selectedListings.has(listing.id)}
+          />
+        ))}
+      </div>
+      
+      {listingToDelete && (
+        <DeleteListingDialog
+          isOpen={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          listing={listingToDelete}
+          onSuccess={handleDeleteComplete}
         />
-      ))}
-    </div>
+      )}
+    </>
   );
 };
 

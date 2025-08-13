@@ -246,10 +246,12 @@ serve(async (req) => {
         ebay_account_type: accountType
       };
 
+      // For individual accounts, leave policy IDs as NULL
+      // eBay will automatically apply account defaults when we omit policies
       if (accountType === 'individual') {
-        profileUpdates.ebay_payment_policy_id = 'INDIVIDUAL_DEFAULT_PAYMENT';
-        profileUpdates.ebay_return_policy_id = 'INDIVIDUAL_DEFAULT_RETURN';
-        profileUpdates.ebay_fulfillment_policy_id = 'INDIVIDUAL_DEFAULT_FULFILLMENT';
+        profileUpdates.ebay_payment_policy_id = null;
+        profileUpdates.ebay_return_policy_id = null;
+        profileUpdates.ebay_fulfillment_policy_id = null;
         profileUpdates.preferred_shipping_service = 'usps_priority';
       }
 

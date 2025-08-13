@@ -383,17 +383,28 @@ async function syncListingToEbay(supabaseClient: any, userId: string, listingId:
       // Create new offer with eBay API validated shipping services
       const offerData = await ebayApi.offerManager.createOfferData(listing, listingId, userProfile, ebayLocationKey);
       
-      // Enhanced logging for troubleshooting
-      const fulfillmentValidation = EbayShippingServices.validateFulfillmentDetails(offerData.fulfillmentDetails || {});
-      logStep('🔍 Pre-creation validation', {
-        isValid: fulfillmentValidation.isValid,
-        errors: fulfillmentValidation.errors,
-        serviceCode: offerData.fulfillmentDetails?.shippingOptions[0]?.shippingServices[0]?.serviceCode,
-        accountType: EbayOfferManager.isIndividualAccount(userProfile) ? 'individual' : 'business'
-      });
+      // Only validate fulfillmentDetails for business accounts
+      // Individual accounts use listingPolicies instead
+      const isIndividualAccount = EbayOfferManager.isIndividualAccount(userProfile);
       
-      if (!fulfillmentValidation.isValid) {
-        throw new Error(`Invalid fulfillment data: ${fulfillmentValidation.errors.join(', ')}`);
+      if (!isIndividualAccount && offerData.fulfillmentDetails) {
+        // Enhanced logging for troubleshooting (business accounts only)
+        const fulfillmentValidation = EbayShippingServices.validateFulfillmentDetails(offerData.fulfillmentDetails);
+        logStep('🔍 Pre-creation validation for business account', {
+          isValid: fulfillmentValidation.isValid,
+          errors: fulfillmentValidation.errors,
+          serviceCode: offerData.fulfillmentDetails?.shippingOptions[0]?.shippingServices[0]?.serviceCode,
+          accountType: 'business'
+        });
+        
+        if (!fulfillmentValidation.isValid) {
+          throw new Error(`Invalid fulfillment details: ${fulfillmentValidation.errors.join(', ')}`);
+        }
+      } else if (isIndividualAccount) {
+        logStep('🔍 Individual account - using default listing policies', {
+          accountType: 'individual',
+          policies: offerData.listingPolicies
+        });
       }
       
       offerId = await ebayApi.createOffer(offerData);

@@ -57,41 +57,26 @@ export class EbayOfferManager {
   }
 
   /**
-   * Builds offer data for individual accounts using fulfillmentDetails
+   * Builds offer data for individual accounts WITHOUT listing policies
+   * eBay will automatically apply the account's default policies
    */
   static async buildIndividualAccountOffer(
     listing: any,
     sku: string,
     userProfile: any,
     ebayLocationKey: string,
-    userId: string
+    userId: string  // Note: userId parameter no longer needed but kept for compatibility
   ): Promise<EbayOfferData> {
-    EbayOfferManager.logStep('🔍 Building individual account offer with eBay API validated shipping', {
+    EbayOfferManager.logStep('🔍 Building individual account offer WITHOUT policies', {
       sku,
       title: listing.title,
-      shipping_cost_domestic: userProfile.shipping_cost_domestic,
-      handling_time_days: userProfile.handling_time_days
+      accountType: 'INDIVIDUAL',
+      note: 'Omitting listingPolicies - eBay will apply account defaults'
     });
 
-    // 🔥 DEPLOYMENT VERSION: v1.70 - Use eBay API to get valid shipping services
-    const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(userProfile, { userId });
-
-    // 🔍 CRITICAL DEBUG - Verify service code before returning
-    console.log('🚨 DEPLOYMENT VERIFICATION v1.62 - Service code being used:', {
-      serviceCode: fulfillmentDetails.shippingOptions[0].shippingServices[0].serviceCode,
-      deploymentVersion: 'v1.62',
-      timestamp: new Date().toISOString(),
-      hasAdditionalShippingCost: !!fulfillmentDetails.shippingOptions[0].shippingServices[0].additionalShippingCost,
-      hasShipToLocations: !!fulfillmentDetails.shipToLocations
-    });
-
-    EbayOfferManager.logStep('✅ Individual account fulfillment details created with enhanced shipping', {
-      serviceCode: fulfillmentDetails.shippingOptions[0].shippingServices[0].serviceCode,
-      cost: fulfillmentDetails.shippingOptions[0].shippingServices[0].shippingCost.value,
-      additionalCost: fulfillmentDetails.shippingOptions[0].shippingServices[0].additionalShippingCost?.value,
-      shipToRegions: fulfillmentDetails.shipToLocations?.regionIncluded?.map(r => r.regionName)
-    });
-
+    // For individual accounts, we DON'T send listingPolicies at all
+    // eBay will automatically apply the account's default policies
+    // The fake "INDIVIDUAL_DEFAULT_*" IDs were causing error 25709
     const offerData: EbayOfferData = {
       sku,
       marketplaceId: "EBAY_US",
@@ -105,18 +90,15 @@ export class EbayOfferManager {
           currency: "USD"
         }
       },
-      listingDescription: listing.description || 'Quality item in great condition.',
-      fulfillmentDetails
+      listingDescription: listing.description || 'Quality item in great condition.'
+      // NO listingPolicies field - let eBay apply defaults!
     };
 
-    EbayOfferManager.logStep('✅ Enhanced individual account offer created', {
+    EbayOfferManager.logStep('✅ Individual account offer created WITHOUT policies', {
       sku,
       categoryId: offerData.categoryId,
       price: offerData.pricingSummary.price.value,
-      shippingService: fulfillmentDetails.shippingOptions[0].shippingServices[0].serviceCode,
-      shippingCost: fulfillmentDetails.shippingOptions[0].shippingServices[0].shippingCost.value,
-      additionalShippingCost: fulfillmentDetails.shippingOptions[0].shippingServices[0].additionalShippingCost?.value,
-      shipToLocations: fulfillmentDetails.shipToLocations?.regionIncluded?.length
+      note: 'eBay will apply account default policies automatically'
     });
 
     return offerData;
@@ -171,32 +153,37 @@ export class EbayOfferManager {
   }
 
   /**
-   * Determines if user has individual account policies
+   * Determines if user has individual account (no custom business policies)
    */
   static isIndividualAccount(userProfile: any): boolean {
-    const individualPolicyIds = [
+    // Individual accounts are identified by:
+    // 1. Null/undefined policy IDs
+    // 2. The fake "INDIVIDUAL_DEFAULT_*" strings we were using (for backwards compatibility)
+    // 3. Empty string policy IDs
+    
+    const hasNullPolicies = !userProfile.ebay_payment_policy_id || 
+                           !userProfile.ebay_fulfillment_policy_id || 
+                           !userProfile.ebay_return_policy_id;
+    
+    // Check for our old fake policy IDs (for backwards compatibility)
+    const fakeIndividualPolicyIds = [
       'INDIVIDUAL_DEFAULT_PAYMENT',
       'INDIVIDUAL_DEFAULT_RETURN',
       'INDIVIDUAL_DEFAULT_FULFILLMENT'
     ];
     
-    // Check if policies are null/undefined (individual account) or specific individual policy strings
-    const hasNullPolicies = !userProfile.ebay_payment_policy_id || 
-                           !userProfile.ebay_fulfillment_policy_id || 
-                           !userProfile.ebay_return_policy_id;
-    
-    const hasIndividualPolicy = individualPolicyIds.includes(userProfile.ebay_payment_policy_id) ||
-           individualPolicyIds.includes(userProfile.ebay_return_policy_id) ||
-           individualPolicyIds.includes(userProfile.ebay_fulfillment_policy_id);
+    const hasFakePolicy = fakeIndividualPolicyIds.includes(userProfile.ebay_payment_policy_id) ||
+           fakeIndividualPolicyIds.includes(userProfile.ebay_return_policy_id) ||
+           fakeIndividualPolicyIds.includes(userProfile.ebay_fulfillment_policy_id);
            
-    const isIndividual = hasNullPolicies || hasIndividualPolicy;
+    const isIndividual = hasNullPolicies || hasFakePolicy;
            
     EbayOfferManager.logStep('Account type check', {
       paymentPolicy: userProfile.ebay_payment_policy_id,
       returnPolicy: userProfile.ebay_return_policy_id,
       fulfillmentPolicy: userProfile.ebay_fulfillment_policy_id,
       hasNullPolicies,
-      hasIndividualPolicy,
+      hasFakePolicy,
       isIndividual
     });
     
