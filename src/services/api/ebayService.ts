@@ -62,8 +62,18 @@ export class EbayService {
   }
 
   static async syncListing(listingId: string, options: { dryRun?: boolean } = {}) {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { data, error } = await supabase.functions.invoke('ebay-inventory-sync', {
-      body: { listingId, ...options }
+      body: { 
+        listingId, 
+        userId: user.id,
+        ...options 
+      }
     });
 
     if (error) {

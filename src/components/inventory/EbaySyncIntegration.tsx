@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EbayService } from '@/services/api/ebayService';
+import { EbayTradingService } from '@/services/api/ebayTradingService';
 import { supabase } from '@/integrations/supabase/client';
 import type { Listing } from '@/types/Listing';
 
@@ -220,26 +221,25 @@ const EbaySyncIntegration = ({
           try {
             console.log('📤 Creating new eBay listing for:', listing.title);
             
-            // Use the syncListing method which handles the full creation flow
-            const result = await EbayService.syncListing(listing.id, { dryRun: false });
+            // TEMPORARY: Test Trading API directly for individual sellers
+            console.log('🔧 [DEBUG] Testing Trading API directly for individual seller');
+            console.log('🔍 [DEBUG] Calling ebay-trading-api edge function...');
+            
+            const result = await EbayTradingService.createListing(listing.id);
+            
+            console.log('📊 [DEBUG] Trading API result:', result);
             
             if (result.success) {
               setSyncStatuses(prev => prev.map(s => 
                 s.listingId === listing.id 
-                  ? { ...s, status: 'success', message: `Created on eBay: ${result.itemId}`, ebayItemId: result.itemId }
+                  ? { ...s, status: 'success', message: `Created on eBay via Trading API: ${result.itemId}`, ebayItemId: result.itemId }
                   : s
               ));
               successCount++;
               
-              // Update the listing with the new eBay item ID
-              if (result.itemId) {
-                await supabase
-                  .from('listings')
-                  .update({ ebay_item_id: result.itemId })
-                  .eq('id', listing.id);
-              }
+              // The Trading API function already updates the listing with the eBay item ID
             } else {
-              throw new Error(result.error || 'Failed to create eBay listing');
+              throw new Error(result.error || 'Failed to create eBay listing via Trading API');
             }
           } catch (createError) {
             console.error('Failed to create eBay listing:', createError);

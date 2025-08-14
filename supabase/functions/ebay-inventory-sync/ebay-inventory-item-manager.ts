@@ -115,6 +115,7 @@ export class EbayInventoryItemManager {
       },
       condition: this.mapConditionToEbay(listing.condition),
       availability: {
+        // For individual accounts, set availability with proper location reference
         shipToLocationAvailability: {
           quantity: 1
         }
@@ -175,13 +176,30 @@ export class EbayInventoryItemManager {
     });
 
     if (!response.ok) {
-      let errorDetails;
-      try {
-        errorDetails = await response.json();
-      } catch {
-        errorDetails = await response.text();
+      const errorDetails = await response.json().catch(() => ({ message: 'Could not parse error response' }));
+      
+      // Enhanced error logging
+      console.error('❌ eBay Inventory API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        sku: sku,
+        errorDetails: errorDetails,
+        requestData: {
+          title: itemData.product?.title,
+          condition: itemData.condition,
+          imageCount: itemData.product?.imageUrls?.length || 0,
+          hasDescription: !!itemData.product?.description
+        }
+      });
+      
+      // Check for specific error codes
+      if (errorDetails.errors) {
+        const errorMessages = errorDetails.errors.map((e: any) => 
+          `${e.errorId}: ${e.message} ${e.longMessage ? `- ${e.longMessage}` : ''}`
+        ).join('; ');
+        throw new Error(`Failed to create inventory item: ${errorMessages}`);
       }
-      EbayInventoryItemManager.logStep('Inventory item creation failed', { error: errorDetails, status: response.status });
+      
       throw new Error(`Failed to create inventory item: ${JSON.stringify(errorDetails)}`);
     }
 

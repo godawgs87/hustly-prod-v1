@@ -20,6 +20,20 @@ export interface EbayOfferData {
     fulfillmentPolicyId: string;
     returnPolicyId: string;
   };
+  paymentMethods?: {
+    paymentMethodType: string;
+    brands?: string[];
+  }[];
+  returnTerms?: {
+    returnsAccepted: boolean;
+    returnPeriod: {
+      value: number;
+      unit: string;
+    };
+    returnMethod: string;
+    returnShippingCostPayer: string;
+    restockingFeePercentage: string;
+  };
 }
 
 export interface ExistingOffer {
@@ -65,27 +79,18 @@ export class EbayOfferManager {
     sku: string,
     userProfile: any,
     ebayLocationKey: string,
-    userId: string
+    userId: string,
+    ebayPolicies?: { paymentPolicyId: string; returnPolicyId: string; fulfillmentPolicyId: string } | null
   ): Promise<EbayOfferData> {
-    EbayOfferManager.logStep('🔍 Building individual account offer WITHOUT policies', {
+    EbayOfferManager.logStep('🔍 Building individual account offer', {
       sku,
       title: listing.title,
       accountType: 'INDIVIDUAL',
-      note: 'Omitting listingPolicies - eBay will apply account defaults'
+      hasPolicies: !!ebayPolicies,
+      note: ebayPolicies ? 'Using fetched eBay policies' : 'Using inline fulfillment details'
     });
 
-    // Create fulfillment details for individual accounts
-    const { EbayShippingServices } = await import('./ebay-shipping-services.ts');
-    const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(
-      userProfile,
-      {
-        domesticCost: listing.shipping_cost || 9.95,
-        handlingTimeDays: listing.handling_time || 1,
-        userId
-      }
-    );
-
-    // For individual accounts, we DON'T send listingPolicies but DO send fulfillmentDetails
+    // Base offer data
     const offerData: EbayOfferData = {
       sku,
       marketplaceId: "EBAY_US",
@@ -99,17 +104,94 @@ export class EbayOfferManager {
           currency: "USD"
         }
       },
-      listingDescription: listing.description || 'Quality item in great condition.',
-      fulfillmentDetails  // Include shipping details for individual accounts!
+      listingDescription: listing.description || 'Quality item in great condition.'
     };
 
-    EbayOfferManager.logStep('✅ Individual account offer created WITHOUT policies but WITH fulfillment', {
+    // Check if we have valid eBay policies (not null, not empty object)
+    const hasValidPolicies = ebayPolicies && 
+      ebayPolicies.paymentPolicyId && 
+      ebayPolicies.returnPolicyId && 
+      ebayPolicies.fulfillmentPolicyId;
+
+    // If we have valid eBay policies, use them (should never happen for individual accounts)
+    if (hasValidPolicies) {
+      offerData.listingPolicies = {
+        paymentPolicyId: ebayPolicies.paymentPolicyId,
+        returnPolicyId: ebayPolicies.returnPolicyId,
+        fulfillmentPolicyId: ebayPolicies.fulfillmentPolicyId
+      };
+      
+      EbayOfferManager.logStep('⚠️ Unexpected: Individual account with business policies', {
+        policies: offerData.listingPolicies
+      });
+    } else {
+      // Fallback: Create fulfillment details for individual accounts
+      EbayOfferManager.logStep('🚀 Entering inline details branch for individual account', {
+        reason: 'No eBay policies provided, adding inline payment/return/fulfillment'
+      });
+      
+      const { EbayShippingServices } = await import('./ebay-shipping-services.ts');
+      const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(
+        userProfile,
+        {
+          domesticCost: listing.shipping_cost || 9.95,
+          handlingTimeDays: listing.handling_time || 1,
+          userId
+        }
+      );
+      offerData.fulfillmentDetails = fulfillmentDetails;
+      
+      // Add inline payment methods (required for individual accounts)
+      offerData.paymentMethods = [
+        {
+          paymentMethodType: "CREDIT_CARD",
+          brands: ["VISA", "MASTERCARD", "AMERICAN_EXPRESS", "DISCOVER"]
+        },
+        {
+          paymentMethodType: "PAYPAL"
+        }
+      ];
+      
+      EbayOfferManager.logStep('💳 Added payment methods', {
+        count: offerData.paymentMethods.length,
+        types: offerData.paymentMethods.map(pm => pm.paymentMethodType)
+      });
+      
+      // Add inline return terms (required for individual accounts)
+      offerData.returnTerms = {
+        returnsAccepted: userProfile?.accepts_returns !== false, // Default to true if not specified
+        returnPeriod: {
+          value: userProfile?.return_period_days || 30,
+          unit: "DAY"
+        },
+        returnMethod: "MONEY_BACK", // eBay individual accounts typically require MONEY_BACK
+        returnShippingCostPayer: userProfile?.return_shipping_paid_by === 'seller' ? "SELLER" : "BUYER",
+        restockingFeePercentage: userProfile?.restocking_fee_percentage || "0"
+      };
+      
+      EbayOfferManager.logStep('↩️ Added return terms', {
+        returnsAccepted: offerData.returnTerms.returnsAccepted,
+        returnPeriod: `${offerData.returnTerms.returnPeriod.value} ${offerData.returnTerms.returnPeriod.unit}`,
+        returnMethod: offerData.returnTerms.returnMethod,
+        shippingPayer: offerData.returnTerms.returnShippingCostPayer
+      });
+      
+      EbayOfferManager.logStep('✅ Added inline payment and return details for individual account', {
+        paymentMethods: offerData.paymentMethods.length,
+        returnsAccepted: offerData.returnTerms.returnsAccepted,
+        returnPeriod: offerData.returnTerms.returnPeriod.value,
+        fulfillmentAdded: !!offerData.fulfillmentDetails
+      });
+    }
+
+    EbayOfferManager.logStep('✅ Individual account offer created', {
       sku,
       categoryId: offerData.categoryId,
       price: offerData.pricingSummary.price.value,
-      hasShipping: !!fulfillmentDetails,
-      shippingService: fulfillmentDetails?.shippingOptions?.[0]?.shippingServices?.[0]?.serviceCode,
-      note: 'eBay will apply account default policies automatically'
+      hasPolicies: !!ebayPolicies,
+      hasShipping: !!offerData.fulfillmentDetails,
+      shippingService: offerData.fulfillmentDetails?.shippingOptions?.[0]?.shippingServices?.[0]?.serviceCode,
+      note: ebayPolicies ? 'Using fetched eBay policies' : 'Using inline fulfillment details'
     });
 
     return offerData;
@@ -130,6 +212,12 @@ export class EbayOfferManager {
       ebay_return_policy_id: userProfile.ebay_return_policy_id,
       preferred_shipping_service: userProfile.preferred_shipping_service
     });
+    
+    // Check if we have valid policy IDs
+    const hasValidPolicies = userProfile.ebay_payment_policy_id && 
+                            userProfile.ebay_fulfillment_policy_id && 
+                            userProfile.ebay_return_policy_id;
+    
     const offerData: EbayOfferData = {
       sku,
       marketplaceId: "EBAY_US",
@@ -143,18 +231,56 @@ export class EbayOfferManager {
           currency: "USD"
         }
       },
-      listingDescription: listing.description || 'Quality item in great condition.',
-      listingPolicies: {
+      listingDescription: listing.description || 'Quality item in great condition.'
+    };
+    
+    // If we have valid policy IDs, use them
+    if (hasValidPolicies) {
+      offerData.listingPolicies = {
         paymentPolicyId: userProfile.ebay_payment_policy_id,
         fulfillmentPolicyId: userProfile.ebay_fulfillment_policy_id,
         returnPolicyId: userProfile.ebay_return_policy_id
-      }
-    };
+      };
+    } else {
+      // Otherwise, include inline fulfillment details (required for publish)
+      const shippingService = EbayShippingServices.getServiceConfig(
+        userProfile.preferred_shipping_service || 'usps_priority'
+      ) || { serviceCode: 'USPSPriority', displayName: 'USPS Priority Mail', estimatedDays: { min: 1, max: 3 }, isValid: true };
+      
+      offerData.fulfillmentDetails = {
+        handlingTime: {
+          value: userProfile.handling_time_days || 1,
+          unit: "DAY"
+        },
+        shippingOptions: [{
+          optionType: "DOMESTIC",
+          costType: "FLAT_RATE",
+          shippingServices: [{
+            serviceCode: shippingService.serviceCode,
+            shippingCost: {
+              value: (listing.shipping_cost || userProfile.shipping_cost_domestic || 10.45).toString(),
+              currency: "USD"
+            },
+            additionalShippingCost: {
+              value: (userProfile.shipping_cost_additional || 2.00).toString(),
+              currency: "USD"
+            }
+          }]
+        }]
+      };
+      
+      EbayOfferManager.logStep('⚠️ No valid policy IDs, using inline fulfillment details', {
+        serviceCode: shippingService.serviceCode,
+        shippingCost: offerData.fulfillmentDetails.shippingOptions[0].shippingServices[0].shippingCost.value
+      });
+    }
 
     EbayOfferManager.logStep('✅ Business account offer created', {
       sku,
       categoryId: offerData.categoryId,
       price: offerData.pricingSummary.price.value,
+      hasListingPolicies: !!offerData.listingPolicies,
+      hasFulfillmentDetails: !!offerData.fulfillmentDetails,
       paymentPolicyId: userProfile.ebay_payment_policy_id,
       fulfillmentPolicyId: userProfile.ebay_fulfillment_policy_id,
       returnPolicyId: userProfile.ebay_return_policy_id
@@ -220,23 +346,21 @@ export class EbayOfferManager {
     userProfile: any,
     ebayLocationKey: string
   ): Promise<EbayOfferData> {
-    // 🔍 CRITICAL DEBUG - Account type detection
-    console.log('🔍 CRITICAL DEBUG - Account type detection:', {
-      hasPaymentPolicy: !!userProfile.ebay_payment_policy_id,
-      hasFulfillmentPolicy: !!userProfile.ebay_fulfillment_policy_id,
-      hasReturnPolicy: !!userProfile.ebay_return_policy_id,
+    EbayOfferManager.logStep('🔍 Creating offer data', {
+      sku,
+      accountType: userProfile.account_type,
+      hasBusinessPolicies: userProfile.has_business_policies,
       paymentPolicyValue: userProfile.ebay_payment_policy_id,
       fulfillmentPolicyValue: userProfile.ebay_fulfillment_policy_id,
       returnPolicyValue: userProfile.ebay_return_policy_id,
       isIndividual: EbayOfferManager.isIndividualAccount(userProfile),
-      codePath: EbayOfferManager.isIndividualAccount(userProfile) ? 'INDIVIDUAL_ACCOUNT' : 'BUSINESS_ACCOUNT'
+      codePath: 'ALWAYS_USE_POLICIES'
     });
 
-    if (EbayOfferManager.isIndividualAccount(userProfile)) {
-      return await EbayOfferManager.buildIndividualAccountOffer(listing, sku, userProfile, ebayLocationKey, this.userId);
-    } else {
-      return EbayOfferManager.buildBusinessAccountOffer(listing, sku, userProfile, ebayLocationKey);
-    }
+    // CRITICAL: eBay Inventory API requires business policy IDs for ALL accounts
+    // Individual accounts cannot use inline details - they must have policy IDs
+    // The getUserBusinessPolicies method will create policies if needed
+    return EbayOfferManager.buildBusinessAccountOffer(listing, sku, userProfile, ebayLocationKey);
   }
 
   /**
@@ -367,11 +491,69 @@ export class EbayOfferManager {
   async publishOffer(token: string, offerId: string): Promise<string> {
     EbayOfferManager.logStep('Publishing offer', { offerId });
 
-    const requestHeaders = this.ebayHeaders(token);
+    // First, let's verify the offer exists and get its details
+    EbayOfferManager.logStep('🔍 DEBUG - Verifying offer before publish', { offerId });
+    
+    try {
+      const verifyHeaders = new Headers();
+      verifyHeaders.set('Authorization', `Bearer ${token}`);
+      verifyHeaders.set('Accept-Language', 'en-US');
+      verifyHeaders.set('Content-Type', 'application/json');
+      
+      const verifyResponse = await fetch(`${this.baseUrl}/sell/inventory/v1/offer/${offerId}`, {
+        method: 'GET',
+        headers: verifyHeaders
+      });
+      
+      if (verifyResponse.ok) {
+        const offerDetails = await verifyResponse.json();
+        EbayOfferManager.logStep('📋 DEBUG - Offer details before publish', {
+          offerId: offerDetails.offerId,
+          sku: offerDetails.sku,
+          status: offerDetails.status,
+          merchantLocationKey: offerDetails.merchantLocationKey,
+          hasListingPolicies: !!offerDetails.listingPolicies,
+          listingPolicies: offerDetails.listingPolicies,
+          hasFulfillmentPolicy: !!offerDetails.listingPolicies?.fulfillmentPolicyId,
+          hasPaymentMethods: !!offerDetails.paymentMethods,
+          hasReturnTerms: !!offerDetails.returnTerms,
+          categoryId: offerDetails.categoryId
+        });
+      } else {
+        EbayOfferManager.logStep('⚠️ DEBUG - Could not verify offer', { 
+          status: verifyResponse.status,
+          offerId 
+        });
+      }
+    } catch (verifyError) {
+      EbayOfferManager.logStep('⚠️ DEBUG - Error verifying offer', { 
+        error: verifyError,
+        offerId 
+      });
+    }
 
+    // For publishOffer, we need special headers without Content-Type
+    // since we're not sending a body
+    const requestHeaders = new Headers();
+    requestHeaders.set('Authorization', `Bearer ${token}`);
+    requestHeaders.set('Accept-Language', 'en-US');
+    // DO NOT set Content-Type for publishOffer - no body is sent
+
+    EbayOfferManager.logStep('🚀 DEBUG - Publishing offer with headers', {
+      offerId,
+      url: `${this.baseUrl}/sell/inventory/v1/offer/${offerId}/publish`,
+      headers: {
+        'Authorization': 'Bearer [token]',
+        'Accept-Language': 'en-US'
+      }
+    });
+
+    // IMPORTANT: publishOffer API does NOT accept a request body
+    // Sending any payload causes error 2004 "Invalid request"
     const response = await fetch(`${this.baseUrl}/sell/inventory/v1/offer/${offerId}/publish`, {
       method: 'POST',
       headers: requestHeaders
+      // NO BODY - the API doesn't accept any payload
     });
 
     if (!response.ok) {
@@ -381,7 +563,19 @@ export class EbayOfferManager {
       } catch {
         errorDetails = await response.text();
       }
-      EbayOfferManager.logStep('Offer publishing failed', { error: errorDetails, status: response.status });
+      
+      // Enhanced error logging for debugging
+      EbayOfferManager.logStep('❌ CRITICAL - Offer publishing failed with detailed error', { 
+        offerId,
+        status: response.status,
+        errorDetails: errorDetails,
+        errorCode: errorDetails?.errors?.[0]?.errorId,
+        errorMessage: errorDetails?.errors?.[0]?.message,
+        errorLongMessage: errorDetails?.errors?.[0]?.longMessage,
+        errorParameters: errorDetails?.errors?.[0]?.parameters,
+        fullError: JSON.stringify(errorDetails, null, 2)
+      });
+      
       throw new Error(`Failed to publish offer: ${JSON.stringify(errorDetails)}`);
     }
 

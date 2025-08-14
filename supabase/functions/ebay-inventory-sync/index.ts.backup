@@ -1,0 +1,1557 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { EbayOfferManager } from './ebay-offer-manager.ts'
+import { EbayInventoryItemManager } from './ebay-inventory-item-manager.ts'
+import { EbayShippingServices } from './ebay-shipping-services.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[EBAY-INVENTORY-SYNC] ${step}${detailsStr}`);
+};
+
+// ========== EBAY SHIPPING SERVICES (INLINED) ==========
+class EbayShippingServices {
+  static async createFulfillmentDetails(userProfile: any, options: any) {
+    const logShipping = (msg: string, data?: any) => {
+      console.log(`[EBAY-SHIPPING] ${msg}`, data || '');
+    };
+
+    logShipping('Creating fulfillment details', {
+      accountType: userProfile.account_type,
+      hasBusinessPolicies: userProfile.has_business_policies,
+      userId: options.userId
+    });
+
+    // For business accounts with policies, return null (policies will be used)
+    if (userProfile.account_type === 'business' && userProfile.has_business_policies) {
+      logShipping('Business account with policies detected, skipping inline fulfillment');
+      return null;
+    }
+
+    // For individual accounts or business without policies, create inline fulfillment
+    const shippingOption = {
+      optionType: 'DOMESTIC',
+      costType: 'FLAT_RATE',
+      shippingCost: {
+        value: String(options.domesticCost || 9.95),
+        currency: 'USD'
+      },
+      shippingServices: [{
+        sortOrder: 1,
+        shippingCarrierCode: 'USPS',
+        shippingServiceCode: 'USPSPriority',
+        shippingCost: {
+          value: String(options.domesticCost || 9.95),
+          currency: 'USD'
+        },
+        additionalShippingCost: {
+          value: '0.00',
+          currency: 'USD'
+        },
+        freeShipping: false,
+        buyerResponsibleForShipping: false,
+        buyerResponsibleForPickup: false
+      }],
+      insuranceOffered: false,
+      insuranceFee: {
+        value: '0.00',
+        currency: 'USD'
+      }
+    };
+
+    const fulfillmentDetails = {
+      fulfillmentTime: {
+        value: options.handlingTimeDays || 1,
+        unit: 'DAY'
+      },
+      shippingOptions: [shippingOption]
+    };
+
+    logShipping('Created inline fulfillment details', fulfillmentDetails);
+    return fulfillmentDetails;
+  }
+}
+
+// ========== EBAY INVENTORY ITEM MANAGER (INLINED) ==========
+interface EbayInventoryItem {
+  sku: string;
+  product: {
+    title: string;
+    description: string;
+    imageUrls: string[];
+    brand?: string;
+    aspects: Record<string, string[]>;
+  };
+  condition: string;
+  availability: {
+    shipToLocationAvailability: {
+      quantity: number;
+    };
+  };
+}
+
+class EbayInventoryItemManager {
+  private baseUrl: string;
+  private supabaseClient: any;
+  private userId: string;
+
+  constructor(baseUrl: string, supabaseClient: any, userId: string) {
+    this.baseUrl = baseUrl;
+    this.supabaseClient = supabaseClient;
+    this.userId = userId;
+  }
+
+  private ebayHeaders(token: string): Headers {
+    const headers = new Headers();
+    headers.set('Authorization', `Bearer ${token}`);
+    headers.set('Content-Type', 'application/json');
+    headers.set('Content-Language', 'en-US');
+    headers.set('Accept-Language', 'en-US');
+    return headers;
+  }
+
+  static mapListingToEbayInventory(listing: any, photos: any[]): EbayInventoryItem {
+    let imageUrls: string[] = [];
+    
+    // Try new photo format first (listing_photos table)
+    if (photos && photos.length > 0) {
+      imageUrls = photos
+        .filter(p => p.photo_url)
+        .map(p => p.photo_url);
+    }
+    
+    // Fall back to legacy photos field if no new photos
+    if (imageUrls.length === 0 && listing.photos) {
+      // Legacy photos is a JSON array of URLs
+      if (Array.isArray(listing.photos)) {
+        imageUrls = listing.photos.filter(url => url && typeof url === 'string');
+      }
+    }
+    
+    // Use placeholder if still no images
+    if (imageUrls.length === 0) {
+      imageUrls = ['https://via.placeholder.com/400x400/CCCCCC/666666?text=No+Image'];
+    }
+
+    const aspects: Record<string, string[]> = {};
+    
+    if (listing.brand) {
+      aspects['Brand'] = [listing.brand];
+    }
+    if (listing.size) {
+      aspects['Size'] = [listing.size];
+    }
+    if (listing.color) {
+      aspects['Color'] = [listing.color];
+    }
+    if (listing.material) {
+      aspects['Material'] = [listing.material];
+    }
+    if (listing.style) {
+      aspects['Style'] = [listing.style];
+    }
+
+    const conditionMapping: Record<string, string> = {
+      'new_with_tags': 'NEW',
+      'new_without_tags': 'NEW_WITHOUT_TAGS',
+      'new_other': 'NEW_OTHER',
+      'like_new': 'LIKE_NEW',
+      'excellent': 'USED_EXCELLENT',
+      'very_good': 'USED_VERY_GOOD',
+      'good': 'USED_GOOD',
+      'fair': 'USED_ACCEPTABLE',
+      'poor': 'FOR_PARTS_OR_NOT_WORKING'
+    };
+
+    const ebayCondition = conditionMapping[listing.condition] || 'USED_GOOD';
+
+    return {
+      sku: listing.sku,
+      product: {
+        title: listing.title || 'Untitled Item',
+        description: listing.description || 'No description provided',
+        imageUrls: imageUrls,
+        brand: listing.brand,
+        aspects: aspects
+      },
+      condition: ebayCondition,
+      availability: {
+        shipToLocationAvailability: {
+          quantity: listing.quantity || 1
+        }
+      }
+    };
+  }
+
+  async createInventoryItem(listing: any, sku: string, locationKey: string): Promise<any> {
+    const token = await this.getAccessToken();
+    
+    const { data: photos, error: photosError } = await this.supabaseClient
+      .from('listing_photos')
+      .select('*')
+      .eq('listing_id', listing.id)
+      .order('display_order', { ascending: true });
+
+    if (photosError) {
+      logStep('⚠️ Could not fetch photos', { error: photosError });
+    }
+
+    const inventoryItem = EbayInventoryItemManager.mapListingToEbayInventory(
+      { ...listing, sku }, 
+      photos || []
+    );
+
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/inventory_item/${sku}`, {
+      method: 'PUT',
+      headers: this.ebayHeaders(token),
+      body: JSON.stringify(inventoryItem)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create inventory item: ${errorText}`);
+    }
+
+    return { sku, locationKey };
+  }
+
+  private async getAccessToken(): Promise<string> {
+    const { data: account, error } = await this.supabaseClient
+      .from('marketplace_accounts')
+      .select('oauth_token')
+      .eq('user_id', this.userId)
+      .eq('platform', 'ebay')
+      .single();
+
+    if (error || !account) {
+      throw new Error('No eBay account found');
+    }
+
+    return account.oauth_token;
+  }
+}
+
+// ========== EBAY OFFER MANAGER (INLINED) ==========
+class EbayOfferManager {
+  private baseUrl: string;
+  private supabaseClient: any;
+  private userId: string;
+
+  constructor(baseUrl: string, supabaseClient: any, userId: string) {
+    this.baseUrl = baseUrl;
+    this.supabaseClient = supabaseClient;
+    this.userId = userId;
+  }
+
+  /**
+   * Determines if user has individual account (no custom business policies)
+   */
+  static isIndividualAccount(userProfile: any): boolean {
+    // Individual accounts are identified by:
+    // 1. Null/undefined policy IDs
+    // 2. Empty string policy IDs
+    // 3. Policy IDs that are too short to be real eBay policy IDs (< 15 chars)
+    
+    const hasNullPolicies = !userProfile.ebay_payment_policy_id || 
+                           !userProfile.ebay_return_policy_id || 
+                           !userProfile.ebay_fulfillment_policy_id;
+    
+    const hasEmptyPolicies = userProfile.ebay_payment_policy_id === '' ||
+                            userProfile.ebay_return_policy_id === '' ||
+                            userProfile.ebay_fulfillment_policy_id === '';
+    
+    const hasShortPolicies = (userProfile.ebay_payment_policy_id && userProfile.ebay_payment_policy_id.length < 15) ||
+                             (userProfile.ebay_return_policy_id && userProfile.ebay_return_policy_id.length < 15) ||
+                             (userProfile.ebay_fulfillment_policy_id && userProfile.ebay_fulfillment_policy_id.length < 15);
+    
+    // Also check the account_type and has_business_policies flags
+    const isNotBusinessAccount = userProfile.account_type !== 'business' || !userProfile.has_business_policies;
+    
+    return hasNullPolicies || hasEmptyPolicies || hasShortPolicies || isNotBusinessAccount;
+  }
+
+  private ebayHeaders(token: string): Headers {
+    const headers = new Headers();
+    headers.set('Authorization', `Bearer ${token}`);
+    headers.set('Content-Type', 'application/json');
+    headers.set('Content-Language', 'en-US');
+    headers.set('Accept-Language', 'en-US');
+    return headers;
+  }
+
+  async createOfferForInventoryItem(listing: any, sku: string, userProfile: any, ebayLocationKey: string, userId: string): Promise<any> {
+    const token = await this.getAccessToken();
+    
+    logStep('Creating offer', { 
+      sku, 
+      accountType: userProfile.account_type,
+      hasBusinessPolicies: userProfile.has_business_policies 
+    });
+
+    const offerData: any = {
+      sku: sku,
+      marketplaceId: 'EBAY_US',
+      format: 'FIXED_PRICE',
+      availableQuantity: listing.quantity || 1,
+      categoryId: listing.ebay_category_id || listing.category_id || '165',
+      listingDescription: listing.description || 'No description provided',
+      pricingSummary: {
+        price: {
+          value: String(listing.price || 0),
+          currency: 'USD'
+        }
+      },
+      merchantLocationKey: ebayLocationKey
+    };
+
+    // Handle policies based on account type
+    if (userProfile.account_type === 'business' && userProfile.has_business_policies) {
+      // Business account with policies
+      const policies = await this.getBusinessPolicies(userId);
+      
+      if (policies.paymentPolicyId) {
+        offerData.paymentPolicyId = policies.paymentPolicyId;
+      }
+      if (policies.returnPolicyId) {
+        offerData.returnPolicyId = policies.returnPolicyId;
+      }
+      if (policies.fulfillmentPolicyId) {
+        offerData.fulfillmentPolicyId = policies.fulfillmentPolicyId;
+      }
+      
+      logStep('Using business policies', policies);
+    } else {
+      // Individual account or business without policies - use inline details
+      logStep('Creating inline policies for individual/non-policy account');
+      
+      // Payment policy (inline)
+      offerData.paymentMethods = [{
+        paymentMethodType: 'PAYPAL',
+        recipientAccountReference: {
+          referenceType: 'PAYPAL_EMAIL',
+          referenceId: userProfile.email || 'payment@example.com'
+        }
+      }];
+
+      // Return policy (inline)
+      offerData.returnTerms = {
+        returnsAccepted: true,
+        returnPeriod: {
+          value: 30,
+          unit: 'DAY'
+        },
+        returnShippingCostPayer: 'BUYER',
+        returnMethod: 'EXCHANGE',
+        restockingFeePercentage: '0'
+      };
+
+      // Fulfillment policy (inline) - shipping services
+      const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(
+        userProfile,
+        {
+          domesticCost: listing.shipping_cost || 9.95,
+          handlingTimeDays: listing.handling_time || 1,
+          userId: userId
+        }
+      );
+
+      if (fulfillmentDetails) {
+        offerData.fulfillmentTime = fulfillmentDetails.fulfillmentTime;
+        offerData.shippingOptions = fulfillmentDetails.shippingOptions;
+        logStep('Added inline fulfillment details', fulfillmentDetails);
+      }
+    }
+
+    logStep('Final offer data', offerData);
+
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/offer`, {
+      method: 'POST',
+      headers: this.ebayHeaders(token),
+      body: JSON.stringify(offerData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logStep('❌ Offer creation failed', { 
+        status: response.status, 
+        error: errorText 
+      });
+      throw new Error(`Failed to create offer: ${errorText}`);
+    }
+
+    const result = await response.json();
+    logStep('✅ Offer created successfully', { offerId: result.offerId });
+    return result;
+  }
+
+  async publishOffer(offerId: string): Promise<any> {
+    const token = await this.getAccessToken();
+    
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/offer/${offerId}/publish`, {
+      method: 'POST',
+      headers: this.ebayHeaders(token),
+      body: JSON.stringify({})
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to publish offer: ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  }
+
+  private async getBusinessPolicies(userId: string): Promise<any> {
+    const { data: policies, error } = await this.supabaseClient
+      .from('ebay_business_policies')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_default', true);
+
+    if (error || !policies || policies.length === 0) {
+      logStep('⚠️ No default business policies found');
+      return {};
+    }
+
+    const paymentPolicy = policies.find(p => p.policy_type === 'PAYMENT');
+    const returnPolicy = policies.find(p => p.policy_type === 'RETURN');
+    const fulfillmentPolicy = policies.find(p => p.policy_type === 'FULFILLMENT');
+
+    return {
+      paymentPolicyId: paymentPolicy?.policy_id,
+      returnPolicyId: returnPolicy?.policy_id,
+      fulfillmentPolicyId: fulfillmentPolicy?.policy_id
+    };
+  }
+
+  private async getAccessToken(): Promise<string> {
+    const { data: account, error } = await this.supabaseClient
+      .from('marketplace_accounts')
+      .select('oauth_token')
+      .eq('user_id', this.userId)
+      .eq('platform', 'ebay')
+      .single();
+
+    if (error || !account) {
+      throw new Error('No eBay account found');
+    }
+
+    return account.oauth_token;
+  }
+
+  /**
+   * Gets existing offers for a SKU
+   */
+  async getExistingOffers(token: string, sku: string): Promise<any[]> {
+    logStep('Checking for existing offers', { sku });
+
+    const requestHeaders = this.ebayHeaders(token);
+
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}`, {
+      method: 'GET',
+      headers: requestHeaders
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        logStep('No existing offers found (404)', { sku });
+        return [];
+      }
+      
+      let errorDetails;
+      try {
+        errorDetails = await response.json();
+      } catch {
+        errorDetails = await response.text();
+      }
+      logStep('Failed to check existing offers', { error: errorDetails, status: response.status });
+      throw new Error(`Failed to check existing offers: ${JSON.stringify(errorDetails)}`);
+    }
+
+    const data = await response.json();
+    const offers = data.offers || [];
+    logStep('Found existing offers', { 
+      count: offers.length, 
+      offers: offers.map((o: any) => ({ id: o.offerId, status: o.status })) 
+    });
+    return offers;
+  }
+
+  /**
+   * Deletes an existing offer
+   */
+  async deleteOffer(token: string, offerId: string): Promise<void> {
+    logStep('🗑️ Deleting invalid offer', { offerId });
+
+    const requestHeaders = this.ebayHeaders(token);
+
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/offer/${offerId}`, {
+      method: 'DELETE',
+      headers: requestHeaders
+    });
+
+    if (!response.ok && response.status !== 404) {
+      let errorDetails;
+      try {
+        errorDetails = await response.json();
+      } catch {
+        errorDetails = await response.text();
+      }
+      logStep('Offer deletion failed', { error: errorDetails, status: response.status });
+      throw new Error(`Failed to delete offer: ${JSON.stringify(errorDetails)}`);
+    }
+
+    logStep('✅ Offer deleted successfully', { offerId });
+  }
+
+  /**
+   * Creates the appropriate offer data based on account type
+   */
+  async createOfferData(
+    listing: any,
+    sku: string,
+    userProfile: any,
+    ebayLocationKey: string
+  ): Promise<any> {
+    // 🔍 CRITICAL DEBUG - Account type detection
+    console.log('🔍 CRITICAL DEBUG - Account type detection:', {
+      hasPaymentPolicy: !!userProfile.ebay_payment_policy_id,
+      hasFulfillmentPolicy: !!userProfile.ebay_fulfillment_policy_id,
+      hasReturnPolicy: !!userProfile.ebay_return_policy_id,
+      paymentPolicyValue: userProfile.ebay_payment_policy_id,
+      fulfillmentPolicyValue: userProfile.ebay_fulfillment_policy_id,
+      returnPolicyValue: userProfile.ebay_return_policy_id,
+      isIndividual: EbayOfferManager.isIndividualAccount(userProfile),
+      codePath: EbayOfferManager.isIndividualAccount(userProfile) ? 'INDIVIDUAL_ACCOUNT' : 'BUSINESS_ACCOUNT'
+    });
+
+    if (EbayOfferManager.isIndividualAccount(userProfile)) {
+      return await EbayOfferManager.buildIndividualAccountOffer(listing, sku, userProfile, ebayLocationKey, this.userId);
+    } else {
+      return EbayOfferManager.buildBusinessAccountOffer(listing, sku, userProfile, ebayLocationKey);
+    }
+  }
+
+  /**
+   * Builds offer data for individual accounts using fulfillmentDetails
+   */
+  static async buildIndividualAccountOffer(
+    listing: any,
+    sku: string,
+    userProfile: any,
+    ebayLocationKey: string,
+    userId: string
+  ): Promise<any> {
+    logStep('🔍 CRITICAL DEBUG - Individual account using fulfillmentDetails', {
+      preferred_shipping_service: userProfile.preferred_shipping_service,
+      shipping_cost: listing.shipping_cost,
+      handling_time: listing.handling_time
+    });
+
+    const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(
+      userProfile,
+      {
+        domesticCost: listing.shipping_cost || 9.95,
+        handlingTimeDays: listing.handling_time || 1,
+        userId
+      }
+    );
+
+    // For individual accounts, we DON'T send listingPolicies but DO send fulfillmentDetails
+    const offerData = {
+      sku,
+      marketplaceId: "EBAY_US",
+      format: "FIXED_PRICE",
+      availableQuantity: 1,
+      categoryId: listing.ebay_category_id || "11450",
+      merchantLocationKey: ebayLocationKey,
+      pricingSummary: {
+        price: {
+          value: (listing.price || 10).toString(),
+          currency: "USD"
+        }
+      },
+      listingDescription: listing.description || 'Quality item in great condition.',
+      fulfillmentDetails  // Include shipping details for individual accounts!
+    };
+
+    logStep('✅ Individual account offer created WITHOUT policies but WITH fulfillment', {
+      sku,
+      categoryId: offerData.categoryId,
+      price: offerData.pricingSummary.price.value,
+      hasShipping: !!fulfillmentDetails,
+      shippingService: fulfillmentDetails?.shippingOptions?.[0]?.shippingServices?.[0]?.shippingServiceCode,
+      note: 'eBay will apply account default policies automatically'
+    });
+
+    return offerData;
+  }
+
+  /**
+   * Builds offer data for business accounts using listingPolicies
+   */
+  static buildBusinessAccountOffer(
+    listing: any,
+    sku: string,
+    userProfile: any,
+    ebayLocationKey: string
+  ): any {
+    logStep('🔍 CRITICAL DEBUG - Business account using policies', {
+      ebay_payment_policy_id: userProfile.ebay_payment_policy_id,
+      ebay_fulfillment_policy_id: userProfile.ebay_fulfillment_policy_id,
+      ebay_return_policy_id: userProfile.ebay_return_policy_id,
+      preferred_shipping_service: userProfile.preferred_shipping_service
+    });
+    
+    const offerData = {
+      sku,
+      marketplaceId: "EBAY_US",
+      format: "FIXED_PRICE",
+      availableQuantity: 1,
+      categoryId: listing.ebay_category_id || "11450",
+      merchantLocationKey: ebayLocationKey,
+      pricingSummary: {
+        price: {
+          value: (listing.price || 10).toString(),
+          currency: "USD"
+        }
+      },
+      listingDescription: listing.description || 'Quality item in great condition.',
+      listingPolicies: {
+        paymentPolicyId: userProfile.ebay_payment_policy_id,
+        fulfillmentPolicyId: userProfile.ebay_fulfillment_policy_id,
+        returnPolicyId: userProfile.ebay_return_policy_id
+      }
+    };
+
+    logStep('✅ Business account offer created', {
+      sku,
+      categoryId: offerData.categoryId,
+      price: offerData.pricingSummary.price.value,
+      paymentPolicyId: userProfile.ebay_payment_policy_id,
+      fulfillmentPolicyId: userProfile.ebay_fulfillment_policy_id,
+      returnPolicyId: userProfile.ebay_return_policy_id
+    });
+
+    return offerData;
+  }
+
+  /**
+   * Creates an offer on eBay
+   */
+  async createOffer(token: string, offerData: any): Promise<string> {
+    logStep('Creating offer', { 
+      sku: offerData.sku, 
+      price: offerData.pricingSummary.price.value 
+    });
+    
+    // 🔍 CRITICAL DEBUG - Final offer data verification
+    console.log('🔍 FINAL OFFER - Exact data being sent to eBay:', {
+      hasFulfillmentDetails: !!offerData.fulfillmentDetails,
+      hasListingPolicies: !!offerData.listingPolicies,
+      serviceCode: offerData.fulfillmentDetails?.shippingOptions[0]?.shippingServices[0]?.shippingServiceCode,
+      policyIds: offerData.listingPolicies ? {
+        payment: offerData.listingPolicies.paymentPolicyId,
+        fulfillment: offerData.listingPolicies.fulfillmentPolicyId,
+        return: offerData.listingPolicies.returnPolicyId
+      } : 'NO_POLICIES',
+      fullOfferData: JSON.stringify(offerData, null, 2)
+    });
+
+    logStep('🚀 CRITICAL DEBUG - Full offer data being sent to eBay', { 
+      offerData: JSON.stringify(offerData, null, 2),
+      fulfillmentDetails: offerData.fulfillmentDetails ? JSON.stringify(offerData.fulfillmentDetails, null, 2) : 'No fulfillmentDetails',
+      listingPolicies: offerData.listingPolicies ? JSON.stringify(offerData.listingPolicies, null, 2) : 'No listingPolicies'
+    });
+
+    const requestHeaders = this.ebayHeaders(token);
+
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/offer`, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify(offerData)
+    });
+
+    if (!response.ok) {
+      let errorDetails;
+      try {
+        errorDetails = await response.json();
+      } catch {
+        errorDetails = await response.text();
+      }
+      logStep('🔥 OFFER CREATION FAILED - eBay Response', { 
+        error: errorDetails, 
+        status: response.status,
+        offerDataSent: JSON.stringify(offerData, null, 2)
+      });
+      throw new Error(`Failed to create offer: ${JSON.stringify(errorDetails)}`);
+    }
+
+    const data = await response.json();
+    logStep('✅ Offer created successfully', { offerId: data.offerId });
+    return data.offerId;
+  }
+
+  /**
+   * Handles existing offers - deletes invalid UNPUBLISHED offers that would cause eBay error 25007
+   */
+  async handleExistingOffers(token: string, sku: string): Promise<{ offerId?: string; shouldCreateNew: boolean; alreadyPublished?: { listingId: string; offerId: string } }> {
+    const existingOffers = await this.getExistingOffers(token, sku);
+    
+    if (existingOffers.length === 0) {
+      logStep('No existing offers found - will create new', { sku });
+      return { shouldCreateNew: true };
+    }
+
+    const publishedOffer = existingOffers.find(offer => offer.status === 'PUBLISHED');
+    if (publishedOffer) {
+      logStep('Found published offer - sync complete', { 
+        offerId: publishedOffer.offerId, 
+        listingId: publishedOffer.listing?.listingId 
+      });
+      return { 
+        shouldCreateNew: false, 
+        alreadyPublished: { 
+          listingId: publishedOffer.listing?.listingId || publishedOffer.offerId,
+          offerId: publishedOffer.offerId 
+        }
+      };
+    }
+
+    // Handle UNPUBLISHED offers - these likely have invalid shipping data causing error 25007
+    const unpublishedOffers = existingOffers.filter(offer => offer.status === 'UNPUBLISHED');
+    for (const offer of unpublishedOffers) {
+      logStep('⚠️ Found UNPUBLISHED offer - likely invalid shipping data, deleting', { 
+        offerId: offer.offerId,
+        status: offer.status 
+      });
+      
+      try {
+        await this.deleteOffer(token, offer.offerId);
+        logStep('✅ Deleted invalid UNPUBLISHED offer', { offerId: offer.offerId });
+      } catch (deleteError) {
+        logStep('⚠️ Failed to delete offer, will try to create new anyway', { 
+          offerId: offer.offerId, 
+          error: deleteError.message 
+        });
+      }
+    }
+
+    logStep('Cleaned up invalid offers - will create new', { sku, deletedCount: unpublishedOffers.length });
+    return { shouldCreateNew: true };
+  }
+}
+
+// ========== MAIN EBAY INVENTORY API CLASS ==========
+class EbayInventoryAPI {
+  private accessToken: string = '';
+  baseUrl: string;
+  private clientId: string;
+  private clientSecret: string;
+  private supabaseClient: any;
+  private userId: string;
+  private inventoryItemManager: EbayInventoryItemManager;
+  private offerManager: EbayOfferManager;
+
+  constructor(isSandbox: boolean = false, supabaseClient: any, userId: string) {
+    this.baseUrl = isSandbox 
+      ? 'https://api.sandbox.ebay.com'
+      : 'https://api.ebay.com';
+    this.clientId = Deno.env.get('EBAY_CLIENT_ID') || '';
+    this.clientSecret = Deno.env.get('EBAY_CLIENT_SECRET') || '';
+    this.supabaseClient = supabaseClient;
+    this.userId = userId;
+    
+    // Initialize modular managers
+    this.inventoryItemManager = new EbayInventoryItemManager(this.baseUrl, supabaseClient, userId);
+    this.offerManager = new EbayOfferManager(this.baseUrl, supabaseClient, userId);
+  }
+
+  // Centralized header utility for eBay API requests
+  ebayHeaders(token: string): Headers {
+    const headers = new Headers();
+    headers.set('Authorization', `Bearer ${token}`);
+    headers.set('Content-Type', 'application/json');
+    headers.set('Content-Language', 'en-US');
+    headers.set('Accept-Language', 'en-US');
+    return headers;
+  }
+
+  async ensureValidToken(): Promise<string> {
+    // Get the current marketplace account
+    const { data: account, error } = await this.supabaseClient
+      .from('marketplace_accounts')
+      .select('*')
+      .eq('platform', 'ebay')
+      .eq('user_id', this.userId)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !account) {
+      throw new Error('No active eBay account found. Please connect your eBay account first.');
+    }
+
+    // Check if token is expired or expires soon (within 30 minutes)
+    const expiryTime = new Date(account.oauth_expires_at);
+    const now = new Date();
+    const timeUntilExpiry = expiryTime.getTime() - now.getTime();
+    const thirtyMinutes = 30 * 60 * 1000;
+
+    if (timeUntilExpiry <= thirtyMinutes) {
+      logStep('Token expired or expires soon, refreshing', { 
+        expiresAt: account.oauth_expires_at,
+        timeUntilExpiry: Math.floor(timeUntilExpiry / 1000 / 60) + ' minutes'
+      });
+
+      // Direct token refresh
+      if (!account.refresh_token) {
+        throw new Error('No refresh token available - requires re-authentication');
+      }
+
+      if (!this.clientId || !this.clientSecret) {
+        throw new Error('eBay credentials not configured');
+      }
+
+      const credentials = btoa(`${this.clientId}:${this.clientSecret}`);
+      
+      const refreshResponse = await fetch(`${this.baseUrl}/identity/v1/oauth2/token`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${credentials}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `grant_type=refresh_token&refresh_token=${account.refresh_token}&scope=https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account`
+      });
+
+      if (!refreshResponse.ok) {
+        const errorText = await refreshResponse.text();
+        logStep('Token refresh failed', { status: refreshResponse.status, error: errorText });
+        
+        if (errorText.includes('invalid_grant') || errorText.includes('refresh_token')) {
+          await this.supabaseClient
+            .from('marketplace_accounts')
+            .update({
+              is_connected: false,
+              oauth_expires_at: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', account.id);
+        }
+        
+        throw new Error(`eBay token refresh failed: ${refreshResponse.statusText} - ${errorText}`);
+      }
+
+      const tokenData = await refreshResponse.json();
+      logStep('Token refreshed successfully', { expiresIn: tokenData.expires_in });
+
+      const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
+
+      const { error: updateError } = await this.supabaseClient
+        .from('marketplace_accounts')
+        .update({
+          oauth_token: tokenData.access_token,
+          oauth_expires_at: expiresAt.toISOString(),
+          refresh_token: tokenData.refresh_token || account.refresh_token,
+          last_sync_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', account.id);
+
+      if (updateError) {
+        throw new Error(`Failed to update account tokens: ${updateError.message}`);
+      }
+
+      this.accessToken = tokenData.access_token;
+      logStep('Token refreshed and stored successfully');
+    } else {
+      this.accessToken = account.oauth_token;
+      logStep('Using existing valid token', { 
+        expiresAt: account.oauth_expires_at,
+        timeUntilExpiry: Math.floor(timeUntilExpiry / 1000 / 60) + ' minutes'
+      });
+    }
+
+    return this.accessToken;
+  }
+
+  async getAccessToken(): Promise<string> {
+    return await this.ensureValidToken();
+  }
+
+  // Inventory operations using modular managers
+  async createInventoryItem(sku: string, itemData: any): Promise<void> {
+    const token = await this.getAccessToken();
+    return await this.inventoryItemManager.createInventoryItem(token, sku, itemData);
+  }
+
+  async getInventoryItem(sku: string): Promise<any> {
+    const token = await this.getAccessToken();
+    
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/inventory_item/${sku}`, {
+      method: 'GET',
+      headers: this.ebayHeaders(token)
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to get inventory item: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  }
+
+  async updateInventoryItem(sku: string, itemData: any): Promise<void> {
+    const token = await this.getAccessToken();
+    
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/inventory_item/${sku}`, {
+      method: 'PUT',
+      headers: this.ebayHeaders(token),
+      body: JSON.stringify(itemData)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update inventory item: ${errorText}`);
+    }
+  }
+
+  async getExistingOffers(sku: string): Promise<any[]> {
+    const token = await this.getAccessToken();
+    return await this.offerManager.getExistingOffers(token, sku);
+  }
+
+  async createOffer(offerData: any): Promise<string> {
+    const token = await this.getAccessToken();
+    return await this.offerManager.createOffer(token, offerData);
+  }
+
+  async publishOffer(offerId: string): Promise<string> {
+    const token = await this.getAccessToken();
+    return await this.offerManager.publishOffer(token, offerId);
+  }
+
+  async deleteOffer(offerId: string): Promise<void> {
+    const token = await this.getAccessToken();
+    return await this.offerManager.deleteOffer(token, offerId);
+  }
+
+  async handleExistingOffers(sku: string): Promise<{ offerId?: string; shouldCreateNew: boolean; alreadyPublished?: { listingId: string; offerId: string } }> {
+    const token = await this.getAccessToken();
+    return await this.offerManager.handleExistingOffers(token, sku);
+  }
+
+  async createOfferData(listing: any, sku: string, userProfile: any, ebayLocationKey: string): Promise<any> {
+    return await this.offerManager.createOfferData(listing, sku, userProfile, ebayLocationKey);
+  }
+
+  async ensureInventoryLocationWithShipping(userProfile: any): Promise<string> {
+    const token = await this.getAccessToken();
+    
+    // First, get existing locations
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/location`, {
+      method: 'GET',
+      headers: this.ebayHeaders(token)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get inventory locations: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const locations = data.locations || [];
+    
+    if (locations.length === 0) {
+      // Create a new location with shipping services for individual accounts
+      return await this.createInventoryLocationWithShipping(userProfile);
+    }
+
+    const defaultLocation = locations.find((loc: any) => loc.locationTypes?.includes('WAREHOUSE')) || locations[0];
+    const locationKey = defaultLocation.merchantLocationKey;
+    
+    // For individual accounts, ensure the location has shipping services configured
+    if (userProfile.ebay_account_type === 'INDIVIDUAL') {
+      logStep('🚢 Updating inventory location with shipping services for individual account', { 
+        locationKey,
+        accountType: 'INDIVIDUAL'
+      });
+      
+      await this.updateLocationWithShipping(locationKey, userProfile);
+    }
+    
+    logStep('Using inventory location', { key: locationKey, name: defaultLocation.name });
+    return locationKey;
+  }
+
+  async createInventoryLocationWithShipping(userProfile: any): Promise<string> {
+    const token = await this.getAccessToken();
+    const locationKey = `warehouse_${Date.now()}`;
+    
+    logStep('📍 Creating new inventory location with shipping services', { locationKey });
+    
+    const locationData: any = {
+      merchantLocationKey: locationKey,
+      name: 'Main Warehouse',
+      locationTypes: ['WAREHOUSE'],
+      address: {
+        addressLine1: userProfile.business_address || '123 Main St',
+        city: userProfile.business_city || 'San Francisco',
+        stateOrProvince: userProfile.business_state || 'CA',
+        postalCode: userProfile.business_zip || '94102',
+        country: 'US'
+      },
+      merchantLocationStatus: 'ENABLED'
+    };
+
+    // Add shipping services for individual accounts
+    if (userProfile.ebay_account_type === 'INDIVIDUAL') {
+      const { EbayShippingServices } = await import('./ebay-shipping-services.ts');
+      const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(
+        userProfile,
+        {
+          domesticCost: 9.95,
+          handlingTimeDays: 1,
+          userId: this.userId
+        }
+      );
+      
+      if (fulfillmentDetails?.shippingOptions?.[0]) {
+        locationData.shippingOptions = fulfillmentDetails.shippingOptions;
+      }
+    }
+
+    const createResponse = await fetch(`${this.baseUrl}/sell/inventory/v1/location/${locationKey}`, {
+      method: 'POST',
+      headers: this.ebayHeaders(token),
+      body: JSON.stringify(locationData)
+    });
+
+    if (!createResponse.ok) {
+      const error = await createResponse.text();
+      throw new Error(`Failed to create inventory location: ${error}`);
+    }
+
+    logStep('✅ Created inventory location with shipping', { locationKey });
+    return locationKey;
+  }
+
+  async updateLocationWithShipping(locationKey: string, userProfile: any): Promise<void> {
+    const token = await this.getAccessToken();
+    
+    // Get current location data
+    const getResponse = await fetch(`${this.baseUrl}/sell/inventory/v1/location/${locationKey}`, {
+      method: 'GET',
+      headers: this.ebayHeaders(token)
+    });
+
+    if (!getResponse.ok) {
+      logStep('⚠️ Could not fetch location details, skipping shipping update', { locationKey });
+      return;
+    }
+
+    const locationData = await getResponse.json();
+    
+    // Add shipping services for individual accounts
+    const { EbayShippingServices } = await import('./ebay-shipping-services.ts');
+    const fulfillmentDetails = await EbayShippingServices.createFulfillmentDetails(
+      userProfile,
+      {
+        domesticCost: 9.95,
+        handlingTimeDays: 1,
+        userId: this.userId
+      }
+    );
+    
+    if (fulfillmentDetails?.shippingOptions?.[0]) {
+      // Add shipping services to the location data
+      locationData.shippingOptions = fulfillmentDetails.shippingOptions;
+      
+      // Update the entire location with shipping services using the correct eBay API endpoint
+      const updateResponse = await fetch(`${this.baseUrl}/sell/inventory/v1/location/${locationKey}`, {
+        method: 'POST',
+        headers: this.ebayHeaders(token),
+        body: JSON.stringify(locationData)
+      });
+
+      if (updateResponse.ok) {
+        logStep('✅ Updated location with shipping services', { locationKey });
+      } else {
+        const errorText = await updateResponse.text();
+        logStep('⚠️ Could not update location shipping services', { 
+          locationKey,
+          status: updateResponse.status,
+          error: errorText
+        });
+        // Don't fail the sync, just log the warning
+      }
+    }
+  }
+
+  async getUserInventoryLocationKey(): Promise<string> {
+    const token = await this.getAccessToken();
+    
+    const response = await fetch(`${this.baseUrl}/sell/inventory/v1/location`, {
+      method: 'GET',
+      headers: this.ebayHeaders(token)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get inventory locations: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const locations = data.locations || [];
+    
+    if (locations.length === 0) {
+      throw new Error('No inventory locations found. Please set up an inventory location in eBay.');
+    }
+
+    const defaultLocation = locations.find((loc: any) => loc.locationTypes?.includes('WAREHOUSE')) || locations[0];
+    logStep('Using inventory location', { key: defaultLocation.merchantLocationKey, name: defaultLocation.name });
+    
+    return defaultLocation.merchantLocationKey;
+  }
+}
+
+// Validation and utility functions
+async function validateListingData(listing: any, userProfile: any): Promise<{ isValid: boolean; errors: string[] }> {
+  const errors: string[] = [];
+  
+  if (!listing.title || listing.title.length < 10) {
+    errors.push('Title must be at least 10 characters');
+  }
+  if (!listing.price || listing.price <= 0) {
+    errors.push('Price must be greater than $0');
+  }
+  if (!listing.condition) {
+    errors.push('Condition is required');
+  }
+  
+  const hasNewPhotos = listing.listing_photos && listing.listing_photos.length > 0;
+  const hasLegacyPhotos = listing.photos && listing.photos.length > 0;
+  
+  if (!hasNewPhotos && !hasLegacyPhotos) {
+    errors.push('At least one photo is required to sync this listing to eBay');
+  }
+  
+  // Only validate policies for business accounts - individual accounts use inline fulfillment
+  const isIndividualAccount = EbayOfferManager.isIndividualAccount(userProfile);
+  if (!isIndividualAccount) {
+    if (!userProfile.ebay_payment_policy_id || 
+        !userProfile.ebay_return_policy_id || 
+        !userProfile.ebay_fulfillment_policy_id) {
+      errors.push('eBay policies not configured. Please refresh your eBay policies.');
+    }
+  } else {
+    // For individual accounts, validate fulfillment data instead
+    if (!userProfile.shipping_cost_domestic) {
+      errors.push('Shipping cost is required for individual accounts');
+    }
+    if (!userProfile.handling_time_days) {
+      errors.push('Handling time is required for individual accounts');
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+// Main sync function
+async function syncListingToEbay(supabaseClient: any, userId: string, listingId: string, dryRun: boolean = false) {
+  // 🔍 CRITICAL DEBUG - Function entry point
+  console.log('🔍 CRITICAL DEBUG - syncListingToEbay called:', { 
+    listingId, 
+    userId, 
+    dryRun,
+    timestamp: new Date().toISOString()
+  });
+
+  logStep('🚀 Starting eBay listing sync', { listingId, userId, dryRun });
+  
+  try {
+    // 1. Fetch listing with photos
+    const { data: listing, error: listingError } = await supabaseClient
+      .from('listings')
+      .select('*, listing_photos(*)')
+      .eq('id', listingId)
+      .eq('user_id', userId)
+      .single();
+
+    if (listingError || !listing) {
+      throw new Error(`Listing not found: ${listingError?.message}`);
+    }
+
+    logStep('✅ Listing fetched', { 
+      title: listing.title, 
+      photos: listing.listing_photos?.length || 0,
+      legacyPhotos: listing.photos?.length || 0
+    });
+
+    // 2. Fetch user profile
+    const { data: userProfile, error: profileError } = await supabaseClient
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !userProfile) {
+      throw new Error(`User profile not found: ${profileError?.message}`);
+    }
+
+    logStep('✅ User profile fetched', { 
+      hasEbayPolicies: !!(userProfile.ebay_payment_policy_id && userProfile.ebay_return_policy_id && userProfile.ebay_fulfillment_policy_id)
+    });
+
+    // 3. Validate listing
+    const validation = await validateListingData(listing, userProfile);
+    if (!validation.isValid) {
+      throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+    }
+
+    logStep('✅ Listing validation passed');
+
+    // 4. Check existing sync
+    const { data: existingSync } = await supabaseClient
+      .from('platform_listings')
+      .select('*')
+      .eq('listing_id', listingId)
+      .eq('platform', 'ebay')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (existingSync?.status === 'active') {
+      logStep('✅ Listing already synced', { 
+        platformListingId: existingSync.platform_listing_id,
+        platformUrl: existingSync.platform_url 
+      });
+      return {
+        status: 'already_synced',
+        platform_listing_id: existingSync.platform_listing_id,
+        platform_url: existingSync.platform_url
+      };
+    }
+
+    if (dryRun) {
+      logStep('✅ Dry run successful - listing ready for sync');
+      return {
+        status: 'dry_run_success',
+        validation,
+        simulatedData: {
+          sku: listingId,
+          title: listing.title,
+          price: listing.price
+        }
+      };
+    }
+
+    // 🔍 CRITICAL DEBUG - Early execution checkpoint
+    console.log('🔍 CRITICAL DEBUG - About to create offer data:', {
+      listingId,
+      userProfile: {
+        ebay_payment_policy_id: userProfile.ebay_payment_policy_id,
+        ebay_fulfillment_policy_id: userProfile.ebay_fulfillment_policy_id,
+        ebay_return_policy_id: userProfile.ebay_return_policy_id,
+        preferred_shipping_service: userProfile.preferred_shipping_service
+      }
+    });
+
+    // 5. Initialize eBay API
+    const ebayApi = new EbayInventoryAPI(false, supabaseClient, userId);
+    const ebayLocationKey = await ebayApi.ensureInventoryLocationWithShipping(userProfile);
+
+    // 7. Create inventory item
+    const inventoryData = EbayInventoryItemManager.mapListingToEbayInventory(listing, listing.listing_photos);
+    
+    // Enhanced logging for debugging
+    logStep('📦 Creating inventory item with data:', {
+      sku: listingId,
+      title: inventoryData.product?.title,
+      description: inventoryData.product?.description?.substring(0, 100) + '...',
+      condition: inventoryData.condition,
+      categoryId: listing.ebay_category_id,
+      imageUrls: inventoryData.product?.imageUrls?.length || 0,
+      availability: inventoryData.availability
+    });
+    
+    try {
+      // First check if inventory item already exists
+      const existingItem = await ebayApi.getInventoryItem(listingId);
+      if (existingItem) {
+        logStep('⚠️ Inventory item already exists, updating instead of creating', {
+          sku: listingId
+        });
+        // Update existing item instead of creating new one
+        await ebayApi.updateInventoryItem(listingId, inventoryData);
+        logStep('✅ Inventory item updated successfully');
+      } else {
+        // Create new inventory item
+        await ebayApi.createInventoryItem(listingId, inventoryData);
+        logStep('✅ Inventory item created successfully');
+      }
+    } catch (inventoryError: any) {
+      // Check if it's a duplicate SKU error (Error 25002)
+      if (inventoryError.message?.includes('25002') || inventoryError.message?.includes('SKU')) {
+        logStep('⚠️ SKU conflict detected, attempting to update existing item', {
+          sku: listingId
+        });
+        try {
+          await ebayApi.updateInventoryItem(listingId, inventoryData);
+          logStep('✅ Inventory item updated after SKU conflict');
+        } catch (updateError: any) {
+          logStep('❌ Failed to update existing inventory item:', {
+            error: updateError.message,
+            sku: listingId
+          });
+          throw updateError;
+        }
+      } else {
+        logStep('❌ Inventory item creation failed:', {
+          error: inventoryError.message,
+          sku: listingId,
+          response: inventoryError.response || 'No response data'
+        });
+        throw inventoryError;
+      }
+    }
+
+    // 8. Handle offers with automatic cleanup
+    const offerResult = await ebayApi.handleExistingOffers(listingId);
+    
+    let offerId: string;
+    let ebayListingId: string;
+
+    if (offerResult.alreadyPublished) {
+      logStep('✅ Using existing published offer', { 
+        offerId: offerResult.alreadyPublished.offerId,
+        listingId: offerResult.alreadyPublished.listingId 
+      });
+      offerId = offerResult.alreadyPublished.offerId;
+      ebayListingId = offerResult.alreadyPublished.listingId;
+    } else if (offerResult.shouldCreateNew) {
+      // Create new offer with eBay API validated shipping services
+      const offerData = await ebayApi.createOfferData(listing, listingId, userProfile, ebayLocationKey);
+      
+      // Only validate fulfillmentDetails for business accounts
+      // Individual accounts use listingPolicies instead
+      const isIndividualAccount = EbayOfferManager.isIndividualAccount(userProfile);
+      
+      if (!isIndividualAccount && offerData.fulfillmentDetails) {
+        // Enhanced logging for troubleshooting (business accounts only)
+        const fulfillmentValidation = EbayShippingServices.validateFulfillmentDetails(offerData.fulfillmentDetails);
+        logStep('🔍 Pre-creation validation for business account', {
+          isValid: fulfillmentValidation.isValid,
+          errors: fulfillmentValidation.errors,
+          serviceCode: offerData.fulfillmentDetails?.shippingOptions[0]?.shippingServices[0]?.serviceCode,
+          accountType: 'business'
+        });
+        
+        if (!fulfillmentValidation.isValid) {
+          throw new Error(`Invalid fulfillment details: ${fulfillmentValidation.errors.join(', ')}`);
+        }
+      } else if (isIndividualAccount) {
+        logStep('🔍 Individual account - using default listing policies', {
+          accountType: 'individual',
+          policies: offerData.listingPolicies
+        });
+      }
+      
+      offerId = await ebayApi.createOffer(offerData);
+      logStep('✅ Offer created');
+
+      // Publish offer with fallback retry logic
+      try {
+        ebayListingId = await ebayApi.publishOffer(offerId);
+        logStep('✅ Offer published', { ebayListingId });
+      } catch (publishError: any) {
+        logStep('❌ Offer publish failed, attempting fallback', { error: publishError.message });
+        
+        // Check if it's a shipping service error (Error 25007)
+        if (publishError.message.includes('25007') || publishError.message.includes('shipping service')) {
+          logStep('🔄 Attempting with fallback shipping service');
+          
+          // Get fallback fulfillment details
+          const fallbackFulfillmentDetails = await EbayShippingServices.createFulfillmentDetailsWithFallback(
+            userProfile, 
+            { 
+              attemptedService: offerData.fulfillmentDetails?.shippingOptions[0]?.shippingServices[0]?.serviceCode,
+              userId: userId
+            }
+          );
+          
+          // Update offer with fallback shipping
+          const fallbackOfferData = {
+            ...offerData,
+            fulfillmentDetails: fallbackFulfillmentDetails
+          };
+          
+          // Delete failed offer and create new one
+          await ebayApi.deleteOffer(offerId);
+          const fallbackOfferId = await ebayApi.createOffer(fallbackOfferData);
+          ebayListingId = await ebayApi.publishOffer(fallbackOfferId);
+          offerId = fallbackOfferId;
+          
+          logStep('✅ Fallback offer published successfully', { 
+            ebayListingId, 
+            fallbackService: fallbackFulfillmentDetails.shippingOptions[0]?.shippingServices[0]?.serviceCode 
+          });
+        } else {
+          throw publishError;
+        }
+      }
+    } else {
+      throw new Error('Unexpected offer handling result');
+    }
+
+    // 9. Update platform_listings table
+    await supabaseClient.from('platform_listings').upsert({
+      listing_id: listingId,
+      user_id: userId,
+      platform: 'ebay',
+      platform_listing_id: ebayListingId,
+      platform_url: `https://www.ebay.com/itm/${ebayListingId}`,
+      status: 'active',
+      last_synced_at: new Date().toISOString(),
+      platform_data: {
+        offer_id: offerId,
+        sku: listingId
+      }
+    });
+
+    logStep('✅ Platform listing record updated');
+
+    return {
+      status: 'success',
+      platform_listing_id: ebayListingId,
+      platform_url: `https://www.ebay.com/itm/${ebayListingId}`,
+      offer_id: offerId
+    };
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep('❌ Sync failed', { error: errorMessage });
+    throw error;
+  }
+}
+
+// Serve function  
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  let requestData: any = {};
+  let userData: any = null;
+
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("No authorization header provided");
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userAuthData, error: userError } = await supabaseClient.auth.getUser(token);
+    if (userError) throw new Error(`Authentication error: ${userError.message}`);
+    
+    userData = userAuthData;
+    const user = userData.user;
+    if (!user?.id) throw new Error("User not authenticated");
+
+    requestData = await req.json();
+    const { listingId, action = 'sync_listing', dryRun = false } = requestData;
+    
+    // Test fetching valid shipping services if requested
+    if (action === 'test_shipping_service_fetcher') {
+      logStep('🧪 Testing eBay shipping service fetcher');
+      
+      try {
+        const services = await EbayShippingServices.fetchValidServices(user.id, requestData.forceRefresh);
+        
+        return new Response(JSON.stringify({
+          status: 'test_complete',
+          services,
+          serviceCount: services.length
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return new Response(JSON.stringify({
+          status: 'test_error',
+          error: errorMessage
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        });
+      }
+    }
+    
+    if (!listingId) throw new Error('Listing ID required');
+
+    const result = await syncListingToEbay(supabaseClient, user.id, listingId, dryRun);
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Enhanced error logging for debugging
+    logStep("❌ CRITICAL ERROR", { 
+      message: errorMessage,
+      stack: errorStack,
+      timestamp: new Date().toISOString(),
+      requestData: requestData ? { listingId: requestData.listingId, action: requestData.action } : null
+    });
+    
+    // Log to Supabase for persistence (best effort)
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        { auth: { persistSession: false } }
+      );
+      
+      await supabaseClient.from('posting_queue').insert({
+        user_id: userData?.user?.id || 'unknown',
+        listing_id: requestData?.listingId || 'unknown',
+        platform: 'ebay',
+        queue_status: 'error',
+        error_message: errorMessage,
+        result_data: { 
+          error: errorMessage, 
+          stack: errorStack,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (logError) {
+      // Don't fail the response if logging fails
+      console.error('Failed to log error to database:', logError);
+    }
+    
+    return new Response(JSON.stringify({ 
+      status: 'error',
+      error: errorMessage,
+      timestamp: new Date().toISOString()
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+});
