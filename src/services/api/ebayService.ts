@@ -575,4 +575,134 @@ export class EbayService {
       condition: listingData.condition || undefined
     };
   }
+
+  /**
+   * Extract eBay required fields from price research comparables
+   */
+  extractRequiredFieldsFromComparables(comparables: any[]): {
+    brand?: string;
+    mpn?: string;
+    itemSpecifics?: Record<string, string>;
+    suggestedCategoryId?: string;
+  } {
+    if (!comparables || comparables.length === 0) {
+      return {};
+    }
+
+    // Extract brands from comparables
+    const brandCounts = new Map<string, number>();
+    const mpnCounts = new Map<string, number>();
+    const categoryIdCounts = new Map<string, number>();
+    const itemSpecificsMap = new Map<string, Map<string, number>>();
+
+    comparables.forEach(item => {
+      // Extract brand
+      if (item.brand) {
+        const brand = item.brand.trim();
+        brandCounts.set(brand, (brandCounts.get(brand) || 0) + 1);
+      }
+
+      // Extract MPN from title or item specifics
+      const title = item.title || '';
+      const mpnMatch = title.match(/\b[A-Z0-9]{2,}[-]?[A-Z0-9]+[-]?[A-Z0-9]*\b/g);
+      if (mpnMatch) {
+        mpnMatch.forEach(mpn => {
+          // Filter out year ranges
+          if (!/^\d{4}[-]\d{4}$/.test(mpn)) {
+            mpnCounts.set(mpn, (mpnCounts.get(mpn) || 0) + 1);
+          }
+        });
+      }
+
+      // Extract category ID - CRITICAL for eBay sync
+      // Check multiple possible locations for category ID
+      const categoryId = 
+        item.categoryId || 
+        item.category_id || 
+        item.categories?.[0]?.categoryId ||
+        item.primaryCategory?.categoryId ||
+        item.leafCategoryId;
+      
+      if (categoryId) {
+        categoryIdCounts.set(String(categoryId), (categoryIdCounts.get(String(categoryId)) || 0) + 1);
+      }
+
+      // Extract item specifics
+      if (item.itemSpecifics || item.localizedAspects) {
+        const specifics = item.itemSpecifics || item.localizedAspects || [];
+        specifics.forEach((spec: any) => {
+          const name = spec.name || spec.type;
+          const value = spec.value || spec.values?.[0];
+          if (name && value) {
+            if (!itemSpecificsMap.has(name)) {
+              itemSpecificsMap.set(name, new Map());
+            }
+            const valueMap = itemSpecificsMap.get(name)!;
+            valueMap.set(value, (valueMap.get(value) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    // Get most common values
+    const getMostCommon = <T>(counts: Map<T, number>): T | undefined => {
+      let maxCount = 0;
+      let mostCommon: T | undefined;
+      counts.forEach((count, value) => {
+        if (count > maxCount) {
+          maxCount = count;
+          mostCommon = value;
+        }
+      });
+      return mostCommon;
+    };
+
+    // Build item specifics object with most common values
+    const itemSpecifics: Record<string, string> = {};
+    itemSpecificsMap.forEach((valueCounts, name) => {
+      const mostCommonValue = getMostCommon(valueCounts);
+      if (mostCommonValue) {
+        itemSpecifics[name] = mostCommonValue;
+      }
+    });
+
+    // Get the most common category ID
+    const suggestedCategoryId = getMostCommon(categoryIdCounts);
+    
+    // If no category ID found, try to detect based on keywords
+    if (!suggestedCategoryId) {
+      const firstTitle = comparables[0]?.title || '';
+      const lowerTitle = firstTitle.toLowerCase();
+      
+      if (lowerTitle.includes('key fob') || lowerTitle.includes('smart key') || lowerTitle.includes('keyless')) {
+        return {
+          brand: getMostCommon(brandCounts),
+          mpn: getMostCommon(mpnCounts),
+          itemSpecifics,
+          suggestedCategoryId: '33542' // Keyless Entry Remotes & Fobs
+        };
+      } else if (lowerTitle.includes('sensor')) {
+        return {
+          brand: getMostCommon(brandCounts),
+          mpn: getMostCommon(mpnCounts),
+          itemSpecifics,
+          suggestedCategoryId: '33694' // Sensors
+        };
+      } else if (lowerTitle.includes('tpms')) {
+        return {
+          brand: getMostCommon(brandCounts),
+          mpn: getMostCommon(mpnCounts),
+          itemSpecifics,
+          suggestedCategoryId: '262215' // TPMS Sensors
+        };
+      }
+    }
+
+    return {
+      brand: getMostCommon(brandCounts),
+      mpn: getMostCommon(mpnCounts),
+      itemSpecifics,
+      suggestedCategoryId
+    };
+  }
 }

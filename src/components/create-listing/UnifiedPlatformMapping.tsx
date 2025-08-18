@@ -27,14 +27,18 @@ const PLATFORM_CONFIGS = {
     extractFields: (data: ListingData) => ({
       condition: data.condition,
       brand: data.brand,
-      mpn: extractMPN(data.title || ''),
-      upc: extractUPC(data.description || ''),
-      itemSpecifics: {
+      mpn: data.mpn || extractMPN(data.title || ''),
+      upc: data.upc || extractUPC(data.description || ''),
+      leafCategoryId: data.ebay_category_id || getEbayCategoryId(data),
+      itemSpecifics: data.item_specifics || {
         Brand: data.brand,
         Condition: data.condition,
         Color: data.color,
         Material: data.material,
-        Size: data.size
+        Size: data.size,
+        'Manufacturer Part Number': data.mpn || extractMPN(data.title || ''),
+        'OE/OEM Part Number': extractOENumber(data.title || ''),
+        'Fitment Type': data.fitment_type || 'Direct Replacement'
       }
     })
   },
@@ -48,7 +52,9 @@ const PLATFORM_CONFIGS = {
       brand: data.brand,
       size: data.size,
       color: data.color,
-      shippingWeight: data.shipping_weight
+      shippingWeight: data.shipping_weight,
+      tags: extractTags(data),
+      sku: data.sku
     })
   },
   poshmark: {
@@ -61,7 +67,9 @@ const PLATFORM_CONFIGS = {
       size: data.size,
       color: data.color,
       condition: mapConditionToPoshmark(data.condition),
-      category: mapCategoryToPoshmark(data.category)
+      category: mapCategoryToPoshmark(data.category),
+      originalPrice: data.original_price,
+      style: extractStyle(data.description || '')
     })
   },
   depop: {
@@ -75,7 +83,9 @@ const PLATFORM_CONFIGS = {
       color: data.color,
       condition: data.condition,
       style: extractStyle(data.description || ''),
-      era: extractEra(data.description || '')
+      era: extractEra(data.description || ''),
+      tags: extractTags(data),
+      subcategory: data.subcategory
     })
   },
   facebook: {
@@ -87,7 +97,25 @@ const PLATFORM_CONFIGS = {
       condition: data.condition,
       brand: data.brand,
       location: 'Local pickup available',
-      category: mapCategoryToFacebook(data.category)
+      category: mapCategoryToFacebook(data.category),
+      vehicleInfo: extractVehicleInfo(data),
+      availability: 'In Stock'
+    })
+  },
+  whatnot: {
+    name: 'Whatnot',
+    icon: '🎬',
+    feeRate: 0.08, // 8% transaction fee
+    color: 'bg-yellow-100 text-yellow-800',
+    extractFields: (data: ListingData) => ({
+      condition: data.condition,
+      brand: data.brand,
+      category: mapCategoryToWhatnot(data.category),
+      startingBid: Math.floor(data.price * 0.5), // 50% of list price as starting bid
+      buyNowPrice: data.price,
+      authenticityGuarantee: isAuthenticityEligible(data),
+      shippingWeight: data.shipping_weight,
+      tags: extractTags(data)
     })
   }
 };
@@ -96,6 +124,12 @@ const PLATFORM_CONFIGS = {
 function extractMPN(title: string): string | null {
   const mpnMatch = title.match(/\b[A-Z0-9]{3,}-[A-Z0-9]{3,}\b/);
   return mpnMatch ? mpnMatch[0] : null;
+}
+
+function extractOENumber(title: string): string | null {
+  // Extract OE/OEM part numbers (common in automotive)
+  const oeMatch = title.match(/\b[A-Z0-9]{2,}[-]?[A-Z0-9]+[-]?[A-Z0-9]*\b/);
+  return oeMatch ? oeMatch[0] : null;
 }
 
 function extractUPC(description: string): string | null {
@@ -113,6 +147,53 @@ function extractEra(description: string): string {
   const eras = ['90s', '2000s', '2010s', 'vintage', 'retro'];
   const found = eras.find(era => description.toLowerCase().includes(era));
   return found || 'modern';
+}
+
+function extractTags(data: ListingData): string[] {
+  const tags = [];
+  if (data.brand) tags.push(data.brand);
+  if (data.category?.primary) tags.push(data.category.primary);
+  if (data.keywords) tags.push(...data.keywords.slice(0, 3));
+  return tags.slice(0, 5); // Most platforms limit tags
+}
+
+function extractVehicleInfo(data: ListingData): string | null {
+  // Extract vehicle year/make/model for automotive parts
+  const title = data.title || '';
+  const vehicleMatch = title.match(/(\d{4}[-\s]?\d{0,4})?\s*([A-Za-z]+)\s+([A-Za-z0-9\-]+)/);
+  if (vehicleMatch) {
+    return `${vehicleMatch[1] || ''} ${vehicleMatch[2]} ${vehicleMatch[3]}`.trim();
+  }
+  return null;
+}
+
+function getEbayCategoryId(data: ListingData): string {
+  // Return the stored category ID or detect based on keywords
+  if (data.ebay_category_id) return data.ebay_category_id;
+  
+  const title = (data.title || '').toLowerCase();
+  const description = (data.description || '').toLowerCase();
+  const combined = title + ' ' + description;
+  
+  // Auto-detect common automotive categories
+  if (combined.includes('key fob') || combined.includes('smart key') || combined.includes('keyless')) {
+    return '33542'; // Keyless Entry Remotes & Fobs
+  }
+  if (combined.includes('sensor')) {
+    return '33694'; // Sensors
+  }
+  if (combined.includes('tpms')) {
+    return '262215'; // TPMS Sensors
+  }
+  
+  return '6030'; // Other Parts (default for automotive)
+}
+
+function isAuthenticityEligible(data: ListingData): boolean {
+  // Check if item is eligible for authenticity guarantee (luxury brands, high value)
+  const luxuryBrands = ['gucci', 'louis vuitton', 'chanel', 'hermes', 'rolex', 'omega'];
+  const brand = (data.brand || '').toLowerCase();
+  return luxuryBrands.includes(brand) || data.price > 500;
 }
 
 function mapConditionToMercari(condition: string): string {
@@ -141,15 +222,30 @@ function mapCategoryToPoshmark(category: any): string {
     if (primary.includes('clothing')) return 'Women';
     if (primary.includes('shoes')) return 'Shoes';
     if (primary.includes('accessories')) return 'Accessories';
+    if (primary.includes('automotive')) return 'Other';
   }
   return 'Other';
 }
 
 function mapCategoryToFacebook(category: any): string {
   if (typeof category === 'object' && category?.primary) {
-    return category.primary;
+    const primary = category.primary;
+    if (primary.toLowerCase().includes('automotive')) return 'Automotive';
+    return primary;
   }
   return typeof category === 'string' ? category : 'Other';
+}
+
+function mapCategoryToWhatnot(category: any): string {
+  if (typeof category === 'object' && category?.primary) {
+    const primary = category.primary.toLowerCase();
+    if (primary.includes('automotive')) return 'Automotive';
+    if (primary.includes('collectibles')) return 'Collectibles';
+    if (primary.includes('trading cards')) return 'Trading Cards';
+    if (primary.includes('toys')) return 'Toys';
+    return 'Other';
+  }
+  return 'Other';
 }
 
 const UnifiedPlatformMapping: React.FC<UnifiedPlatformMappingProps> = ({
@@ -178,7 +274,7 @@ const UnifiedPlatformMapping: React.FC<UnifiedPlatformMappingProps> = ({
     if (typeof category === 'object' && category?.primary) {
       return category.primary;
     }
-    return typeof category === 'string' ? category : 'Other';
+    return typeof category === 'string' ? category : 'Automotive';
   };
 
   const mappings = generatePlatformMappings();
@@ -218,8 +314,8 @@ const UnifiedPlatformMapping: React.FC<UnifiedPlatformMappingProps> = ({
                 <div className="space-y-1">
                   {Object.entries(mapping.platformFields).map(([key, value]) => (
                     <div key={key} className="flex justify-between text-xs">
-                      <span className="text-gray-500 capitalize">{key}:</span>
-                      <span className="text-gray-700">
+                      <span className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                      <span className="text-gray-700 truncate max-w-[150px]" title={typeof value === 'object' ? JSON.stringify(value) : String(value)}>
                         {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                       </span>
                     </div>

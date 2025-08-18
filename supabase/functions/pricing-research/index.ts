@@ -17,6 +17,8 @@ interface EbayItem {
   condition: string;
   listingType: string;
   endTime?: string;
+  categoryId?: string;
+  categoryPath?: string;
 }
 
 interface PricingData {
@@ -29,6 +31,11 @@ interface PricingData {
     condition: string;
   }>;
   confidence: 'high' | 'medium' | 'low';
+  suggestedCategory?: {
+    categoryId: string;
+    categoryPath: string;
+    confidence: number;
+  };
 }
 
 serve(async (req) => {
@@ -119,7 +126,9 @@ async function getEbayPricing(query: string, condition: string): Promise<EbayIte
     title: item.title,
     price: parseFloat(item.price?.value || '0'),
     condition: item.condition || condition,
-    listingType: item.buyingOptions?.[0] || 'FIXED_PRICE'
+    listingType: item.buyingOptions?.[0] || 'FIXED_PRICE',
+    categoryId: item.categoryId,
+    categoryPath: item.categoryPath
   })).filter((item: EbayItem) => item.price > 0);
 }
 
@@ -189,11 +198,30 @@ function analyzePricingData(items: EbayItem[], condition: string): PricingData {
   // Simple trend analysis (placeholder - could be enhanced with historical data)
   const marketTrend: 'up' | 'down' | 'stable' = 'stable';
 
+  // Suggest category based on most common category
+  const categories = items.map(item => item.categoryId);
+  const categoryCounts: { [key: string]: number } = {};
+  categories.forEach(category => {
+    if (categoryCounts[category]) {
+      categoryCounts[category]++;
+    } else {
+      categoryCounts[category] = 1;
+    }
+  });
+  const suggestedCategory = Object.keys(categoryCounts).reduce((a, b) => categoryCounts[a] > categoryCounts[b] ? a : b);
+  const suggestedCategoryPath = items.find(item => item.categoryId === suggestedCategory)?.categoryPath;
+  const suggestedCategoryConfidence = categoryCounts[suggestedCategory] / items.length;
+
   return {
     suggestedPrice,
     priceRange: { min: Math.round(min * 100) / 100, max: Math.round(max * 100) / 100 },
     marketTrend,
     competitors,
-    confidence
+    confidence,
+    suggestedCategory: {
+      categoryId: suggestedCategory,
+      categoryPath: suggestedCategoryPath,
+      confidence: suggestedCategoryConfidence
+    }
   };
 }

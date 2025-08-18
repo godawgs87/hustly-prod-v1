@@ -14,6 +14,8 @@ const logStep = (step: string, details?: any) => {
 // Centralized eBay API Client
 export class EbayAPIClient {
   private accessToken: string = '';
+  private appAccessToken: string = '';
+  private appAccessExpiresAt: number = 0;
   baseUrl: string;
   private clientId: string;
   private clientSecret: string;
@@ -89,7 +91,7 @@ export class EbayAPIClient {
         'Authorization': `Basic ${credentials}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: `grant_type=refresh_token&refresh_token=${account.refresh_token}&scope=https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/buy.browse`
+      body: `grant_type=refresh_token&refresh_token=${account.refresh_token}`
     });
 
     if (!response.ok) {
@@ -114,6 +116,35 @@ export class EbayAPIClient {
     return this.accessToken;
   }
 
+  // Fetch and cache an application access token for Buy APIs (Browse)
+  private async getAppAccessToken(): Promise<string> {
+    const now = Date.now();
+    if (this.appAccessToken && this.appAccessExpiresAt && now < this.appAccessExpiresAt - 60_000) {
+      return this.appAccessToken;
+    }
+
+    const credentials = btoa(`${this.clientId}:${this.clientSecret}`);
+    const response = await fetch(`${this.baseUrl}/identity/v1/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials&scope=' + encodeURIComponent('https://api.ebay.com/oauth/api_scope')
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`App token fetch failed: ${error}`);
+    }
+
+    const tokenData = await response.json();
+    this.appAccessToken = tokenData.access_token;
+    this.appAccessExpiresAt = now + (tokenData.expires_in * 1000);
+    console.log('🔐 Obtained eBay APP token for Browse API', { expiresIn: tokenData.expires_in });
+    return this.appAccessToken;
+  }
+
   async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     console.log('🌐 Making eBay API request:', {
       endpoint,
@@ -121,11 +152,13 @@ export class EbayAPIClient {
       fullUrl: `${this.baseUrl}${endpoint}`
     });
     
-    const token = await this.ensureValidToken();
+    const usingBuyAPI = endpoint.startsWith('/buy/');
+    const token = usingBuyAPI ? await this.getAppAccessToken() : await this.ensureValidToken();
     console.log('🔑 Token obtained:', {
       hasToken: !!token,
       tokenLength: token?.length || 0,
-      tokenStart: token?.substring(0, 10) + '...' || 'none'
+      tokenStart: token?.substring(0, 10) + '...' || 'none',
+      tokenType: usingBuyAPI ? 'APP' : 'USER'
     });
     
     const headers = this.ebayHeaders(token);
@@ -134,6 +167,11 @@ export class EbayAPIClient {
     if (options.headers) {
       const existingHeaders = new Headers(options.headers);
       existingHeaders.forEach((value, key) => headers.set(key, value));
+    }
+
+    if (usingBuyAPI) {
+      // Ensure marketplace is set for Browse calls
+      headers.set('X-EBAY-C-MARKETPLACE-ID', 'EBAY_US');
     }
 
     console.log('📡 Making fetch request to:', `${this.baseUrl}${endpoint}`);
@@ -172,7 +210,6 @@ export class EbayAPIClient {
     return result;
   }
 
-  // Browse API methods for price research
   async searchCompletedListings(params: {
     query: string;
     category?: string;
@@ -180,150 +217,289 @@ export class EbayAPIClient {
     condition?: string;
     limit?: number;
   }): Promise<any> {
-    console.log('🔍 [Backend] searchCompletedListings called with:', params);
-    logStep('SEARCH_COMPLETED_LISTINGS', { query: params.query, category: params.category });
-    
-    // Use the actual query from frontend parameter extraction
-    const query = params.query || 'generic item';
-    console.log('🔍 [Backend] Using query:', query);
-    
-    // Build search parameters
-    const limitParam = `&limit=${Math.min(params.limit || 20, 50)}`;
-    let endpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}${limitParam}`;
-    
-    // Add brand filter if provided
-    if (params.brand) {
-      endpoint += `&aspect_filter=Brand:${encodeURIComponent(params.brand)}`;
-    }
-    
-    // Add condition filter if provided
-    if (params.condition && params.condition !== 'Any') {
-      const conditionMap: { [key: string]: string } = {
-        'New': '1000',
-        'Used': '3000',
-        'Refurbished': '2000'
-      };
-      const conditionId = conditionMap[params.condition];
-      if (conditionId) {
-        endpoint += `&filter=conditionIds:{${conditionId}}`;
-      }
-    }
+    console.log('🔍 [Backend] Starting Browse API search for:', params.query);
+    logStep('SEARCH_PARAMS', params);
     
     try {
-      console.log('🌐 [Backend] Final eBay API endpoint:', endpoint);
-      logStep('MAKING_EBAY_REQUEST', { endpoint, query: params.query });
-      const result = await this.makeRequest(endpoint);
-      console.log('📊 [Backend] eBay API raw result:', {
-        total: result.total,
-        itemCount: result.itemSummaries?.length || 0,
-        hasItems: !!result.itemSummaries
+      const endpoint = '/buy/browse/v1/item_summary/search';
+      const targetLimit = Math.min(params.limit || 20, 50);
+      
+      // Analyze query components
+      const queryAnalysis = this.analyzeSearchQuery(params.query);
+      console.log('🧠 [Backend] Query analysis:', queryAnalysis);
+      
+      // Determine search strategies based on query components
+      const searchStrategies: Array<{query: string, filters: string[], strategy: string}> = [];
+      
+      // Always include the original query as-is
+      searchStrategies.push({
+        query: params.query,
+        filters: ['buyingOptions:{FIXED_PRICE}'],
+        strategy: 'original'
       });
       
-      // Progressive fallback search strategy if no results
-      if (result.total === 0) {
-        console.log('🔄 [Backend] No results with specific query, trying progressive fallback searches');
+      // If we have part numbers, add part number searches
+      if (queryAnalysis.partNumbers.length > 0) {
+        // Part number alone (broadest for parts)
+        searchStrategies.push({
+          query: queryAnalysis.partNumbers[0],
+          filters: ['buyingOptions:{FIXED_PRICE}'],
+          strategy: 'part-number-only'
+        });
         
-        // Try 1: Remove year range and part numbers, keep core terms
-        const coreTerms = params.query
-          .replace(/\b(OEM|Genuine|Original)\b/gi, '')
-          .replace(/\b\d{4}-?\d{4}\b/g, '') // Remove year ranges
-          .replace(/\b[A-Z0-9]{8,}\b/g, '') // Remove long part numbers
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        if (coreTerms && coreTerms !== params.query) {
-          console.log('🔄 [Backend] Fallback 1: Core terms search -', coreTerms);
-          const fallback1Endpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(coreTerms)}&limit=20`;
-          const fallback1Result = await this.makeRequest(fallback1Endpoint);
-          console.log('📊 [Backend] Fallback 1 result:', { total: fallback1Result.total });
-          
-          if (fallback1Result.total > 0) {
-            return {
-              items: fallback1Result.itemSummaries || [],
-              total: fallback1Result.total,
-              searchQuery: coreTerms,
-              searchType: 'core_terms_fallback'
-            };
-          }
-        }
-        
-        // Try 2: Brand + key product type only
-        if (params.brand) {
-          const brandQuery = `${params.brand} key fob`;
-          console.log('🔄 [Backend] Fallback 2: Brand + product type -', brandQuery);
-          const fallback2Endpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(brandQuery)}&limit=20`;
-          const fallback2Result = await this.makeRequest(fallback2Endpoint);
-          console.log('📊 [Backend] Fallback 2 result:', { total: fallback2Result.total });
-          
-          if (fallback2Result.total > 0) {
-            return {
-              items: fallback2Result.itemSummaries || [],
-              total: fallback2Result.total,
-              searchQuery: brandQuery,
-              searchType: 'brand_product_fallback'
-            };
-          }
-        }
-        
-        // Try 3: Just the product type (last resort)
-        const productType = 'key fob';
-        console.log('🔄 [Backend] Fallback 3: Product type only -', productType);
-        const fallback3Endpoint = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(productType)}&limit=20`;
-        const fallback3Result = await this.makeRequest(fallback3Endpoint);
-        console.log('📊 [Backend] Fallback 3 result:', { total: fallback3Result.total });
-        
-        if (fallback3Result.total > 0) {
-          return {
-            items: fallback3Result.itemSummaries || [],
-            total: fallback3Result.total,
-            searchQuery: productType,
-            searchType: 'product_type_fallback'
-          };
+        // Part number with brand if available
+        if (params.brand || queryAnalysis.brand) {
+          const brandName = params.brand || queryAnalysis.brand;
+          searchStrategies.push({
+            query: `${brandName} ${queryAnalysis.partNumbers[0]}`,
+            filters: ['buyingOptions:{FIXED_PRICE}'],
+            strategy: 'brand-part-number'
+          });
         }
       }
       
-      logStep('EBAY_RAW_RESPONSE', { 
-        total: result.total, 
-        itemSummariesLength: result.itemSummaries?.length,
-        hasItemSummaries: !!result.itemSummaries,
-        resultKeys: Object.keys(result),
-        fullResult: JSON.stringify(result).substring(0, 500) // First 500 chars
+      // If we have model/product info without part numbers, create model-focused search
+      if (queryAnalysis.model && !queryAnalysis.partNumbers.length) {
+        const modelQuery = [
+          queryAnalysis.brand,
+          queryAnalysis.model,
+          queryAnalysis.productType
+        ].filter(Boolean).join(' ');
+        
+        if (modelQuery && modelQuery !== params.query) {
+          searchStrategies.push({
+            query: modelQuery,
+            filters: ['buyingOptions:{FIXED_PRICE}'],
+            strategy: 'model-focused'
+          });
+        }
+      }
+      
+      // Add category filter if provided
+      if (params.category) {
+        searchStrategies.forEach(s => s.filters.push(`categoryIds:{${params.category}}`));
+      }
+      
+      // Execute searches in parallel for efficiency
+      console.log('🚀 [Backend] Executing parallel searches:', searchStrategies.map(s => s.strategy));
+      
+      const searchPromises = searchStrategies.map(async (search) => {
+        const queryParams = new URLSearchParams({
+          q: search.query,
+          filter: search.filters.join(','),
+          limit: String(targetLimit),
+          sort: 'price'
+        });
+        
+        try {
+          const response = await this.makeRequest(`${endpoint}?${queryParams}`, { method: 'GET' });
+          return {
+            strategy: search.strategy,
+            query: search.query,
+            items: response.itemSummaries || [],
+            total: response.total || 0
+          };
+        } catch (error) {
+          console.error(`❌ Search failed for strategy ${search.strategy}:`, error);
+          return {
+            strategy: search.strategy,
+            query: search.query,
+            items: [],
+            total: 0
+          };
+        }
       });
       
-      // Process and format results for price research
-      const processedResults = {
-        total: result.total || 0,
-        items: (result.itemSummaries || []).map((item: any) => ({
-          title: item.title,
-          price: item.price?.value || null,
-          currency: item.price?.currency || 'USD',
-          condition: item.condition,
-          image: item.image?.imageUrl || null,
-          itemId: item.itemId,
-          seller: item.seller?.username || null,
-          shippingCost: item.shippingOptions?.[0]?.shippingCost?.value || null,
-          location: item.itemLocation?.country || null,
-          soldDate: item.lastModifiedDate || null,
-          salePrice: item.price?.value || null
-        }))
+      const searchResults = await Promise.all(searchPromises);
+      
+      // Log individual search results
+      searchResults.forEach(result => {
+        console.log(`� [Backend] ${result.strategy} results:`, {
+          query: result.query,
+          count: result.items.length,
+          total: result.total
+        });
+      });
+      
+      // Merge and deduplicate results intelligently
+      const mergedItems = this.mergeSearchResults(searchResults, params.condition);
+      
+      const result = {
+        items: mergedItems.slice(0, targetLimit * 2), // Allow more results for better pricing
+        total: mergedItems.length
       };
       
-      logStep('SEARCH_COMPLETED_SUCCESS', { 
-        total: processedResults.total, 
-        itemCount: processedResults.items.length,
-        endpoint: endpoint,
-        processedItems: processedResults.items.slice(0, 2) // First 2 items for debugging
+      console.log('✅ [Backend] Browse API search successful:', {
+        strategiesUsed: searchStrategies.map(s => s.strategy),
+        itemCount: result.items.length,
+        total: result.total
       });
       
-      return processedResults;
+      logStep('SEARCH_COMPLETED', { 
+        total: result.total, 
+        itemCount: result.items.length,
+        strategies: searchStrategies.map(s => s.strategy)
+      });
+      
+      return result;
       
     } catch (error) {
-      logStep('SEARCH_COMPLETED_ERROR', { error: error.message, endpoint: endpoint });
-      throw error;
+      console.error('❌ [Backend] Browse API error:', error);
+      logStep('SEARCH_ERROR', { 
+        error: error.message, 
+        stack: error.stack 
+      });
+      
+      return {
+        items: [],
+        total: 0
+      };
     }
   }
+  
+  private analyzeSearchQuery(query: string): {
+    partNumbers: string[];
+    brand?: string;
+    model?: string;
+    year?: string;
+    productType?: string;
+  } {
+    // Extract part numbers (various formats) - EXCLUDE year ranges
+    const partNumberPatterns = [
+      // Standard automotive part numbers with letters and numbers separated by dashes
+      /\b([A-Z][A-Z0-9]{1,}[-][A-Z0-9]{2,}(?:[-][A-Z0-9]{1,})*)\b/gi,  // NL3T-15K601-EC, 164-R8304
+      // Part numbers starting with numbers then dash
+      /\b(\d{3,}[-][A-Z][A-Z0-9]{2,})\b/gi,  // 164-R8304
+      // Alphanumeric codes without dashes (but not pure numbers)
+      /\b([A-Z]{2,}\d{4,}[A-Z0-9]*)\b/g  // AB1234X
+    ];
+    
+    const partNumbers = new Set<string>();
+    partNumberPatterns.forEach(pattern => {
+      const matches = query.match(pattern);
+      if (matches) {
+        matches.forEach(m => {
+          // Filter out year ranges (e.g., 2022-2025)
+          if (!/^\d{4}-\d{4}$/.test(m)) {
+            partNumbers.add(m.toUpperCase());
+          }
+        });
+      }
+    });
+    
+    // Extract year (4 digits) or year range
+    const yearMatch = query.match(/\b((?:19|20)\d{2})(?:-(?:19|20)\d{2})?\b/);
+    const year = yearMatch ? yearMatch[1] : undefined;
+    
+    // Common automotive brands (extend as needed)
+    const brands = ['Ford', 'Chevy', 'Chevrolet', 'GMC', 'Toyota', 'Honda', 'Nissan', 'BMW', 'Mercedes', 'Audi', 'VW', 'Volkswagen', 'Dodge', 'Ram', 'Jeep', 'Chrysler'];
+    const brandPattern = new RegExp(`\\b(${brands.join('|')})\\b`, 'i');
+    const brandMatch = query.match(brandPattern);
+    const brand = brandMatch ? brandMatch[1] : undefined;
+    
+    // Extract model (F-150, Camry, etc.) - be more specific
+    const modelPatterns = [
+      /\b(F-\d{3})\b/i,  // F-150, F-250
+      /\b([A-Z][-]?\d{3,4})\b/,  // C-300, E350
+      /\b(Lightning|Raptor|King Ranch|Platinum|Limited|Lariat)\b/i,  // Trim levels
+      /\b(Camry|Corolla|Civic|Accord|Altima|Sentra|Malibu|Cruze|Focus|Fusion)\b/i  // Common models
+    ];
+    
+    let model: string | undefined;
+    for (const pattern of modelPatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        model = match[1];
+        break;
+      }
+    }
+    
+    // Product type detection
+    const productTypes = ['key fob', 'key', 'remote', 'sensor', 'module', 'switch', 'relay', 'filter', 'brake', 'rotor'];
+    const productTypePattern = new RegExp(`\\b(${productTypes.join('|')})s?\\b`, 'i');
+    const productMatch = query.match(productTypePattern);
+    const productType = productMatch ? productMatch[1] : undefined;
+    
+    console.log('🔍 [Backend] Query analysis debug:', {
+      query,
+      extractedPartNumbers: Array.from(partNumbers),
+      year,
+      brand,
+      model,
+      productType
+    });
+    
+    return {
+      partNumbers: Array.from(partNumbers),
+      brand,
+      model,
+      year,
+      productType
+    };
+  }
+  
+  private mergeSearchResults(
+    searchResults: Array<{strategy: string; items: any[]; total: number}>,
+    preferredCondition?: string
+  ): any[] {
+    const itemMap = new Map<string, any>();
+    const itemScores = new Map<string, number>();
+    
+    // Score items based on which searches found them
+    searchResults.forEach((result, index) => {
+      result.items.forEach((item: any) => {
+        const mappedItem = {
+          id: item.itemId,
+          title: item.title,
+          price: item.price?.value || 0,
+          currency: item.price?.currency || 'USD',
+          condition: item.condition,
+          location: item.itemLocation?.country,
+          url: item.itemWebUrl,
+          image: item.image?.imageUrl,
+          endTime: item.itemEndDate,
+          // Extract eBay category information
+          categoryId: item.leafCategoryIds?.[0] || item.categoryId,
+          categoryPath: item.categoryPath,
+          categories: item.categories
+        };
+        
+        if (!itemMap.has(mappedItem.id)) {
+          itemMap.set(mappedItem.id, mappedItem);
+          itemScores.set(mappedItem.id, 0);
+        }
+        
+        // Score based on strategy priority (original query gets highest score)
+        let score = 0;
+        switch(result.strategy) {
+          case 'original': score = 100; break;
+          case 'brand-part-number': score = 80; break;
+          case 'part-number-only': score = 60; break;
+          case 'model-focused': score = 40; break;
+          default: score = 20;
+        }
+        
+        // Bonus for condition match
+        if (preferredCondition && item.condition === preferredCondition) {
+          score += 10;
+        }
+        
+        itemScores.set(mappedItem.id, (itemScores.get(mappedItem.id) || 0) + score);
+      });
+    });
+    
+    // Sort by score (relevance) then by price
+    const sortedItems = Array.from(itemMap.values()).sort((a, b) => {
+      const scoreA = itemScores.get(a.id) || 0;
+      const scoreB = itemScores.get(b.id) || 0;
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      return a.price - b.price;
+    });
+    
+    return sortedItems;
+  }
 
-  async getSuggestedPrice(searchResults: any): Promise<{ suggestedPrice: number; confidence: string; analysis: any }> {
+  async getSuggestedPrice(searchResults: any): Promise<{ suggestedPrice: number; confidence: string; analysis: any; ebayCategory?: { id: string; path?: string } }> {
     logStep('GET_SUGGESTED_PRICE', { itemCount: searchResults.items?.length || 0 });
     
     if (!searchResults.items || searchResults.items.length === 0) {
@@ -332,6 +508,33 @@ export class EbayAPIClient {
         confidence: 'low',
         analysis: { message: 'No comparable listings found' }
       };
+    }
+    
+    // Extract eBay category from comparables
+    let ebayCategory: { id: string; path?: string } | undefined;
+    const categoryFrequency = new Map<string, number>();
+    
+    searchResults.items.forEach((item: any) => {
+      if (item.categoryId) {
+        const count = categoryFrequency.get(item.categoryId) || 0;
+        categoryFrequency.set(item.categoryId, count + 1);
+      }
+    });
+    
+    // Get most frequent category
+    if (categoryFrequency.size > 0) {
+      const sortedCategories = Array.from(categoryFrequency.entries())
+        .sort((a, b) => b[1] - a[1]);
+      
+      const mostFrequentCategoryId = sortedCategories[0][0];
+      const itemWithCategory = searchResults.items.find((item: any) => item.categoryId === mostFrequentCategoryId);
+      
+      ebayCategory = {
+        id: mostFrequentCategoryId,
+        path: itemWithCategory?.categoryPath
+      };
+      
+      console.log('📦 [Backend] Extracted eBay category:', ebayCategory);
     }
     
     // Extract and validate prices with enhanced logging
@@ -433,9 +636,76 @@ export class EbayAPIClient {
       recommendation: 'Price set 5% below median for competitive advantage'
     };
     
-    logStep('PRICE_SUGGESTION_COMPLETE', { suggestedPrice, confidence, analysis });
+    logStep('PRICE_SUGGESTION_COMPLETE', { suggestedPrice, confidence, analysis, ebayCategory });
     
-    return { suggestedPrice, confidence, analysis };
+    return { suggestedPrice, confidence, analysis, ebayCategory };
+  }
+
+  async researchItemPrice(params: any): Promise<any> {
+    console.log('🔍 [Backend] RECEIVED PARAMS:', {
+      query: params.query,
+      brand: params.brand,
+      condition: params.condition,
+      category: params.category,
+      limit: params.limit,
+      allParams: params
+    });
+    
+    logStep('RESEARCH_ITEM_PRICE_START', { query: params.query, brand: params.brand, condition: params.condition });
+    
+    // Validate required parameters
+    if (!params.query || typeof params.query !== 'string') {
+      throw new Error('Query parameter is required and must be a string');
+    }
+    
+    let searchData;
+    try {
+      const searchParams = {
+        query: params.query.trim(),
+        category: params.category || undefined,
+        brand: params.brand || undefined,
+        condition: params.condition || undefined,
+        limit: Math.min(params.limit || 20, 50) // Cap at 50 to prevent API overload
+      };
+      
+      logStep('SEARCH_PARAMS', searchParams);
+      
+      searchData = await this.searchCompletedListings(searchParams);
+      logStep('SEARCH_COMPLETED', { total: searchData.total, itemCount: searchData.items?.length });
+    } catch (searchError) {
+      logStep('SEARCH_ERROR', { error: searchError.message, stack: searchError.stack });
+      // Return partial success with error info instead of throwing
+      return new Response(JSON.stringify({ 
+        status: 'partial_success', 
+        data: {
+          searchResults: { items: [], total: 0 },
+          priceAnalysis: { suggestedPrice: 0, priceRange: { min: 0, max: 0 } },
+          error: searchError.message
+        }
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+    
+    let priceData;
+    try {
+      priceData = await this.getSuggestedPrice(searchData);
+    } catch (priceError) {
+      logStep('PRICE_ANALYSIS_ERROR', { error: priceError.message });
+      priceData = { suggestedPrice: 0, priceRange: { min: 0, max: 0 } };
+    }
+    
+    return new Response(JSON.stringify({ 
+      status: 'success', 
+      data: {
+        searchResults: searchData,
+        priceAnalysis: priceData
+      }
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
   }
 }
 
@@ -502,71 +772,7 @@ serve(async (req) => {
         });
 
       case 'research_item_price':
-        // Combined action: search + analyze in one call
-        console.log('🔍 [Backend] RECEIVED PARAMS:', {
-          query: params.query,
-          brand: params.brand,
-          condition: params.condition,
-          category: params.category,
-          limit: params.limit,
-          allParams: params
-        });
-        
-        logStep('RESEARCH_ITEM_PRICE_START', { query: params.query, brand: params.brand, condition: params.condition });
-        
-        // Validate required parameters
-        if (!params.query || typeof params.query !== 'string') {
-          throw new Error('Query parameter is required and must be a string');
-        }
-        
-        let searchData;
-        try {
-          const searchParams = {
-            query: params.query.trim(),
-            category: params.category || undefined,
-            brand: params.brand || undefined,
-            condition: params.condition || undefined,
-            limit: Math.min(params.limit || 20, 50) // Cap at 50 to prevent API overload
-          };
-          
-          logStep('SEARCH_PARAMS', searchParams);
-          
-          searchData = await ebayClient.searchCompletedListings(searchParams);
-          logStep('SEARCH_COMPLETED', { total: searchData.total, itemCount: searchData.items?.length });
-        } catch (searchError) {
-          logStep('SEARCH_ERROR', { error: searchError.message, stack: searchError.stack });
-          // Return partial success with error info instead of throwing
-          return new Response(JSON.stringify({ 
-            status: 'partial_success', 
-            data: {
-              searchResults: { items: [], total: 0 },
-              priceAnalysis: { suggestedPrice: 0, priceRange: { min: 0, max: 0 } },
-              error: searchError.message
-            }
-          }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-          });
-        }
-        
-        let priceData;
-        try {
-          priceData = await ebayClient.getSuggestedPrice(searchData);
-        } catch (priceError) {
-          logStep('PRICE_ANALYSIS_ERROR', { error: priceError.message });
-          priceData = { suggestedPrice: 0, priceRange: { min: 0, max: 0 } };
-        }
-        
-        return new Response(JSON.stringify({ 
-          status: 'success', 
-          data: {
-            searchResults: searchData,
-            priceAnalysis: priceData
-          }
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
+        return await ebayClient.researchItemPrice(params);
 
       default:
         throw new Error(`Unknown action: ${action}`);

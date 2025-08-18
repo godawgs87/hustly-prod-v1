@@ -120,10 +120,12 @@ export function useUnifiedUploadFlow({ initialPhotos = [], mode, onComplete, shi
   // Price research handlers
   const handlePriceResearchComplete = useCallback((priceData: any, suggestedPrice?: number) => {
     if (suggestedPrice && photoGroups.length > 0) {
-      // Update the listing data with the suggested price
+      // Update the listing data with the suggested price and eBay category
       setPhotoGroups(prev => prev.map(g => ({
         ...g,
-        listingData: g.listingData ? { ...g.listingData, price: suggestedPrice } : g.listingData
+        listingData: g.listingData ? { ...g.listingData, price: suggestedPrice } : g.listingData,
+        ebay_category_id: priceData?.ebayCategory?.id || priceData?.priceAnalysis?.ebayCategory?.id || g.ebay_category_id,
+        ebay_category_path: priceData?.ebayCategory?.path || priceData?.priceAnalysis?.ebayCategory?.path || g.ebay_category_path,
       })));
     }
     setCurrentStep('edit');

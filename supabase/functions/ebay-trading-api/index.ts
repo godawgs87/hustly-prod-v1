@@ -58,6 +58,22 @@ class EbayTradingAPI {
     return profile?.business_type || 'individual'
   }
 
+  private async getUserLocation(): Promise<{ postalCode: string; location: string }> {
+    const { data: profile } = await this.supabaseClient
+      .from('user_profiles')
+      .select('zip_code, city, state')
+      .eq('user_id', this.userId)
+      .single()
+    
+    // Use user's zip code if available, otherwise default to a common US zip
+    const postalCode = profile?.zip_code || '10001'
+    const location = (profile?.city && profile?.state) 
+      ? `${profile.city}, ${profile.state}` 
+      : 'United States'
+    
+    return { postalCode, location }
+  }
+
   private async getAccessToken(): Promise<string> {
     const { data: account, error } = await this.supabaseClient
       .from('marketplace_accounts')
@@ -83,71 +99,101 @@ class EbayTradingAPI {
     return headers
   }
 
-  private buildAddFixedPriceItemXML(listing: ListingData, sku: string): string {
+  private async buildAddFixedPriceItemXML(listing: ListingData, sku: string): Promise<string> {
     const builder = new Builder({
       xmldec: { version: '1.0', encoding: 'UTF-8' },
       renderOpts: { pretty: false }
     })
+
+    // Get user location
+    const { postalCode, location } = await this.getUserLocation()
+
+    // Build the item object with required fields only
+    const item: any = {
+      Title: listing.title,
+      Description: listing.description,
+      PrimaryCategory: {
+        CategoryID: listing.ebay_category_id
+      },
+      StartPrice: listing.price.toString(),
+      CategoryMappingAllowed: 'true',
+      Country: 'US',
+      Currency: 'USD',
+      DispatchTimeMax: (listing.handling_time || 3).toString(),
+      ListingDuration: 'GTC',
+      ListingType: 'FixedPriceItem',
+      Quantity: listing.quantity.toString(),
+      ConditionID: this.mapConditionToID(listing.condition),
+      SKU: sku,
+      Location: location,
+      PostalCode: postalCode
+    }
+
+    // Add shipping details - always required
+    item.ShippingDetails = {
+      ShippingType: 'Flat',
+      ShippingServiceOptions: {
+        ShippingServicePriority: '1',
+        ShippingService: listing.shipping_service || 'USPSPriority',
+        ShippingServiceCost: (listing.shipping_cost || 0).toString(),
+        ShippingServiceAdditionalCost: '0.00'
+      }
+    }
+
+    // Build return policy object carefully to avoid undefined fields
+    const returnPolicy: any = {}
+    if (listing.return_accepted === true) {
+      returnPolicy.ReturnsAcceptedOption = 'ReturnsAccepted'
+      returnPolicy.RefundOption = 'MoneyBack'
+      returnPolicy.ReturnsWithinOption = listing.return_period ? `Days_${listing.return_period}` : 'Days_30'
+      returnPolicy.ShippingCostPaidByOption = 'Buyer'
+      returnPolicy.Description = 'Returns accepted within 30 days. Buyer pays return shipping.'
+    } else {
+      returnPolicy.ReturnsAcceptedOption = 'ReturnsNotAccepted'
+    }
+    item.ReturnPolicy = returnPolicy
 
     const itemData: any = {
       AddFixedPriceItemRequest: {
         $: { xmlns: 'urn:ebay:apis:eBLBaseComponents' },
         ErrorLanguage: 'en_US',
         WarningLevel: 'High',
-        Item: {
-          Title: listing.title,
-          Description: listing.description,
-          PrimaryCategory: {
-            CategoryID: listing.ebay_category_id
-          },
-          StartPrice: listing.price.toString(),
-          CategoryMappingAllowed: 'true',
-          Country: 'US',
-          Currency: 'USD',
-          DispatchTimeMax: listing.handling_time || 3,
-          ListingDuration: 'GTC',
-          ListingType: 'FixedPriceItem',
-          Quantity: listing.quantity.toString(),
-          ConditionID: this.mapConditionToID(listing.condition),
-          SKU: sku,
-          // Inline payment details (no policy required)
-          PaymentMethods: ['PayPal', 'CreditCard'],
-          PayPalEmailAddress: 'paypal@hustly.com', // Will be replaced with user's PayPal
-          // Inline shipping details (no policy required)
-          ShippingDetails: {
-            ShippingType: 'Flat',
-            ShippingServiceOptions: {
-              ShippingServicePriority: '1',
-              ShippingService: listing.shipping_service || 'USPSPriority',
-              ShippingServiceCost: (listing.shipping_cost || 0).toString(),
-              ShippingServiceAdditionalCost: '0.00'
-            }
-          },
-          // Inline return details (no policy required)
-          ReturnPolicy: {
-            ReturnsAcceptedOption: listing.return_accepted ? 'ReturnsAccepted' : 'ReturnsNotAccepted',
-            RefundOption: 'MoneyBack',
-            ReturnsWithinOption: `Days_${listing.return_period || 30}`,
-            ShippingCostPaidByOption: 'Buyer'
-          }
+        Item: item
+      }
+    }
+
+    // Add photos if available - filter out any undefined/null values
+    if (listing.photos && listing.photos.length > 0) {
+      const validPhotos = listing.photos.filter(photo => photo && typeof photo === 'string').slice(0, 12)
+      if (validPhotos.length > 0) {
+        itemData.AddFixedPriceItemRequest.Item.PictureDetails = {
+          PictureURL: validPhotos
         }
       }
     }
 
-    // Add photos if available
-    if (listing.photos && listing.photos.length > 0) {
-      itemData.AddFixedPriceItemRequest.Item.PictureDetails = {
-        PictureURL: listing.photos.slice(0, 12) // eBay allows max 12 photos
+    // Add product identifiers if available - only include defined values
+    const productListingDetails: any = {}
+    
+    // Handle BrandMPN carefully
+    if (listing.brand || listing.mpn) {
+      productListingDetails.BrandMPN = {}
+      if (listing.brand && listing.brand.trim()) {
+        productListingDetails.BrandMPN.Brand = listing.brand.trim()
+      }
+      if (listing.mpn && listing.mpn.trim()) {
+        productListingDetails.BrandMPN.MPN = listing.mpn.trim()
+      }
+      // Only keep BrandMPN if it has at least one field
+      if (Object.keys(productListingDetails.BrandMPN).length === 0) {
+        delete productListingDetails.BrandMPN
       }
     }
-
-    // Add product identifiers if available
-    const productListingDetails: any = {}
-    if (listing.brand) productListingDetails.BrandMPN = { Brand: listing.brand }
-    if (listing.mpn) productListingDetails.BrandMPN = { ...productListingDetails.BrandMPN, MPN: listing.mpn }
-    if (listing.upc) productListingDetails.UPC = listing.upc
-    if (listing.ean) productListingDetails.EAN = listing.ean
-    if (listing.isbn) productListingDetails.ISBN = listing.isbn
+    
+    // Add other identifiers only if they have values
+    if (listing.upc && listing.upc.trim()) productListingDetails.UPC = listing.upc.trim()
+    if (listing.ean && listing.ean.trim()) productListingDetails.EAN = listing.ean.trim()
+    if (listing.isbn && listing.isbn.trim()) productListingDetails.ISBN = listing.isbn.trim()
     
     if (Object.keys(productListingDetails).length > 0) {
       itemData.AddFixedPriceItemRequest.Item.ProductListingDetails = productListingDetails
@@ -201,44 +247,178 @@ class EbayTradingAPI {
     return conditionMap[condition.toLowerCase()] || '3000'
   }
 
-  async addFixedPriceItem(listing: ListingData, sku: string): Promise<any> {
-    const token = await this.getAccessToken()
-    const xmlPayload = this.buildAddFixedPriceItemXML(listing, sku)
-    
-    console.log('[Trading API] Sending AddFixedPriceItem request')
-    
-    const response = await fetch(this.baseUrl, {
-      method: 'POST',
-      headers: this.getTradingAPIHeaders('AddFixedPriceItem', token),
-      body: xmlPayload
-    })
+  async addFixedPriceItem(listingId: string): Promise<{ success: boolean; itemId?: string; error?: string }> {
+    try {
+      console.log('[Trading API] Sending AddFixedPriceItem request');
+      
+      // Get listing data from database
+      const { data: listing, error: listingError } = await this.supabaseClient
+        .from('listings')
+        .select('*')
+        .eq('id', listingId)
+        .single();
 
-    const responseText = await response.text()
-    const result = await parseStringPromise(responseText)
-    
-    if (result.AddFixedPriceItemResponse?.Errors) {
-      const errors = Array.isArray(result.AddFixedPriceItemResponse.Errors)
-        ? result.AddFixedPriceItemResponse.Errors
-        : [result.AddFixedPriceItemResponse.Errors]
-      
-      const severeErrors = errors.filter((e: any) => 
-        e.SeverityCode && e.SeverityCode[0] === 'Error'
-      )
-      
-      if (severeErrors.length > 0) {
-        throw new Error(`eBay Trading API Error: ${JSON.stringify(severeErrors)}`)
+      if (listingError || !listing) {
+        throw new Error(`Failed to fetch listing: ${listingError?.message}`);
       }
-    }
 
-    if (result.AddFixedPriceItemResponse?.ItemID) {
+      // Determine eBay category ID
+      let ebayCategoryId = listing.ebay_category_id;
+      
+      if (!ebayCategoryId) {
+        // Use smart category detection based on title and description
+        ebayCategoryId = this.detectEbayCategory(listing.title, listing.description, listing.category);
+        console.log('[Trading API] Auto-detected eBay category:', ebayCategoryId, 'for listing:', listing.title);
+      }
+
+      if (!ebayCategoryId) {
+        throw new Error('Unable to determine eBay category. Please set a category for this listing.');
+      }
+
+      const sku = `HUSTLY-${listingId}`;
+      
+      // Build XML with the detected category
+      const listingWithCategory = { ...listing, ebay_category_id: ebayCategoryId };
+      const xmlPayload = await this.buildAddFixedPriceItemXML(listingWithCategory, sku);
+      
+      // Get access token and make the Trading API request
+      const token = await this.getAccessToken();
+      
+      console.log('[Trading API] Sending request to eBay Trading API');
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: this.getTradingAPIHeaders('AddFixedPriceItem', token),
+        body: xmlPayload
+      });
+
+      const responseText = await response.text();
+      const result = await parseStringPromise(responseText);
+      
+      // Check for errors in the response
+      if (result.AddFixedPriceItemResponse?.Errors) {
+        const errors = Array.isArray(result.AddFixedPriceItemResponse.Errors)
+          ? result.AddFixedPriceItemResponse.Errors
+          : [result.AddFixedPriceItemResponse.Errors];
+        
+        const severeErrors = errors.filter((e: any) => 
+          e.SeverityCode && e.SeverityCode[0] === 'Error'
+        );
+        
+        if (severeErrors.length > 0) {
+          throw new Error(`eBay Trading API Error: ${JSON.stringify(severeErrors)}`);
+        }
+      }
+
+      // Check for successful response with ItemID
+      if (result.AddFixedPriceItemResponse?.ItemID) {
+        const itemId = result.AddFixedPriceItemResponse.ItemID[0];
+        
+        // Update listing with eBay item ID and detected category
+        await this.supabaseClient
+          .from('listings')
+          .update({ 
+            ebay_item_id: itemId,
+            ebay_category_id: ebayCategoryId
+          })
+          .eq('id', listingId);
+
+        return {
+          success: true,
+          itemId: itemId
+        };
+      } else {
+        throw new Error('Unexpected response from eBay Trading API - no ItemID returned');
+      }
+    } catch (error: any) {
+      console.error('[Trading API] Error:', error);
       return {
-        success: true,
-        itemId: result.AddFixedPriceItemResponse.ItemID[0],
-        fees: result.AddFixedPriceItemResponse.Fees
-      }
+        success: false,
+        error: error.message
+      };
     }
+  }
 
-    throw new Error('Unexpected response from eBay Trading API')
+  private detectEbayCategory(title: string, description: string = '', internalCategory: string = ''): string | null {
+    const text = `${title} ${description} ${internalCategory}`.toLowerCase();
+    
+    // Home & Garden
+    if (text.includes('vacuum') || text.includes('dyson') || text.includes('cleaner')) {
+      return '20613'; // Vacuum Cleaners
+    }
+    if (text.includes('furniture') || text.includes('chair') || text.includes('table') || text.includes('sofa')) {
+      return '3197'; // Furniture
+    }
+    if (text.includes('kitchen') || text.includes('appliance')) {
+      return '20667'; // Kitchen Appliances
+    }
+    
+    // Automotive categories - Using valid eBay Motors categories
+    // Note: eBay Motors Parts & Accessories root category is 6028
+    if (text.includes('ford') || text.includes('f-150') || text.includes('lightning') || 
+        text.includes('proximity') || text.includes('sensor') || text.includes('key') || text.includes('fob')) {
+      // Use the general eBay Motors Parts category which is always valid
+      return '6028'; // eBay Motors > Parts & Accessories
+    }
+    if (text.includes('automotive') || text.includes('car') || text.includes('truck') || text.includes('vehicle')) {
+      return '6028'; // eBay Motors > Parts & Accessories
+    }
+    
+    // Electronics
+    if (text.includes('phone') || text.includes('iphone') || text.includes('android')) {
+      return '9355'; // Cell Phones & Smartphones
+    }
+    if (text.includes('laptop') || text.includes('computer') || text.includes('macbook')) {
+      return '175672'; // Laptops & Netbooks
+    }
+    if (text.includes('electronic') || text.includes('digital') || text.includes('tech') || text.includes('device')) {
+      return '293'; // Consumer Electronics
+    }
+    
+    // Clothing & Fashion
+    if (text.includes('shoe') || text.includes('sneaker') || text.includes('boot')) {
+      return '93427'; // Shoes
+    }
+    if (text.includes('shirt') || text.includes('dress') || text.includes('pants') || text.includes('clothing')) {
+      return '11450'; // Clothing, Shoes & Accessories
+    }
+    if (text.includes('bag') || text.includes('purse') || text.includes('handbag')) {
+      return '169291'; // Women's Bags & Handbags
+    }
+    
+    // Collectibles & Hobbies
+    if (text.includes('card') && (text.includes('pokemon') || text.includes('trading') || text.includes('sports'))) {
+      return '212'; // Trading Cards
+    }
+    if (text.includes('toy') || text.includes('lego') || text.includes('action figure')) {
+      return '220'; // Toys & Hobbies
+    }
+    if (text.includes('collectible') || text.includes('vintage') || text.includes('antique')) {
+      return '1'; // Collectibles
+    }
+    
+    // Books & Media
+    if (text.includes('book') || text.includes('novel') || text.includes('textbook')) {
+      return '267'; // Books
+    }
+    if (text.includes('dvd') || text.includes('blu-ray') || text.includes('movie')) {
+      return '617'; // DVDs & Blu-ray Discs
+    }
+    if (text.includes('game') || text.includes('playstation') || text.includes('xbox') || text.includes('nintendo')) {
+      return '139973'; // Video Games
+    }
+    
+    // Sports & Outdoors
+    if (text.includes('golf') || text.includes('tennis') || text.includes('basketball') || text.includes('soccer')) {
+      return '888'; // Sporting Goods
+    }
+    
+    // Health & Beauty
+    if (text.includes('makeup') || text.includes('cosmetic') || text.includes('perfume')) {
+      return '26395'; // Health & Beauty
+    }
+    
+    // Default fallback - Everything Else category (safer than 99)
+    return '88433'; // Everything Else > Other
   }
 
   async reviseFixedPriceItem(itemId: string, listing: ListingData): Promise<any> {
@@ -399,7 +579,7 @@ Deno.serve(async (req) => {
         }
 
         const sku = `HUSTLY-${listingId || Date.now()}`
-        const result = await api.addFixedPriceItem(listing, sku)
+        const result = await api.addFixedPriceItem(listingId)
         
         // Update listing with eBay item ID
         if (listingId && result.itemId) {

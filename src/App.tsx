@@ -363,6 +363,36 @@ const CreateListingWorking = () => {
     }
   };
 
+  const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) => {
+    console.log('💰 Price research completed:', { priceData, suggestedPrice });
+    
+    // Extract eBay category from price research data
+    const ebayCategory = priceData?.ebayCategory || priceData?.priceAnalysis?.ebayCategory;
+    
+    if (ebayCategory) {
+      console.log('📦 Extracted eBay category from price research:', ebayCategory);
+      setListingData(prev => ({
+        ...prev,
+        ebay_category_id: ebayCategory.id || ebayCategory,
+        ebay_category_path: ebayCategory.path || null
+      }));
+    }
+    
+    if (suggestedPrice) {
+      setListingData(prev => ({
+        ...prev,
+        price: suggestedPrice
+      }));
+    }
+    
+    // Auto-save the updated listing data with eBay category
+    autoSaveListingData({
+      price: suggestedPrice,
+      ebay_category_id: ebayCategory?.id || ebayCategory,
+      ebay_category_path: ebayCategory?.path
+    });
+  };
+
   const getWeight = () => {
     return listingData?.measurements?.weight ? parseFloat(listingData.measurements.weight.toString()) : 1;
   };
@@ -439,6 +469,7 @@ const CreateListingWorking = () => {
             onBack={handleBack}
             backButtonText={getBackButtonText()}
             onSkipPriceResearch={() => setCurrentStep('shipping')}
+            onPriceResearchComplete={handlePriceResearchComplete}
           />
         </div>
         {isMobile && <UnifiedMobileNavigation />}
