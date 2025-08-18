@@ -1,24 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ListingData } from '@/types/CreateListing';
 
 interface PlatformMapping {
   platform: string;
+  platformKey: string;
   icon: string;
   category: string;
   originalPrice: number;
   sellerFees: number;
   priceAfterFees: number;
   platformFields: Record<string, any>;
+  isSelected: boolean;
 }
 
 interface UnifiedPlatformMappingProps {
   listingData: ListingData;
   basePrice: number;
+  selectedPlatforms?: string[];
+  onPlatformToggle?: (platform: string, selected: boolean) => void;
 }
 
-const PLATFORM_CONFIGS = {
+interface PlatformConfig {
+  name: string;
+  icon: string;
+  feeRate: number;
+  color: string;
+  extractFields: (data: ListingData) => Record<string, any>;
+}
+
+const PLATFORM_CONFIGS: Record<string, PlatformConfig> = {
   ebay: {
     name: 'eBay',
     icon: '🛒',
@@ -30,6 +43,7 @@ const PLATFORM_CONFIGS = {
       mpn: data.mpn || extractMPN(data.title || ''),
       upc: data.upc || extractUPC(data.description || ''),
       leafCategoryId: data.ebay_category_id || getEbayCategoryId(data),
+      categoryPath: data.ebay_category_path || null,
       itemSpecifics: data.item_specifics || {
         Brand: data.brand,
         Condition: data.condition,
@@ -111,8 +125,8 @@ const PLATFORM_CONFIGS = {
       condition: data.condition,
       brand: data.brand,
       category: mapCategoryToWhatnot(data.category),
-      startingBid: Math.floor(data.price * 0.5), // 50% of list price as starting bid
-      buyNowPrice: data.price,
+      startingBid: Math.floor((data.price || basePrice) * 0.5), // 50% of list price as starting bid
+      buyNowPrice: data.price || basePrice,
       authenticityGuarantee: isAuthenticityEligible(data),
       shippingWeight: data.shipping_weight,
       tags: extractTags(data)
@@ -250,8 +264,12 @@ function mapCategoryToWhatnot(category: any): string {
 
 const UnifiedPlatformMapping: React.FC<UnifiedPlatformMappingProps> = ({
   listingData,
-  basePrice
+  basePrice,
+  selectedPlatforms = ['ebay', 'mercari', 'poshmark', 'depop', 'facebook', 'whatnot'], // Default all selected
+  onPlatformToggle
 }) => {
+  const [localSelectedPlatforms, setLocalSelectedPlatforms] = useState<string[]>(selectedPlatforms);
+
   const generatePlatformMappings = (): PlatformMapping[] => {
     return Object.entries(PLATFORM_CONFIGS).map(([key, config]) => {
       const sellerFees = basePrice * config.feeRate;
@@ -259,22 +277,41 @@ const UnifiedPlatformMapping: React.FC<UnifiedPlatformMappingProps> = ({
       
       return {
         platform: config.name,
+        platformKey: key,
         icon: config.icon,
-        category: getCategoryForPlatform(key, listingData.category),
+        category: getCategoryForPlatform(key, listingData.category, listingData),
         originalPrice: basePrice,
         sellerFees,
         priceAfterFees,
-        platformFields: config.extractFields(listingData)
+        platformFields: config.extractFields(listingData),
+        isSelected: localSelectedPlatforms.includes(key)
       };
     });
   };
 
-  const getCategoryForPlatform = (platform: string, category: any): string => {
+  const getCategoryForPlatform = (platform: string, category: any, listingData: ListingData): string => {
+    // Special handling for eBay to show the extracted category
+    if (platform === 'ebay' && listingData.ebay_category_id) {
+      return `Category: ${listingData.ebay_category_id}`;
+    }
+    
     // This would integrate with your existing category mapping services
     if (typeof category === 'object' && category?.primary) {
       return category.primary;
     }
     return typeof category === 'string' ? category : 'Automotive';
+  };
+
+  const handlePlatformToggle = (platformKey: string, checked: boolean) => {
+    const newSelected = checked 
+      ? [...localSelectedPlatforms, platformKey]
+      : localSelectedPlatforms.filter(p => p !== platformKey);
+    
+    setLocalSelectedPlatforms(newSelected);
+    
+    if (onPlatformToggle) {
+      onPlatformToggle(platformKey, checked);
+    }
   };
 
   const mappings = generatePlatformMappings();
@@ -284,13 +321,28 @@ const UnifiedPlatformMapping: React.FC<UnifiedPlatformMappingProps> = ({
       <h3 className="text-lg font-semibold">Cross-Platform Mapping</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {mappings.map((mapping) => (
-          <Card key={mapping.platform} className="p-4">
+          <Card key={mapping.platformKey} className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={mapping.isSelected}
+                  onCheckedChange={(checked) => handlePlatformToggle(
+                    mapping.platformKey, 
+                    checked as boolean
+                  )}
+                />
                 <span className="text-xl">{mapping.icon}</span>
                 <h4 className="font-semibold">{mapping.platform}</h4>
               </div>
-              <Badge className={PLATFORM_CONFIGS[mapping.platform.toLowerCase().replace(' ', '')]?.color}>
+              <Badge className={
+                mapping.platform === 'eBay' ? 'bg-blue-100 text-blue-800' :
+                mapping.platform === 'Mercari' ? 'bg-orange-100 text-orange-800' :
+                mapping.platform === 'Poshmark' ? 'bg-pink-100 text-pink-800' :
+                mapping.platform === 'Depop' ? 'bg-purple-100 text-purple-800' :
+                mapping.platform === 'Facebook Marketplace' ? 'bg-blue-100 text-blue-600' :
+                mapping.platform === 'Whatnot' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-gray-100 text-gray-800'
+              }>
                 {mapping.category}
               </Badge>
             </div>
@@ -312,11 +364,14 @@ const UnifiedPlatformMapping: React.FC<UnifiedPlatformMappingProps> = ({
               <div className="mt-3 pt-3 border-t">
                 <h5 className="font-medium text-xs text-gray-700 mb-2">Platform Fields:</h5>
                 <div className="space-y-1">
-                  {Object.entries(mapping.platformFields).map(([key, value]) => (
+                  {Object.entries(mapping.platformFields).filter(([key]) => 
+                    // Only show important fields
+                    ['condition', 'brand', 'leafCategoryId', 'size', 'color', 'category'].includes(key)
+                  ).map(([key, value]) => (
                     <div key={key} className="flex justify-between text-xs">
                       <span className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                      <span className="text-gray-700 truncate max-w-[150px]" title={typeof value === 'object' ? JSON.stringify(value) : String(value)}>
-                        {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      <span className="text-gray-700 truncate max-w-[150px]" title={String(value)}>
+                        {value || 'null'}
                       </span>
                     </div>
                   ))}
