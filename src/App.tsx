@@ -369,28 +369,28 @@ const CreateListingWorking = () => {
     // Extract eBay category from price research data
     const ebayCategory = priceData?.ebayCategory || priceData?.priceAnalysis?.ebayCategory;
     
+    const updates: Partial<ListingData> = {};
+    
     if (ebayCategory) {
       console.log('📦 Extracted eBay category from price research:', ebayCategory);
-      setListingData(prev => ({
-        ...prev,
-        ebay_category_id: ebayCategory.id || ebayCategory,
-        ebay_category_path: ebayCategory.path || null
-      }));
+      updates.ebay_category_id = ebayCategory.id || ebayCategory;
+      updates.ebay_category_path = ebayCategory.path || null;
     }
     
     if (suggestedPrice) {
-      setListingData(prev => ({
-        ...prev,
-        price: suggestedPrice
-      }));
+      updates.price = suggestedPrice;
     }
     
-    // Auto-save the updated listing data with eBay category
-    autoSaveListingData({
-      price: suggestedPrice,
-      ebay_category_id: ebayCategory?.id || ebayCategory,
-      ebay_category_path: ebayCategory?.path
-    });
+    // Update state and auto-save to database
+    if (Object.keys(updates).length > 0) {
+      setListingData(prev => ({
+        ...prev,
+        ...updates
+      }));
+      
+      // Auto-save the updated listing data with eBay category
+      handleListingDataChange(updates);
+    }
   };
 
   const getWeight = () => {
