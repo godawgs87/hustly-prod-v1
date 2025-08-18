@@ -1,33 +1,12 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Settings, Eye, EyeOff } from 'lucide-react';
+import { Edit, Settings, Eye, EyeOff, ChevronDown, ChevronUp } from 'lucide-react';
 import ListingEditor from './ListingEditor';
 import ListingDetails from './listing-preview/ListingDetails';
 import ListingFeatures from './listing-preview/ListingFeatures';
-
-interface ListingData {
-  title: string;
-  description: string;
-  price: number;
-  category: string;
-  condition: string;
-  measurements: {
-    length?: string;
-    width?: string;
-    height?: string;
-    weight?: string;
-  };
-  keywords?: string[];
-  shippingCost?: number;
-  photos: string[];
-  priceResearch?: string;
-  brand?: string;
-  model?: string;
-  features?: string[];
-  defects?: string[];
-  includes?: string[];
-}
+import UnifiedPlatformMapping from './create-listing/UnifiedPlatformMapping';
+import { ListingData } from '@/types/CreateListing';
 
 interface ListingPreviewProps {
   listing: ListingData;
@@ -39,6 +18,7 @@ const ListingPreview = ({ listing, onEdit, onExport }: ListingPreviewProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentListing, setCurrentListing] = useState(listing);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showPlatformMapping, setShowPlatformMapping] = useState(false);
 
   const handleAdminClick = () => {
     window.location.href = '/admin';
@@ -67,11 +47,8 @@ const ListingPreview = ({ listing, onEdit, onExport }: ListingPreviewProps) => {
             <ListingDetails
               title={currentListing.title}
               price={currentListing.price}
-              shippingCost={currentListing.shippingCost}
               category={currentListing.category}
               condition={currentListing.condition}
-              brand={currentListing.brand}
-              model={currentListing.model}
               keywords={currentListing.keywords}
               description={currentListing.description}
               measurements={currentListing.measurements}
@@ -111,8 +88,40 @@ const ListingPreview = ({ listing, onEdit, onExport }: ListingPreviewProps) => {
             {showAdvanced && currentListing.priceResearch && (
               <div className="mt-3 p-3 bg-gray-50 rounded">
                 <h4 className="font-medium text-gray-900 mb-2">Price Research</h4>
-                <p className="text-sm text-gray-600">{currentListing.priceResearch}</p>
+                <div className="text-sm text-gray-600">
+                  {currentListing.priceResearch.priceAnalysis && (
+                    <div>
+                      <p>Suggested Price: ${currentListing.priceResearch.priceAnalysis.suggestedPrice}</p>
+                      <p>Confidence: {currentListing.priceResearch.priceAnalysis.confidence}</p>
+                      <p>Sample Size: {currentListing.priceResearch.priceAnalysis.analysis?.sampleSize || 'N/A'}</p>
+                    </div>
+                  )}
+                </div>
               </div>
+            )}
+          </div>
+
+          {/* Platform-Specific Mapping Section */}
+          <div className="mt-6">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowPlatformMapping(!showPlatformMapping)}
+              className="text-sm mb-3"
+            >
+              {showPlatformMapping ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
+              {showPlatformMapping ? 'Hide' : 'Show'} Platform-Specific Fields
+            </Button>
+            
+            {showPlatformMapping && (
+              <UnifiedPlatformMapping 
+                listingData={currentListing} 
+                basePrice={currentListing.price || 0}
+                selectedPlatforms={['ebay', 'mercari', 'poshmark', 'depop', 'facebook', 'whatnot']}
+                onPlatformToggle={(platform, selected) => {
+                  console.log(`Platform ${platform} ${selected ? 'selected' : 'deselected'}`);
+                }}
+              />
             )}
           </div>
         </div>
