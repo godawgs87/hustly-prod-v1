@@ -443,7 +443,7 @@ export class EbayService {
     };
   }
 
-  private static extractPriceResearchParams(listingData: any) {
+  static extractPriceResearchParams(listingData: any) {
     const title = listingData.title || '';
     const description = listingData.description || '';
     const brand = listingData.brand || '';

@@ -64,6 +64,16 @@ async function testPriceResearch() {
       console.log('\n💰 Price Analysis:');
       console.log(`   Suggested Price: $${analysis.suggestedPrice}`);
       console.log(`   Confidence: ${analysis.confidence}`);
+      
+      // Check for eBay category
+      if (analysis.ebayCategory) {
+        console.log('\n📦 eBay Category Extracted:');
+        console.log(`   Category ID: ${analysis.ebayCategory.id}`);
+        console.log(`   Category Path: ${analysis.ebayCategory.path || 'N/A'}`);
+      } else {
+        console.log('\n⚠️  No eBay category extracted from comparables');
+      }
+      
       if (analysis.analysis) {
         console.log(`   Sample Size: ${analysis.analysis.sampleSize}`);
         console.log(`   Price Range: $${analysis.analysis.priceRange?.min} - $${analysis.analysis.priceRange?.max}`);

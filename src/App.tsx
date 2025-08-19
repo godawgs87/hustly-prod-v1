@@ -366,8 +366,8 @@ const CreateListingWorking = () => {
   const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) => {
     console.log('💰 Price research completed:', { priceData, suggestedPrice });
     
-    // Extract eBay category from price research data
-    const ebayCategory = priceData?.ebayCategory || priceData?.priceAnalysis?.ebayCategory;
+    // Extract eBay category from price research data - check both possible locations
+    const ebayCategory = priceData?.priceAnalysis?.ebayCategory || priceData?.ebayCategory;
     
     const updates: Partial<ListingData> = {};
     
@@ -375,6 +375,8 @@ const CreateListingWorking = () => {
       console.log('📦 Extracted eBay category from price research:', ebayCategory);
       updates.ebay_category_id = ebayCategory.id || ebayCategory;
       updates.ebay_category_path = ebayCategory.path || null;
+    } else {
+      console.log('⚠️ No eBay category found in price research data');
     }
     
     if (suggestedPrice) {
@@ -390,6 +392,7 @@ const CreateListingWorking = () => {
       
       // Auto-save the updated listing data with eBay category
       handleListingDataChange(updates);
+      console.log('✅ Updated listing with eBay category:', updates);
     }
   };
 

@@ -100,6 +100,7 @@ export const PriceResearchStep: React.FC<PriceResearchStepProps> = ({
         
         // Update the main listing data with suggested price
         if (onPriceResearchComplete) {
+          // Include the full priceData which contains ebayCategory from backend
           onPriceResearchComplete(priceData, suggestedPrice);
         }
       } else if (suggestedPrice === callbackProcessedRef.current) {
@@ -173,6 +174,12 @@ export const PriceResearchStep: React.FC<PriceResearchStepProps> = ({
       if (result.data) {
         const totalComps = result.data.searchResults?.total || 0;
         const suggestedPrice = result.data.priceAnalysis?.suggestedPrice || 0;
+        const ebayCategory = result.data.priceAnalysis?.ebayCategory;
+        
+        // Log eBay category if found
+        if (ebayCategory) {
+          console.log('📦 [PriceResearchStep] eBay category extracted:', ebayCategory);
+        }
         
         setPriceData(result.data);
         
