@@ -47,7 +47,7 @@ const CreateListingWorking = () => {
   const [photos, setPhotos] = useState<File[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [listingData, setListingData] = useState<ListingData | null>(null);
-  const [shippingCost, setShippingCost] = useState(0);
+  const [shippingCost, setShippingCost] = useState<number | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleBack = () => {
@@ -202,6 +202,17 @@ const CreateListingWorking = () => {
     if (!listingData) return;
     
     console.log('🔍 Debug - Final export with shipping cost:', shippingCost);
+    
+    // Validate shipping configuration - must be explicitly set (not undefined, null, or 0)
+    if (shippingCost === undefined || shippingCost === null || shippingCost === 0) {
+      toast({
+        title: "Shipping Required",
+        description: "Please select a shipping option before publishing your listing.",
+        variant: "destructive",
+      });
+      setCurrentStep('shipping');
+      return;
+    }
     
     setIsSaving(true);
     try {
@@ -365,6 +376,7 @@ const CreateListingWorking = () => {
 
   const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) => {
     console.log('💰 Price research completed:', { priceData, suggestedPrice });
+    console.log('📍 Current mode:', mode, 'Current step:', currentStep);
     
     // Extract eBay category from price research data - check both possible locations
     const ebayCategory = priceData?.priceAnalysis?.ebayCategory || priceData?.ebayCategory;
@@ -384,16 +396,51 @@ const CreateListingWorking = () => {
     }
     
     // Update state and auto-save to database
-    if (Object.keys(updates).length > 0) {
-      setListingData(prev => ({
-        ...prev,
-        ...updates
-      }));
+    if (Object.keys(updates).length > 0 && listingData) {
+      // Update listing data state
+      setListingData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ...updates
+        };
+      });
       
       // Auto-save the updated listing data with eBay category
-      handleListingDataChange(updates);
+      // Do this asynchronously without blocking the UI
+      (async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            // Find and update the existing draft listing
+            const { listings, updateListing } = useInventoryStore.getState();
+            const existingDraft = listings.find(listing => 
+              listing.status === 'draft' && 
+              listing.title === listingData.title
+            );
+            
+            if (existingDraft) {
+              const updatedDraft = {
+                ...existingDraft,
+                ...updates,
+                updated_at: new Date().toISOString()
+              };
+              
+              await updateListing(existingDraft.id, updatedDraft as any);
+              console.log('✅ Auto-saved eBay category and price from price research:', updates);
+            }
+          }
+        } catch (error) {
+          console.error('❌ Auto-save failed for price research data:', error);
+          // Continue without blocking the UI
+        }
+      })();
+      
       console.log('✅ Updated listing with eBay category:', updates);
     }
+    
+    // Explicitly log that we're staying on the current step
+    console.log('📍 Staying in single mode on analysis step after price research');
   };
 
   const getWeight = () => {
@@ -442,9 +489,7 @@ const CreateListingWorking = () => {
       <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
         <StreamlinedHeader
           title="Create Single Listing"
-          subtitle="Create a listing for one item with AI assistance"
           onBack={handleBack}
-          backButtonText={getBackButtonText()}
         />
         
         <CreateListingSteps 

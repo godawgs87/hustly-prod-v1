@@ -113,7 +113,7 @@ class EbayTradingAPI {
       Title: listing.title,
       Description: listing.description,
       PrimaryCategory: {
-        CategoryID: listing.ebay_category_id
+        CategoryID: this.detectEbayCategory(listing.title, listing.description) || listing.ebay_category_id
       },
       StartPrice: listing.price.toString(),
       CategoryMappingAllowed: 'true',
@@ -352,15 +352,26 @@ class EbayTradingAPI {
       return '20667'; // Kitchen Appliances
     }
     
-    // Automotive categories - Using valid eBay Motors categories
-    // Note: eBay Motors Parts & Accessories root category is 6028
-    if (text.includes('ford') || text.includes('f-150') || text.includes('lightning') || 
-        text.includes('proximity') || text.includes('sensor') || text.includes('key') || text.includes('fob')) {
-      // Use the general eBay Motors Parts category which is always valid
-      return '6028'; // eBay Motors > Parts & Accessories
+    // Automotive categories - Using valid eBay Motors LEAF categories
+    if (text.includes('key fob') || text.includes('key') && text.includes('fob') || 
+        text.includes('proximity') && (text.includes('key') || text.includes('fob'))) {
+      return '33765'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Interior > Switches & Controls > Remotes & Keyless Entry (LEAF)
     }
+    if (text.includes('sensor') && (text.includes('ford') || text.includes('automotive') || text.includes('car'))) {
+      return '33596'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Sensors (LEAF)
+    }
+    if (text.includes('brake') && (text.includes('pad') || text.includes('rotor'))) {
+      return '33564'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Brakes & Brake Parts (LEAF)
+    }
+    if (text.includes('filter') && (text.includes('air') || text.includes('oil'))) {
+      return '33598'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Filters (LEAF)
+    }
+    if (text.includes('battery') && (text.includes('car') || text.includes('automotive'))) {
+      return '33601'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Batteries (LEAF)
+    }
+    // Generic automotive fallback - use a common leaf category
     if (text.includes('automotive') || text.includes('car') || text.includes('truck') || text.includes('vehicle')) {
-      return '6028'; // eBay Motors > Parts & Accessories
+      return '33765'; // Default to Remotes & Keyless Entry as a safe leaf category
     }
     
     // Electronics

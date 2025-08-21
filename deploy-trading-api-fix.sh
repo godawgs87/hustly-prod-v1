@@ -1,34 +1,32 @@
 #!/bin/bash
 
-# Deploy eBay API Client with Browse API Fix
-# This script deploys the corrected eBay API client that uses Browse API instead of Finding API
+# Deploy eBay Trading API with leaf category fix
+# This script deploys the corrected eBay Trading API edge function that fixes the 'Invalid category. The category selected is not a leaf category' error
 
-echo "🚀 Deploying eBay API Client with Browse API fix..."
-echo "================================================"
+echo "🚀 Deploying eBay Trading API with leaf category fix..."
+echo "This fixes the 'Invalid category. The category selected is not a leaf category' error"
+echo ""
 
 # Check if we're in the right directory
-if [ ! -f "supabase/functions/ebay-api-client/index.ts" ]; then
+if [ ! -f "supabase/functions/ebay-trading-api/index.ts" ]; then
     echo "❌ Error: Not in the correct directory. Please run from the project root."
     exit 1
 fi
 
-# Deploy the function
-echo "📦 Deploying ebay-api-client function to Supabase..."
-npx supabase functions deploy ebay-api-client
+# Deploy the edge function
+echo "📦 Deploying ebay-trading-api edge function to Supabase..."
+npx supabase functions deploy ebay-trading-api --no-verify-jwt
 
 if [ $? -eq 0 ]; then
-    echo "✅ Deployment successful!"
+    echo "✅ Deployment complete!"
     echo ""
-    echo "🧪 Test the fix on production:"
-    echo "1. Go to https://hustly.app/create-listing"
-    echo "2. Enter a test item like 'Ford F-150 Lightning Smart Key Fob'"
-    echo "3. Click Price Research"
+    echo "📝 What was fixed:"
+    echo "  - Changed category 6028 (parent) to 33765 (leaf) for key fobs"
+    echo "  - Added specific leaf categories for automotive parts"
+    echo "  - Fixed eBay sync errors for individual sellers"
     echo ""
-    echo "📊 What was fixed:"
-    echo "- Switched from Finding API (rate limited) to Browse API"
-    echo "- Using application token with buy.browse scope"
-    echo "- Single optimized API call instead of progressive search"
-    echo "- Better price calculation algorithm"
+    echo "🧪 Test with: Create a listing with 'Ford F-150 Lightning Smart Key Fob'"
+    echo "   It should now sync to eBay without category errors"
 else
     echo "❌ Deployment failed. Check the error messages above."
     exit 1
