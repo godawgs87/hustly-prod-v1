@@ -109,11 +109,20 @@ class EbayTradingAPI {
     const { postalCode, location } = await this.getUserLocation()
 
     // Build the item object with required fields only
+    const detectedCategory = this.detectEbayCategory(listing.title, listing.description);
+    const finalCategory = detectedCategory || listing.ebay_category_id;
+    console.log('[Trading API] Category detection:', {
+      title: listing.title,
+      detected: detectedCategory,
+      fallback: listing.ebay_category_id,
+      using: finalCategory
+    });
+    
     const item: any = {
       Title: listing.title,
       Description: listing.description,
       PrimaryCategory: {
-        CategoryID: this.detectEbayCategory(listing.title, listing.description) || listing.ebay_category_id
+        CategoryID: finalCategory
       },
       StartPrice: listing.price.toString(),
       CategoryMappingAllowed: 'true',
@@ -354,7 +363,7 @@ class EbayTradingAPI {
     
     // Automotive categories - Using valid eBay Motors LEAF categories
     if (text.includes('key fob') || text.includes('key') && text.includes('fob') || 
-        text.includes('proximity') && (text.includes('key') || text.includes('fob'))) {
+        text.includes('proximity') || text.includes('smart key') || text.includes('keyless')) {
       return '33765'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Interior > Switches & Controls > Remotes & Keyless Entry (LEAF)
     }
     if (text.includes('sensor') && (text.includes('ford') || text.includes('automotive') || text.includes('car'))) {
