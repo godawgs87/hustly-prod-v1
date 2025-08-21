@@ -109,13 +109,20 @@ class EbayTradingAPI {
     const { postalCode, location } = await this.getUserLocation()
 
     // Build the item object with required fields only
+    // Always use category detection for automotive items to ensure leaf categories
     const detectedCategory = this.detectEbayCategory(listing.title, listing.description);
-    const finalCategory = detectedCategory || listing.ebay_category_id;
-    console.log('[Trading API] Category detection:', {
+    
+    // Category 184651 is not a leaf category - it's a parent category for key fobs
+    // We must use a leaf category like 33765 for successful listing
+    const isInvalidCategory = listing.ebay_category_id === '184651';
+    const finalCategory = detectedCategory || (isInvalidCategory ? '33765' : listing.ebay_category_id);
+    
+    console.log('[Trading API] Category resolution:', {
       title: listing.title,
       detected: detectedCategory,
-      fallback: listing.ebay_category_id,
-      using: finalCategory
+      apiProvided: listing.ebay_category_id,
+      isInvalidCategory,
+      finalCategory
     });
     
     const item: any = {
@@ -361,9 +368,16 @@ class EbayTradingAPI {
       return '20667'; // Kitchen Appliances
     }
     
-    // Automotive categories - Using valid eBay Motors LEAF categories
-    if (text.includes('key fob') || text.includes('key') && text.includes('fob') || 
-        text.includes('proximity') || text.includes('smart key') || text.includes('keyless')) {
+    // Automotive key fobs and remotes - proper detection logic
+    const isKeyFob = (
+      (text.includes('key') && text.includes('fob')) ||
+      text.includes('key fob') ||
+      text.includes('keyfob') ||
+      (text.includes('smart') && text.includes('key')) ||
+      (text.includes('proximity') && (text.includes('key') || text.includes('fob') || text.includes('ford') || text.includes('f-150') || text.includes('f150')))
+    );
+    
+    if (isKeyFob) {
       return '33765'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Interior > Switches & Controls > Remotes & Keyless Entry (LEAF)
     }
     if (text.includes('sensor') && (text.includes('ford') || text.includes('automotive') || text.includes('car'))) {
