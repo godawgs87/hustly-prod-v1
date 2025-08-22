@@ -99,7 +99,7 @@ class EbayTradingAPI {
     return headers
   }
 
-  private async buildAddFixedPriceItemXML(listing: ListingData, sku: string): Promise<string> {
+  private async buildAddFixedPriceItemXML(listing: ListingData): Promise<string> {
     const builder = new Builder({
       xmldec: { version: '1.0', encoding: 'UTF-8' },
       renderOpts: { pretty: false }
@@ -109,19 +109,11 @@ class EbayTradingAPI {
     const { postalCode, location } = await this.getUserLocation()
 
     // Build the item object with required fields only
-    // Always use category detection for automotive items to ensure leaf categories
-    const detectedCategory = this.detectEbayCategory(listing.title, listing.description);
-    
-    // Category 184651 is not a leaf category - it's a parent category for key fobs
-    // We must use a leaf category like 33765 for successful listing
-    const isInvalidCategory = listing.ebay_category_id === '184651';
-    const finalCategory = detectedCategory || (isInvalidCategory ? '33765' : listing.ebay_category_id);
+    const finalCategory = await this.validateAndGetLeafCategory(listing.ebay_category_id, listing.title, listing.description);
     
     console.log('[Trading API] Category resolution:', {
       title: listing.title,
-      detected: detectedCategory,
       apiProvided: listing.ebay_category_id,
-      isInvalidCategory,
       finalCategory
     });
     
@@ -140,7 +132,6 @@ class EbayTradingAPI {
       ListingType: 'FixedPriceItem',
       Quantity: listing.quantity.toString(),
       ConditionID: this.mapConditionToID(listing.condition),
-      SKU: sku,
       Location: location,
       PostalCode: postalCode
     }
@@ -282,8 +273,12 @@ class EbayTradingAPI {
       let ebayCategoryId = listing.ebay_category_id;
       
       if (!ebayCategoryId) {
-        // Use smart category detection based on title and description
-        ebayCategoryId = this.detectEbayCategory(listing.title, listing.description, listing.category);
+        // Use proper category validation with Taxonomy API
+        ebayCategoryId = await this.validateAndGetLeafCategory(
+          listing.ebay_category_id || '', 
+          listing.title, 
+          listing.description
+        );
         console.log('[Trading API] Auto-detected eBay category:', ebayCategoryId, 'for listing:', listing.title);
       }
 
@@ -295,7 +290,7 @@ class EbayTradingAPI {
       
       // Build XML with the detected category
       const listingWithCategory = { ...listing, ebay_category_id: ebayCategoryId };
-      const xmlPayload = await this.buildAddFixedPriceItemXML(listingWithCategory, sku);
+      const xmlPayload = await this.buildAddFixedPriceItemXML(listingWithCategory);
       
       // Get access token and make the Trading API request
       const token = await this.getAccessToken();
@@ -354,105 +349,104 @@ class EbayTradingAPI {
     }
   }
 
-  private detectEbayCategory(title: string, description: string = '', internalCategory: string = ''): string | null {
-    const text = `${title} ${description} ${internalCategory}`.toLowerCase();
+  private async getEbayCategorySuggestions(query: string): Promise<string | null> {
+    try {
+      const token = await this.getAccessToken();
+      
+      // First get the default category tree ID for the marketplace
+      const marketplaceId = 'EBAY_US';
+      const treeResponse = await fetch(
+        `https://api.ebay.com/commerce/taxonomy/v1/get_default_category_tree_id?marketplace_id=${marketplaceId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+          }
+        }
+      );
+      
+      if (!treeResponse.ok) {
+        console.error('[Trading API] Failed to get category tree ID:', await treeResponse.text());
+        return null;
+      }
+      
+      const treeData = await treeResponse.json();
+      const categoryTreeId = treeData.categoryTreeId;
+      
+      // Now get category suggestions based on the item title/description
+      const suggestResponse = await fetch(
+        `https://api.ebay.com/commerce/taxonomy/v1/category_tree/${categoryTreeId}/get_category_suggestions?q=${encodeURIComponent(query)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+          }
+        }
+      );
+      
+      if (!suggestResponse.ok) {
+        console.error('[Trading API] Failed to get category suggestions:', await suggestResponse.text());
+        return null;
+      }
+      
+      const suggestions = await suggestResponse.json();
+      
+      // Return the first suggested leaf category
+      if (suggestions.categorySuggestions && suggestions.categorySuggestions.length > 0) {
+        const leafCategory = suggestions.categorySuggestions[0].category.categoryId;
+        console.log(`[Trading API] Taxonomy API suggested category ${leafCategory} for query: ${query}`);
+        return leafCategory;
+      }
+      
+      console.log('[Trading API] No category suggestions found for query:', query);
+      return null;
+    } catch (error) {
+      console.error('[Trading API] Error getting category suggestions:', error);
+      return null;
+    }
+  }
+
+  private async validateAndGetLeafCategory(categoryId: string, title: string, description: string = ''): Promise<string> {
+    console.log('[Trading API] Validating category:', { categoryId, title });
     
-    // Home & Garden
-    if (text.includes('vacuum') || text.includes('dyson') || text.includes('cleaner')) {
-      return '20613'; // Vacuum Cleaners
-    }
-    if (text.includes('furniture') || text.includes('chair') || text.includes('table') || text.includes('sofa')) {
-      return '3197'; // Furniture
-    }
-    if (text.includes('kitchen') || text.includes('appliance')) {
-      return '20667'; // Kitchen Appliances
-    }
+    // First try to get a proper category from eBay's Taxonomy API
+    const query = `${title} ${description}`.substring(0, 200).trim(); // Limit query length
+    const suggestedCategory = await this.getEbayCategorySuggestions(query);
     
-    // Automotive key fobs and remotes - proper detection logic
-    const isKeyFob = (
-      (text.includes('key') && text.includes('fob')) ||
-      text.includes('key fob') ||
-      text.includes('keyfob') ||
-      (text.includes('smart') && text.includes('key')) ||
-      (text.includes('proximity') && (text.includes('key') || text.includes('fob') || text.includes('ford') || text.includes('f-150') || text.includes('f150')))
-    );
-    
-    if (isKeyFob) {
-      return '33765'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Interior > Switches & Controls > Remotes & Keyless Entry (LEAF)
-    }
-    if (text.includes('sensor') && (text.includes('ford') || text.includes('automotive') || text.includes('car'))) {
-      return '33596'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Sensors (LEAF)
-    }
-    if (text.includes('brake') && (text.includes('pad') || text.includes('rotor'))) {
-      return '33564'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Brakes & Brake Parts (LEAF)
-    }
-    if (text.includes('filter') && (text.includes('air') || text.includes('oil'))) {
-      return '33598'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Filters (LEAF)
-    }
-    if (text.includes('battery') && (text.includes('car') || text.includes('automotive'))) {
-      return '33601'; // eBay Motors > Parts & Accessories > Car & Truck Parts > Batteries (LEAF)
-    }
-    // Generic automotive fallback - use a common leaf category
-    if (text.includes('automotive') || text.includes('car') || text.includes('truck') || text.includes('vehicle')) {
-      return '33765'; // Default to Remotes & Keyless Entry as a safe leaf category
-    }
-    
-    // Electronics
-    if (text.includes('phone') || text.includes('iphone') || text.includes('android')) {
-      return '9355'; // Cell Phones & Smartphones
-    }
-    if (text.includes('laptop') || text.includes('computer') || text.includes('macbook')) {
-      return '175672'; // Laptops & Netbooks
-    }
-    if (text.includes('electronic') || text.includes('digital') || text.includes('tech') || text.includes('device')) {
-      return '293'; // Consumer Electronics
-    }
-    
-    // Clothing & Fashion
-    if (text.includes('shoe') || text.includes('sneaker') || text.includes('boot')) {
-      return '93427'; // Shoes
-    }
-    if (text.includes('shirt') || text.includes('dress') || text.includes('pants') || text.includes('clothing')) {
-      return '11450'; // Clothing, Shoes & Accessories
-    }
-    if (text.includes('bag') || text.includes('purse') || text.includes('handbag')) {
-      return '169291'; // Women's Bags & Handbags
-    }
-    
-    // Collectibles & Hobbies
-    if (text.includes('card') && (text.includes('pokemon') || text.includes('trading') || text.includes('sports'))) {
-      return '212'; // Trading Cards
-    }
-    if (text.includes('toy') || text.includes('lego') || text.includes('action figure')) {
-      return '220'; // Toys & Hobbies
-    }
-    if (text.includes('collectible') || text.includes('vintage') || text.includes('antique')) {
-      return '1'; // Collectibles
+    if (suggestedCategory) {
+      console.log(`[Trading API] Using Taxonomy API suggested category ${suggestedCategory} instead of ${categoryId}`);
+      return suggestedCategory;
     }
     
-    // Books & Media
-    if (text.includes('book') || text.includes('novel') || text.includes('textbook')) {
-      return '267'; // Books
-    }
-    if (text.includes('dvd') || text.includes('blu-ray') || text.includes('movie')) {
-      return '617'; // DVDs & Blu-ray Discs
-    }
-    if (text.includes('game') || text.includes('playstation') || text.includes('xbox') || text.includes('nintendo')) {
-      return '139973'; // Video Games
+    // Fallback to known mappings if Taxonomy API fails
+    const knownNonLeafMappings: Record<string, string> = {
+      '184651': '33765', // Keyless Entry Remotes/Fobs -> Remotes & Keyless Entry (leaf)
+      '6028': '33765',   // Another non-leaf -> same leaf  
+      '33559': '33564',  // Brakes parent -> Brakes & Brake Parts (leaf)
+    };
+    
+    if (knownNonLeafMappings[categoryId]) {
+      console.log(`[Trading API] Mapped known non-leaf category ${categoryId} to leaf ${knownNonLeafMappings[categoryId]}`);
+      return knownNonLeafMappings[categoryId];
     }
     
-    // Sports & Outdoors
-    if (text.includes('golf') || text.includes('tennis') || text.includes('basketball') || text.includes('soccer')) {
-      return '888'; // Sporting Goods
+    // If category looks valid and Taxonomy API didn't override it, use it
+    if (categoryId && categoryId.match(/^\d{4,6}$/)) {
+      console.log(`[Trading API] Using provided category ${categoryId}`);
+      return categoryId;
     }
     
-    // Health & Beauty
-    if (text.includes('makeup') || text.includes('cosmetic') || text.includes('perfume')) {
-      return '26395'; // Health & Beauty
+    // Last resort: Use a safe default based on title keywords
+    const text = title.toLowerCase();
+    if (text.includes('key') || text.includes('fob') || text.includes('proximity') || 
+        text.includes('remote') || text.includes('keyless')) {
+      console.log('[Trading API] Using default automotive key fob category');
+      return '33765'; // Remotes & Keyless Entry
     }
     
-    // Default fallback - Everything Else category (safer than 99)
-    return '88433'; // Everything Else > Other
+    // Generic fallback
+    console.warn(`[Trading API] No category mapping found for ${categoryId}, using generic fallback`);
+    return '11450'; // Other - a very generic leaf category
   }
 
   async reviseFixedPriceItem(itemId: string, listing: ListingData): Promise<any> {

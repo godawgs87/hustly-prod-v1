@@ -203,11 +203,11 @@ const CreateListingWorking = () => {
     
     console.log('🔍 Debug - Final export with shipping cost:', shippingCost);
     
-    // Validate shipping configuration - must be explicitly set (not undefined, null, or 0)
-    if (!shippingCost || shippingCost <= 0) {
+    // Validate shipping configuration - must be explicitly selected (not undefined)
+    if (shippingCost === undefined) {
       toast({
         title: "Shipping Required",
-        description: "Please select a shipping option before publishing your listing. Shipping cost must be greater than $0.",
+        description: "Please select a shipping option before publishing your listing.",
         variant: "destructive",
       });
       setCurrentStep('shipping');
