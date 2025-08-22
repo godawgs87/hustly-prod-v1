@@ -210,7 +210,6 @@ const CreateListingWorking = () => {
         description: "Please select a shipping option before publishing your listing.",
         variant: "destructive",
       });
-      setCurrentStep('shipping');
       return;
     }
     
