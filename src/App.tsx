@@ -482,6 +482,7 @@ const getBackButtonText = () => {
   return 'Back';
 };
 
+// Return different UI based on mode
 if (mode === 'bulk') {
   return (
     <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
