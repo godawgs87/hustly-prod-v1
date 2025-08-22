@@ -204,10 +204,11 @@ const CreateListingWorking = () => {
     console.log('🔍 Debug - Final export with shipping cost:', shippingCost);
     
     // Validate shipping configuration - must be explicitly selected (not undefined)
+    // Allow $0 for free shipping, just check that an option was selected
     if (shippingCost === undefined) {
       toast({
         title: "Shipping Required",
-        description: "Please select a shipping option before publishing your listing.",
+        description: "Please select a shipping option (Free Shipping, Local Pickup, or Paid Shipping) before publishing.",
         variant: "destructive",
       });
       return;
@@ -318,41 +319,123 @@ const CreateListingWorking = () => {
       setShippingCost(0);
       
       navigate('/inventory');
-    } catch (error) {
-      console.error('Save failed:', error);
-      toast({
-        title: "Save Failed",
-        description: "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  } catch (error) {
+    console.error('Save failed:', error);
+    toast({
+      title: "Save Failed",
+      description: "Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsSaving(false);
+  }
+};
 
-  const handleShippingSelect = (option: any) => {
+const handleShippingSelect = (option: any) => {
+  if (option.id === 'free') {
+    console.log('🚚 Free Shipping selected, cost set to 0');
+    setShippingCost(0);
+  } else if (option.id === 'local') {
+    console.log('🚚 Local Pickup selected, cost set to 0');
+    setShippingCost(0);
+  } else {
+    console.log('🚚 Paid shipping selected:', option.cost);
     setShippingCost(option.cost || 0);
-  };
+  }
+  
+  // Don't change step - stay on the current page
+};
 
-  const handleListingDataChange = async (updates: Partial<ListingData>) => {
-    console.log('💰 [App.tsx] handleListingDataChange called with updates:', updates);
-    console.log('💰 [App.tsx] Current listingData before update:', listingData?.price);
+const handleListingDataChange = async (updates: Partial<ListingData>) => {
+  console.log('💰 [App.tsx] handleListingDataChange called with updates:', updates);
+  console.log('💰 [App.tsx] Current listingData before update:', listingData?.price);
+  
+  if (listingData) {
+    const updatedListingData = { ...listingData, ...updates };
+    console.log('💰 [App.tsx] Setting updated listingData with price:', updatedListingData.price);
+    setListingData(updatedListingData);
     
-    if (listingData) {
-      const updatedListingData = { ...listingData, ...updates };
-      console.log('💰 [App.tsx] Setting updated listingData with price:', updatedListingData.price);
-      setListingData(updatedListingData);
-      
-      // Auto-save changes to database (especially important for price updates)
+    // Auto-save changes to database (especially important for price updates)
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Find and update the existing draft listing
+        const { listings, updateListing } = useInventoryStore.getState();
+        const existingDraft = listings.find(listing => 
+          listing.status === 'draft' && 
+          listing.title === listingData.title &&
+          listing.user_id === user.id
+        );
+        
+        if (existingDraft) {
+          // Convert priceResearch to string if it's an object
+          const processedUpdates = {
+            ...updates,
+            priceResearch: typeof updates.priceResearch === 'object' 
+              ? JSON.stringify(updates.priceResearch) 
+              : updates.priceResearch
+          };
+          
+          const updatedDraft = {
+            ...existingDraft,
+            ...processedUpdates,
+            updated_at: new Date().toISOString()
+          };
+          
+          await updateListing(existingDraft.id, updatedDraft);
+          console.log('✅ Auto-saved listing data changes:', updates);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Auto-save failed for listing data changes:', error);
+      // Continue without blocking the UI
+    }
+  }
+};
+
+const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) => {
+  console.log('💰 Price research completed:', { priceData, suggestedPrice });
+  console.log('📍 Current mode:', mode, 'Current step:', currentStep);
+  
+  // Extract eBay category from price research data - check both possible locations
+  const ebayCategory = priceData?.priceAnalysis?.ebayCategory || priceData?.ebayCategory;
+  
+  const updates: Partial<ListingData> = {};
+  
+  if (ebayCategory) {
+    console.log('📦 Extracted eBay category from price research:', ebayCategory);
+    updates.ebay_category_id = ebayCategory.id || ebayCategory;
+    updates.ebay_category_path = ebayCategory.path || null;
+  } else {
+    console.log('⚠️ No eBay category found in price research data');
+  }
+  
+  if (suggestedPrice) {
+    updates.price = suggestedPrice;
+  }
+  
+  // Update state and auto-save to database
+  if (Object.keys(updates).length > 0 && listingData) {
+    // Update listing data state
+    setListingData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        ...updates
+      };
+    });
+    
+    // Auto-save the updated listing data with eBay category
+    // Do this asynchronously without blocking the UI
+    (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           // Find and update the existing draft listing
           const { listings, updateListing } = useInventoryStore.getState();
-          const existingDraft = listings.find(listing => 
+          const existingDraft = listings.find((listing: any) => 
             listing.status === 'draft' && 
-            listing.title === listingData.title &&
-            listing.user_id === user.id
+            listing.title === listingData.title
           );
           
           if (existingDraft) {
@@ -362,176 +445,109 @@ const CreateListingWorking = () => {
               updated_at: new Date().toISOString()
             };
             
-            await updateListing(existingDraft.id, updatedDraft);
-            console.log('✅ Auto-saved listing data changes:', updates);
+            await updateListing(existingDraft.id, updatedDraft as any);
+            console.log('✅ Auto-saved eBay category and price from price research:', updates);
           }
         }
       } catch (error) {
-        console.error('❌ Auto-save failed for listing data changes:', error);
+        console.error('❌ Auto-save failed for price research data:', error);
         // Continue without blocking the UI
       }
-    }
-  };
+    })();
+    
+  // Explicitly log that we're staying on the current step
+  console.log('📍 Staying in single mode on analysis step after price research');
+};
 
-  const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) => {
-    console.log('💰 Price research completed:', { priceData, suggestedPrice });
-    console.log('📍 Current mode:', mode, 'Current step:', currentStep);
-    
-    // Extract eBay category from price research data - check both possible locations
-    const ebayCategory = priceData?.priceAnalysis?.ebayCategory || priceData?.ebayCategory;
-    
-    const updates: Partial<ListingData> = {};
-    
-    if (ebayCategory) {
-      console.log('📦 Extracted eBay category from price research:', ebayCategory);
-      updates.ebay_category_id = ebayCategory.id || ebayCategory;
-      updates.ebay_category_path = ebayCategory.path || null;
-    } else {
-      console.log('⚠️ No eBay category found in price research data');
-    }
-    
-    if (suggestedPrice) {
-      updates.price = suggestedPrice;
-    }
-    
-    // Update state and auto-save to database
-    if (Object.keys(updates).length > 0 && listingData) {
-      // Update listing data state
-      setListingData(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          ...updates
-        };
-      });
-      
-      // Auto-save the updated listing data with eBay category
-      // Do this asynchronously without blocking the UI
-      (async () => {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            // Find and update the existing draft listing
-            const { listings, updateListing } = useInventoryStore.getState();
-            const existingDraft = listings.find(listing => 
-              listing.status === 'draft' && 
-              listing.title === listingData.title
-            );
-            
-            if (existingDraft) {
-              const updatedDraft = {
-                ...existingDraft,
-                ...updates,
-                updated_at: new Date().toISOString()
-              };
-              
-              await updateListing(existingDraft.id, updatedDraft as any);
-              console.log('✅ Auto-saved eBay category and price from price research:', updates);
-            }
-          }
-        } catch (error) {
-          console.error('❌ Auto-save failed for price research data:', error);
-          // Continue without blocking the UI
-        }
-      })();
-      
-      console.log('✅ Updated listing with eBay category:', updates);
-    }
-    
-    // Explicitly log that we're staying on the current step
-    console.log('📍 Staying in single mode on analysis step after price research');
-  };
+const getWeight = () => {
+  return listingData?.measurements?.weight ? parseFloat(listingData.measurements.weight.toString()) : 1;
+};
 
-  const getWeight = () => {
-    return listingData?.measurements?.weight ? parseFloat(listingData.measurements.weight.toString()) : 1;
-  };
-
-  const getDimensions = () => {
-    const measurements = listingData?.measurements;
+const getDimensions = () => {
+  if (listingData?.measurements) {
+    const { length, width, height } = listingData.measurements;
     return {
-      length: measurements?.length ? parseFloat(measurements.length.toString()) : 10,
-      width: measurements?.width ? parseFloat(measurements.width.toString()) : 8,
-      height: measurements?.height ? parseFloat(measurements.height.toString()) : 2
+      length: length ? parseFloat(length.toString()) : 10,
+      width: width ? parseFloat(width.toString()) : 10,
+      height: height ? parseFloat(height.toString()) : 10
     };
-  };
-
-  const getBackButtonText = () => {
-    if (currentStep === 'photos') return 'Back to Mode Selection';
-    if (currentStep === 'preview') return 'Back to Photos';
-    if (currentStep === 'shipping') return 'Back to Preview';
-    return 'Back';
-  };
-
-  if (mode === 'bulk') {
-    return (
-      <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
-        <StreamlinedHeader
-          title="Bulk Upload"
-          subtitle="Upload multiple items for batch processing"
-          onBack={handleBack}
-          backButtonText="Back to Mode Selection"
-        />
-        <div className="max-w-6xl mx-auto p-6">
-          <BulkUploadManager
-            onComplete={handleComplete}
-            onBack={handleBack}
-            onViewInventory={handleViewInventory}
-          />
-        </div>
-        {isMobile && <UnifiedMobileNavigation />}
-      </div>
-    );
   }
+  return { length: 10, width: 10, height: 10 };
+};
 
-  if (mode === 'single') {
-    return (
-      <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
-        <StreamlinedHeader
-          title="Create Single Listing"
+const getBackButtonText = () => {
+  if (currentStep === 'photos') return 'Back to Mode Selection';
+  if (currentStep === 'preview') return 'Back to Photos';
+  if (currentStep === 'shipping') return 'Back to Preview';
+  return 'Back';
+};
+
+if (mode === 'bulk') {
+  return (
+    <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
+      <StreamlinedHeader
+        title="Bulk Upload"
+        onBack={handleBack}
+      />
+      <div className="max-w-6xl mx-auto p-6">
+        <BulkUploadManager
+          onComplete={handleComplete}
           onBack={handleBack}
+          onViewInventory={handleViewInventory}
         />
-        
-        <CreateListingSteps 
+      </div>
+      {isMobile && <UnifiedMobileNavigation />}
+    </div>
+  );
+}
+
+if (mode === 'single') {
+  return (
+    <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
+      <StreamlinedHeader
+        title="Create Single Listing"
+        onBack={handleBack}
+      />
+      
+      <CreateListingSteps 
+        currentStep={currentStep}
+        photos={photos}
+        listingData={listingData}
+      />
+      
+      <div className="max-w-4xl mx-auto p-6">
+        <CreateListingContent
           currentStep={currentStep}
           photos={photos}
+          isAnalyzing={isAnalyzing}
           listingData={listingData}
+          shippingCost={shippingCost}
+          isSaving={isSaving}
+          onPhotosChange={handlePhotosChange}
+          onAnalyze={handleAnalyze}
+          onEdit={() => setCurrentStep('analysis')}
+          onExport={handleExport}
+          onShippingSelect={handleShippingSelect}
+          onListingDataChange={handleListingDataChange}
+          getWeight={getWeight}
+          getDimensions={getDimensions}
+          onBack={handleBack}
+          backButtonText={getBackButtonText()}
+          onSkipPriceResearch={() => setCurrentStep('analysis')}
+          onPriceResearchComplete={handlePriceResearchComplete}
         />
-        
-        <div className="max-w-4xl mx-auto p-6">
-          <CreateListingContent
-            currentStep={currentStep}
-            photos={photos}
-            isAnalyzing={isAnalyzing}
-            listingData={listingData}
-            shippingCost={shippingCost}
-            isSaving={isSaving}
-            onPhotosChange={handlePhotosChange}
-            onAnalyze={handleAnalyze}
-            onEdit={() => setCurrentStep('shipping')}
-            onExport={handleExport}
-            onShippingSelect={handleShippingSelect}
-            onListingDataChange={handleListingDataChange}
-            getWeight={getWeight}
-            getDimensions={getDimensions}
-            onBack={handleBack}
-            backButtonText={getBackButtonText()}
-            onSkipPriceResearch={() => setCurrentStep('shipping')}
-            onPriceResearchComplete={handlePriceResearchComplete}
-          />
-        </div>
-        {isMobile && <UnifiedMobileNavigation />}
       </div>
-    );
-  }
+      {isMobile && <UnifiedMobileNavigation />}
+    </div>
+  );
+}
 
   // Mode selection screen
   return (
     <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
         title="Create Listing"
-        subtitle="Choose how you'd like to create your listings"
         onBack={() => navigate('/')}
-        backButtonText="Back to Dashboard"
       />
       
       <div className="max-w-4xl mx-auto p-6">
@@ -631,6 +647,7 @@ const CreateListingWorking = () => {
       {isMobile && <UnifiedMobileNavigation />}
     </div>
   );
+  }
 };
 
 const AppContent = () => {

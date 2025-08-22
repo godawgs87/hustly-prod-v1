@@ -271,46 +271,7 @@ const CreateListingContent = ({
     );
   }
 
-  if (currentStep === 'shipping' && listingData) {
-    return (
-      <Card className="p-6">
-        <div className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">Calculate Shipping</h2>
-            <p className="text-gray-600 mb-6">
-              Choose your shipping method to complete the listing
-            </p>
-          </div>
-
-          <ShippingCalculator
-            itemWeight={getWeight()}
-            itemDimensions={getDimensions()}
-            onShippingSelect={onShippingSelect}
-          />
-
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={onBack}>
-              {backButtonText}
-            </Button>
-            <Button 
-              onClick={onExport}
-              disabled={isSaving}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Publishing...
-                </>
-              ) : (
-                'Publish Listing'
-              )}
-            </Button>
-          </div>
-        </div>
-      </Card>
-    );
-  }
+  // Removed separate shipping step - shipping is now integrated into the edit/analysis page
 
   return null;
 };
