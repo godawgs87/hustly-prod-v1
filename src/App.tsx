@@ -457,34 +457,34 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
     
   // Explicitly log that we're staying on the current step
   console.log('📍 Staying in single mode on analysis step after price research');
-};
+  };
 
-const getWeight = () => {
-  return listingData?.measurements?.weight ? parseFloat(listingData.measurements.weight.toString()) : 1;
-};
+  const getWeight = () => {
+    return listingData?.measurements?.weight ? parseFloat(listingData.measurements.weight.toString()) : 1;
+  };
 
-const getDimensions = () => {
-  if (listingData?.measurements) {
-    const { length, width, height } = listingData.measurements;
-    return {
-      length: length ? parseFloat(length.toString()) : 10,
-      width: width ? parseFloat(width.toString()) : 10,
-      height: height ? parseFloat(height.toString()) : 10
-    };
-  }
-  return { length: 10, width: 10, height: 10 };
-};
+  const getDimensions = () => {
+    if (listingData?.measurements) {
+      const { length, width, height } = listingData.measurements;
+      return {
+        length: length ? parseFloat(length.toString()) : 10,
+        width: width ? parseFloat(width.toString()) : 10,
+        height: height ? parseFloat(height.toString()) : 10
+      };
+    }
+    return { length: 10, width: 10, height: 10 };
+  };
 
-const getBackButtonText = () => {
-  if (currentStep === 'photos') return 'Back to Mode Selection';
-  if (currentStep === 'preview') return 'Back to Photos';
-  if (currentStep === 'shipping') return 'Back to Preview';
-  return 'Back';
-};
+  const getBackButtonText = () => {
+    if (currentStep === 'photos') return 'Back to Mode Selection';
+    if (currentStep === 'preview') return 'Back to Photos';
+    if (currentStep === 'shipping') return 'Back to Preview';
+    return 'Back';
+  };
 
-// Return different UI based on mode
-if (mode === 'bulk') {
-  return (
+  // Return different UI based on mode
+  if (mode === 'bulk') {
+    return (
     <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
         title="Bulk Upload"
@@ -500,10 +500,10 @@ if (mode === 'bulk') {
       {isMobile && <UnifiedMobileNavigation />}
     </div>
   );
-}
+  }
 
-if (mode === 'single') {
-  return (
+  if (mode === 'single') {
+    return (
     <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
         title="Create Single Listing"
@@ -541,7 +541,7 @@ if (mode === 'single') {
       {isMobile && <UnifiedMobileNavigation />}
     </div>
   );
-}
+  }
 
   // Mode selection screen
   return (
@@ -648,7 +648,6 @@ if (mode === 'single') {
       {isMobile && <UnifiedMobileNavigation />}
     </div>
   );
-  }
 };
 
 const AppContent = () => {
