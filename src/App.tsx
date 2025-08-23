@@ -497,7 +497,7 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
   // Return different UI based on mode
   if (mode === 'bulk') {
     return (
-    <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
+      <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
         title="Bulk Upload"
         onBack={handleBack}
@@ -516,7 +516,7 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
 
   if (mode === 'single') {
     return (
-    <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
+      <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
         title="Create Single Listing"
         onBack={handleBack}
@@ -660,7 +660,8 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
       {isMobile && <UnifiedMobileNavigation />}
     </div>
   );
-};
+}
+}; // End of CreateListingWorking component
 
 const AppContent = () => {
   const { needsOnboarding, markOnboardingComplete, currentStep, saveCurrentStep, loadSavedStep } = useOnboardingStatus();
