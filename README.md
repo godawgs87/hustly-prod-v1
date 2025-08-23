@@ -100,4 +100,4 @@ The app includes built-in performance monitoring:
 - User feedback is provided for connection issues
 
 For detailed troubleshooting, see `docs/TROUBLESHOOTING.md`.
-# Force deploy Thu Aug 21 15:26:51 EDT 2025
+# Force deploy Fri Aug 22 23:32:30 EDT 2025
