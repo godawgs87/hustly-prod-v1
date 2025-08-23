@@ -32,7 +32,43 @@ export interface PhotoGroup {
     };
     keywords?: string[];
     photos?: string[];
-    priceResearch?: string;
+    priceResearch?: string | {
+      searchResults?: {
+        total: number;
+        items: {
+          title: string;
+          price: number;
+          currency: string;
+          condition: string;
+          image?: string;
+          itemId: string;
+          seller?: string;
+          shippingCost?: number;
+          location?: string;
+          endDate?: string;
+        }[];
+      };
+      priceAnalysis?: {
+        averagePrice?: number;
+        medianPrice?: number;
+        minPrice?: number;
+        maxPrice?: number;
+        suggestedPrice: number;
+        confidence: string | 'high' | 'medium' | 'low';
+        analysis?: {
+          sampleSize: number;
+          priceRange: {
+            min: number;
+            max: number;
+          };
+          average: number;
+          median: number;
+          recommendation: string;
+        };
+      };
+      isResearching?: boolean;
+      error?: string;
+    };
     purchase_price?: number;
     purchase_date?: string;
     source_location?: string;
