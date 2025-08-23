@@ -35,9 +35,10 @@ import { supabase } from '@/integrations/supabase/client';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { EbayTokenRefreshManager } from '@/utils/ebayTokenRefresh';
 
+const BUILD_ID = "create-listing-2025-08-23-1245";
+
 // Working CreateListing component that integrates with existing components
-const CreateListingWorking = () => {
-  console.log('[CreateListingWorking] render start v2');
+const CreateListingWorking: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { toast } = useToast();
@@ -53,16 +54,8 @@ const CreateListingWorking = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Visible debug overlay (temporary)
-  const DebugOverlay = (
-    <div style={{position:'fixed',top:0,left:0,right:0,padding:'8px',background:'rgba(0,0,0,0.8)',color:'#fff',zIndex:9999,textAlign:'center'}}>
-      CreateListingWorking Debug Overlay v2
-    </div>
-  );
-
-  // Mount log and cleanup on unmount
+  // Cleanup on unmount
   useEffect(() => {
-    console.log('[CreateListingWorking] mounted v2');
     return () => {
       // Cancel any pending API requests
       if (abortControllerRef.current) {
@@ -548,10 +541,8 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
 
   // Return different UI based on mode
   if (mode === 'bulk') {
-    console.log('[CreateListingWorking] rendering: bulk');
     return (
       <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
-      {DebugOverlay}
       <StreamlinedHeader
         title="Bulk Upload"
         onBack={handleBack}
@@ -569,10 +560,8 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
   }
 
   if (mode === 'single') {
-    console.log('[CreateListingWorking] rendering: single');
     return (
       <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
-      {DebugOverlay}
       <StreamlinedHeader
         title="Create Single Listing"
         onBack={handleBack}
@@ -612,10 +601,11 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
   }
 
   // Mode selection screen
-  console.log('[CreateListingWorking] rendering: mode selection');
   return (
     <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
-      {DebugOverlay}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <h1 className="text-xl font-semibold text-gray-900">Create Listing</h1>
+      </div>
       <StreamlinedHeader
         title="Create Listing"
         onBack={() => navigate('/')}
@@ -718,7 +708,6 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
       {isMobile && <UnifiedMobileNavigation />}
     </div>
   );
-}
 }; // End of CreateListingWorking component
 
 const AppContent = () => {
@@ -732,17 +721,6 @@ const AppContent = () => {
         <Route path="/reset-password" element={<PasswordReset />} />
         <Route path="/inventory" element={<ProtectedRoute><SimpleInventoryPage /></ProtectedRoute>} />
         <Route path="/create-listing" element={<ProtectedRoute><CreateListingWorking /></ProtectedRoute>} />
-        <Route
-          path="/create-listing-test"
-          element={
-            <ProtectedRoute>
-              <div style={{padding: 24}}>
-                <h1 style={{fontSize: 24}}>Create Listing Test v1</h1>
-                <p>If you see this, routing and ProtectedRoute are working in production.</p>
-              </div>
-            </ProtectedRoute>
-          }
-        />
         <Route path="/active-listings" element={<ProtectedRoute><ActiveListingsWrapper /></ProtectedRoute>} />
         <Route path="/data-management" element={<ProtectedRoute><DataManagementWrapper /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
@@ -769,6 +747,7 @@ const App = () => {
     // Initialize eBay token refresh manager when app loads
     console.log('🚀 Initializing eBay token refresh manager...');
     EbayTokenRefreshManager.initialize();
+    console.log('BUILD_ID:', BUILD_ID);
 
     // Cleanup on unmount
     return () => {
