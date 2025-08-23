@@ -540,6 +540,7 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
 
   // Return different UI based on mode
   if (mode === 'bulk') {
+    console.log('[CreateListingWorking] rendering: bulk');
     return (
       <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
@@ -559,6 +560,7 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
   }
 
   if (mode === 'single') {
+    console.log('[CreateListingWorking] rendering: single');
     return (
       <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
@@ -600,6 +602,7 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
   }
 
   // Mode selection screen
+  console.log('[CreateListingWorking] rendering: mode selection');
   return (
     <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
       <StreamlinedHeader
