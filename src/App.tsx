@@ -100,6 +100,18 @@ const CreateListingWorking = () => {
     if (photos.length === 0) return;
     
     setIsAnalyzing(true);
+    
+    // Add timeout protection to prevent stuck states
+    const timeoutId = setTimeout(() => {
+      console.error('⏰ Analysis timeout - forcing cleanup');
+      setIsAnalyzing(false);
+      toast({
+        title: "Analysis Timeout",
+        description: "Analysis took too long. Please try again.",
+        variant: "destructive",
+      });
+    }, 60000); // 60 second timeout
+    
     try {
       // Convert photos to base64
       const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
@@ -116,15 +128,15 @@ const CreateListingWorking = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ photos: photoBase64Array })
       });
-      if (!response.ok) throw new Error('AI analysis failed');
+      if (!response.ok) throw new Error(`AI analysis failed: ${response.status}`);
       const aiResult = await response.json();
-      console.log('AI Result:', aiResult); // Debug log to see the structure
+      console.log('AI Result:', aiResult);
       if (!aiResult || aiResult.error) throw new Error(aiResult.error || 'AI returned no data');
       
       // The Edge Function returns { success: true, listing: {...} }
       // We need to extract the listing data
       const listingData = aiResult.success ? aiResult.listing : aiResult;
-      console.log('Listing Data:', listingData); // Debug log to see what we're setting
+      console.log('Listing Data:', listingData);
       setListingData(listingData);
       
       // Auto-save as draft after AI analysis
