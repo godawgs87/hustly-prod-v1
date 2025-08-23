@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/components/AuthProvider';
@@ -49,6 +49,29 @@ const CreateListingWorking = () => {
   const [listingData, setListingData] = useState<ListingData | null>(null);
   const [shippingCost, setShippingCost] = useState<number | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Cancel any pending API requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      // Clear any pending timeouts
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      // Clean up blob URLs if any
+      photos.forEach(photo => {
+        if (photo instanceof File) {
+          const url = URL.createObjectURL(photo);
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, []);
 
   const handleBack = () => {
     if (mode === 'single') {
@@ -99,10 +122,19 @@ const CreateListingWorking = () => {
   const handleAnalyze = async () => {
     if (photos.length === 0) return;
     
+    // Prevent multiple concurrent analyses
+    if (isAnalyzing) {
+      console.warn('Analysis already in progress');
+      return;
+    }
+    
     setIsAnalyzing(true);
     
+    // Create abort controller for this request
+    abortControllerRef.current = new AbortController();
+    
     // Add timeout protection to prevent stuck states
-    const timeoutId = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       console.error('⏰ Analysis timeout - forcing cleanup');
       setIsAnalyzing(false);
       toast({
@@ -126,7 +158,8 @@ const CreateListingWorking = () => {
       const response = await fetch('https://ekzaaptxfwixgmbrooqr.supabase.co/functions/v1/analyze-photos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photos: photoBase64Array })
+        body: JSON.stringify({ photos: photoBase64Array }),
+        signal: abortControllerRef.current?.signal
       });
       if (!response.ok) throw new Error(`AI analysis failed: ${response.status}`);
       const aiResult = await response.json();
@@ -196,7 +229,12 @@ const CreateListingWorking = () => {
         title: "Analysis Complete",
         description: "Item saved as draft. Review and edit before shipping.",
       });
-    } catch (error) {
+    } catch (error: any) {
+      // Handle abort separately
+      if (error.name === 'AbortError') {
+        console.log('Analysis was cancelled');
+        return;
+      }
       console.error('Analysis failed:', error);
       toast({
         title: "Analysis Failed",
@@ -204,6 +242,11 @@ const CreateListingWorking = () => {
         variant: "destructive",
       });
     } finally {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current); // Clear timeout if analysis completes
+        timeoutRef.current = null;
+      }
+      abortControllerRef.current = null;
       setIsAnalyzing(false);
     }
   };
