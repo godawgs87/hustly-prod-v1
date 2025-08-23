@@ -37,6 +37,7 @@ import { EbayTokenRefreshManager } from '@/utils/ebayTokenRefresh';
 
 // Working CreateListing component that integrates with existing components
 const CreateListingWorking = () => {
+  console.log('[CreateListingWorking] render start v2');
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { toast } = useToast();
@@ -52,9 +53,16 @@ const CreateListingWorking = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Visible debug overlay (temporary)
+  const DebugOverlay = (
+    <div style={{position:'fixed',top:0,left:0,right:0,padding:'8px',background:'rgba(0,0,0,0.8)',color:'#fff',zIndex:9999,textAlign:'center'}}>
+      CreateListingWorking Debug Overlay v2
+    </div>
+  );
+
   // Mount log and cleanup on unmount
   useEffect(() => {
-    console.log('[CreateListingWorking] mounted');
+    console.log('[CreateListingWorking] mounted v2');
     return () => {
       // Cancel any pending API requests
       if (abortControllerRef.current) {
@@ -543,6 +551,7 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
     console.log('[CreateListingWorking] rendering: bulk');
     return (
       <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
+      {DebugOverlay}
       <StreamlinedHeader
         title="Bulk Upload"
         onBack={handleBack}
@@ -563,6 +572,7 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
     console.log('[CreateListingWorking] rendering: single');
     return (
       <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
+      {DebugOverlay}
       <StreamlinedHeader
         title="Create Single Listing"
         onBack={handleBack}
@@ -605,6 +615,7 @@ const handlePriceResearchComplete = (priceData: any, suggestedPrice?: number) =>
   console.log('[CreateListingWorking] rendering: mode selection');
   return (
     <div className={`min-h-screen bg-gray-50 ${isMobile ? 'pb-20' : ''}`}>
+      {DebugOverlay}
       <StreamlinedHeader
         title="Create Listing"
         onBack={() => navigate('/')}
@@ -721,6 +732,17 @@ const AppContent = () => {
         <Route path="/reset-password" element={<PasswordReset />} />
         <Route path="/inventory" element={<ProtectedRoute><SimpleInventoryPage /></ProtectedRoute>} />
         <Route path="/create-listing" element={<ProtectedRoute><CreateListingWorking /></ProtectedRoute>} />
+        <Route
+          path="/create-listing-test"
+          element={
+            <ProtectedRoute>
+              <div style={{padding: 24}}>
+                <h1 style={{fontSize: 24}}>Create Listing Test v1</h1>
+                <p>If you see this, routing and ProtectedRoute are working in production.</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
         <Route path="/active-listings" element={<ProtectedRoute><ActiveListingsWrapper /></ProtectedRoute>} />
         <Route path="/data-management" element={<ProtectedRoute><DataManagementWrapper /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
