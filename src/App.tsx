@@ -52,8 +52,9 @@ const CreateListingWorking = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup on unmount
+  // Mount log and cleanup on unmount
   useEffect(() => {
+    console.log('[CreateListingWorking] mounted');
     return () => {
       // Cancel any pending API requests
       if (abortControllerRef.current) {
