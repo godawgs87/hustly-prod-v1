@@ -145,10 +145,13 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
       isSaving={false} // TODO: wire if needed
       onPhotosChange={files => {
         singleUpload.setPhotos(files);
-        // Always reset to 'analysis' after photos are changed
-        singleUpload.groupPhotos(files);
+        // Don't auto-trigger analysis, wait for user to click Analyze button
       }}
-      onAnalyze={singleUpload.analyzeGroups}
+      onAnalyze={() => {
+        // Group photos first, then analyze
+        singleUpload.groupPhotos(singleUpload.photos);
+        singleUpload.analyzeGroups();
+      }}
       onEdit={() => {
         console.log('🎯 onEdit wrapper called - about to call handleEdit');
         handleEdit();
