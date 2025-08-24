@@ -32,7 +32,7 @@ const mapUnifiedStepToBulkStep = (step: UnifiedUploadStep): StepType => {
   }
 };
 
-export default function CreateListing({ onBack, onViewListings }: CreateListingProps) {
+function CreateListing({ onBack, onViewListings }: CreateListingProps) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { user } = useAuth();
