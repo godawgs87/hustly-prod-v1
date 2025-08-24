@@ -10,6 +10,7 @@ import CreateListingContent from '@/components/create-listing/CreateListingConte
 import CreateListingSteps from '@/components/create-listing/CreateListingSteps';
 import BulkUploadManager from '@/components/bulk-upload/BulkUploadManager';
 import CreateListingModeSelector from '@/components/create-listing/CreateListingModeSelector';
+import { useNavigate } from 'react-router-dom';
 
 interface CreateListingProps {
   onBack: () => void;
@@ -34,7 +35,10 @@ const mapUnifiedStepToBulkStep = (step: UnifiedUploadStep): StepType => {
 const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [uploadMode, setUploadMode] = useState<'single' | 'bulk' | null>(null);
+  const [selectedShipping, setSelectedShipping] = useState<any>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
   
   // Debug logging for authentication state
   console.log('🔍 CreateListing - user:', user);
@@ -46,6 +50,31 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
     onViewListings();
     // You can add logic here if needed after upload completes
     setUploadMode(null);
+  };
+
+  // Handle single item publish with redirect
+  const handleSinglePublish = async () => {
+    console.log('handleSinglePublish called, selectedShipping:', selectedShipping);
+    if (!selectedShipping) {
+      console.log('No shipping selected, returning');
+      // Don't allow publish without shipping selection
+      return;
+    }
+    
+    setIsPublishing(true);
+    try {
+      const success = await singleUpload.postAll();
+      console.log('postAll result:', success);
+      if (success) {
+        // Navigate to inventory manager after successful publish
+        console.log('Publishing successful, navigating to /inventory');
+        navigate('/inventory');
+      }
+    } catch (error) {
+      console.error('Failed to publish:', error);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   // Use unified upload flow for single item mode
@@ -141,8 +170,9 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
       photos={singleUpload.photos}
       isAnalyzing={singleUpload.isAnalyzing}
       listingData={getSingleListingData()}
-      shippingCost={0} // TODO: wire if needed
-      isSaving={false} // TODO: wire if needed
+      shippingCost={selectedShipping?.cost || 0}
+      isSaving={isPublishing}
+      hasSelectedShipping={!!selectedShipping}
       onPhotosChange={files => {
         singleUpload.setPhotos(files);
         // Don't auto-trigger analysis, wait for user to click Analyze button
@@ -157,8 +187,12 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
         handleEdit();
         console.log('🎯 onEdit wrapper - handleEdit completed');
       }}
-      onExport={singleUpload.postAll}
-      onShippingSelect={() => {}} // TODO: wire if needed
+      onExport={handleSinglePublish}
+      onShippingSelect={(option) => {
+        console.log('onShippingSelect called with option:', option);
+        setSelectedShipping(option);
+        console.log('selectedShipping state will be set to:', option);
+      }}
       onListingDataChange={updates => {
         if (singleUpload.photoGroups.length > 0) {
           const group = { ...singleUpload.photoGroups[0], listingData: { ...singleUpload.photoGroups[0].listingData, ...updates } };

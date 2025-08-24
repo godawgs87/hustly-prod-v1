@@ -28,7 +28,7 @@ const ShippingCalculator = ({
   const [isFreeShipping, setIsFreeShipping] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
-  // Automatically call onShippingSelect when Free Shipping is toggled
+  // Automatically call onShippingSelect when Free Shipping or Local Pickup is toggled
   useEffect(() => {
     if (isFreeShipping) {
       const freeShippingOption = {
@@ -37,10 +37,21 @@ const ShippingCalculator = ({
         days: '3-5',
         description: 'Free shipping to buyer'
       };
+      setSelectedOption('Free Shipping');
       onShippingSelect(freeShippingOption);
       console.log('🚚 Free Shipping selected, cost set to 0');
+    } else if (isLocalPickup) {
+      const localPickupOption = {
+        service: 'Local Pickup',
+        cost: 0,
+        days: '0-1',
+        description: 'Free local pickup'
+      };
+      setSelectedOption('Local Pickup');
+      onShippingSelect(localPickupOption);
+      console.log('📍 Local Pickup selected, cost set to 0');
     }
-  }, [isFreeShipping, onShippingSelect]);
+  }, [isFreeShipping, isLocalPickup, onShippingSelect]);
 
   const calculateShipping = () => {
     if (isLocalPickup) {

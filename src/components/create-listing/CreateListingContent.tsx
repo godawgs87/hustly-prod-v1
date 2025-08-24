@@ -31,6 +31,7 @@ interface CreateListingContentProps {
   // Price research props
   onPriceResearchComplete?: (priceData: any, suggestedPrice?: number) => void;
   onSkipPriceResearch?: () => void;
+  hasSelectedShipping?: boolean;
 }
 
 const CreateListingContent = ({
@@ -48,6 +49,7 @@ const CreateListingContent = ({
   onListingDataChange,
   getWeight,
   getDimensions,
+  hasSelectedShipping = false,
   onBack,
   backButtonText,
   onPriceResearchComplete,
@@ -251,8 +253,9 @@ const CreateListingContent = ({
                 </Button>
                 <Button 
                   onClick={onExport}
-                  disabled={isSaving}
-                  className="bg-green-600 hover:bg-green-700"
+                  disabled={isSaving || !hasSelectedShipping}
+                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!hasSelectedShipping ? "Please select a shipping option" : ""}
                 >
                   {isSaving ? (
                     <>

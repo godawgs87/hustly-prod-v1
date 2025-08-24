@@ -238,13 +238,14 @@ export function useUnifiedUploadFlow({ initialPhotos = [], mode, onComplete, shi
         if (result.success) {
           setPhotoGroups(prev => prev.map((g, idx) => idx === 0 ? { ...g, isPosted: true, listingId: result.listingId } : g));
           toast({ title: 'Listing Published', description: 'Your item has been published successfully.' });
+          return true; // Return true for success
         } else {
           throw new Error('Failed to publish listing');
         }
       } catch (error) {
         console.error('❌ Failed to publish listing:', error);
         toast({ title: 'Error', description: 'Failed to publish listing. Please try again.', variant: 'destructive' });
-        return;
+        return false; // Return false for failure
       }
     } else {
       // Bulk upload: save all items as active
@@ -266,8 +267,9 @@ export function useUnifiedUploadFlow({ initialPhotos = [], mode, onComplete, shi
       }));
       toast({ title: 'All Items Posted', description: `${photoGroups.length} items posted successfully.` });
     }
-    onComplete(photoGroups);
-  }, [photoGroups, toast, onComplete, mode, draftId, saveListing]);
+    setCurrentStep('confirmation');
+    return true; // Return true for bulk success
+  }, [mode, draftId, photoGroups, shippingCost, saveListing, toast]);
 
   return {
     currentStep,
