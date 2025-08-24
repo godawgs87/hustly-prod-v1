@@ -57,6 +57,7 @@ const CreateListingContent = ({
 }: CreateListingContentProps) => {
   console.log(' CreateListingContent - currentStep:', currentStep);
   console.log(' CreateListingContent - listingData exists:', !!listingData);
+  console.log(' CreateListingContent - hasSelectedShipping:', hasSelectedShipping);
 
   if (currentStep === 'photos') {
     return (
@@ -254,7 +255,9 @@ const CreateListingContent = ({
                 <Button 
                   onClick={onExport}
                   disabled={isSaving || !hasSelectedShipping}
-                  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`${
+                    !hasSelectedShipping ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                  } text-white disabled:opacity-50`}
                   title={!hasSelectedShipping ? "Please select a shipping option" : ""}
                 >
                   {isSaving ? (

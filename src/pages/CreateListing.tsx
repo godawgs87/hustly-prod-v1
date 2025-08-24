@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth } from '@/components/AuthProvider';
+import { useAuth } from '@/hooks/useAuth';
 import { useUnifiedUploadFlow, UnifiedUploadStep } from '@/hooks/useUnifiedUploadFlow';
 import type { StepType } from '@/components/bulk-upload/components/BulkUploadStepRenderer';
 import StreamlinedHeader from '@/components/StreamlinedHeader';
 import UnifiedMobileNavigation from '@/components/UnifiedMobileNavigation';
-import CreateListingContent from '@/components/create-listing/CreateListingContent';
-import CreateListingSteps from '@/components/create-listing/CreateListingSteps';
-import BulkUploadManager from '@/components/bulk-upload/BulkUploadManager';
-import CreateListingModeSelector from '@/components/create-listing/CreateListingModeSelector';
 import { useNavigate } from 'react-router-dom';
+import { CreateListingContent } from '@/components/create-listing/CreateListingContent';
+import { BulkUploadFlow } from '@/components/bulk-upload/BulkUploadFlow';
+import { Upload, Package } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface CreateListingProps {
   onBack: () => void;
@@ -32,10 +32,11 @@ const mapUnifiedStepToBulkStep = (step: UnifiedUploadStep): StepType => {
   }
 };
 
-const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
+export default function CreateListing({ onBack, onViewListings }: CreateListingProps) {
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const { toast } = useToast();
   const [uploadMode, setUploadMode] = useState<'single' | 'bulk' | null>(null);
   const [selectedShipping, setSelectedShipping] = useState<any>(null);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -56,8 +57,12 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
   const handleSinglePublish = async () => {
     console.log('handleSinglePublish called, selectedShipping:', selectedShipping);
     if (!selectedShipping) {
-      console.log('No shipping selected, returning');
-      // Don't allow publish without shipping selection
+      console.log('No shipping selected, preventing publish');
+      toast({ 
+        title: 'Shipping Required', 
+        description: 'Please select a shipping option before publishing.', 
+        variant: 'destructive' 
+      });
       return;
     }
     
@@ -68,10 +73,19 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
       if (success) {
         // Navigate to inventory manager after successful publish
         console.log('Publishing successful, navigating to /inventory');
-        navigate('/inventory');
+        setTimeout(() => {
+          navigate('/inventory');
+        }, 100);
+      } else {
+        console.log('Publishing failed, staying on page');
       }
     } catch (error) {
       console.error('Failed to publish:', error);
+      toast({ 
+        title: 'Publish Failed', 
+        description: 'Failed to publish listing. Please try again.', 
+        variant: 'destructive' 
+      });
     } finally {
       setIsPublishing(false);
     }
