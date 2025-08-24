@@ -8,8 +8,9 @@ import StreamlinedHeader from '@/components/StreamlinedHeader';
 import UnifiedMobileNavigation from '@/components/UnifiedMobileNavigation';
 import { useNavigate } from 'react-router-dom';
 import CreateListingContent from '@/components/create-listing/CreateListingContent';
+import CreateListingModeSelector from '@/components/create-listing/CreateListingModeSelector';
+import CreateListingSteps from '@/components/create-listing/CreateListingSteps';
 import BulkUploadManager from '@/components/bulk-upload/BulkUploadManager';
-import { Upload, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface CreateListingProps {
@@ -164,31 +165,11 @@ function CreateListing({ onBack, onViewListings }: CreateListingProps) {
         onBack={handleBack}
       />
       
-      <div className="max-w-4xl mx-auto p-4">
-        {uploadMode === null && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-center">Choose Upload Mode</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Button
-                onClick={() => setUploadMode('single')}
-                className="h-32 flex flex-col items-center justify-center gap-2"
-                variant="outline"
-              >
-                <Upload className="h-8 w-8" />
-                <span className="text-lg">Single Item</span>
-                <span className="text-sm text-gray-500">Upload one item at a time</span>
-              </Button>
-              <Button
-                onClick={() => setUploadMode('bulk')}
-                className="h-32 flex flex-col items-center justify-center gap-2"
-                variant="outline"
-              >
-                <Package className="h-8 w-8" />
-                <span className="text-lg">Bulk Upload</span>
-                <span className="text-sm text-gray-500">Upload multiple items</span>
-              </Button>
-            </div>
-          </div>
+      <div className="flex-1 overflow-y-auto">
+        {!uploadMode && (
+          <CreateListingModeSelector
+            onModeSelect={setUploadMode}
+          />
         )}
 
         {uploadMode === 'single' && (
