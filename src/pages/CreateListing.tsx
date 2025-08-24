@@ -8,6 +8,7 @@ import StreamlinedHeader from '@/components/StreamlinedHeader';
 import UnifiedMobileNavigation from '@/components/UnifiedMobileNavigation';
 import { useNavigate } from 'react-router-dom';
 import CreateListingContent from '@/components/create-listing/CreateListingContent';
+import BulkUploadManager from '@/components/bulk-upload/BulkUploadManager';
 import { Upload, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -245,12 +246,14 @@ function CreateListing({ onBack, onViewListings }: CreateListingProps) {
     />
         )}
 
-        {uploadMode === 'bulk' && (
-          <div
-            className="text-center p-8">
-            <p>Bulk upload mode is currently under maintenance</p>
-            <Button onClick={() => setUploadMode(null)} className="mt-4">Back</Button>
-          </div>
+        {uploadMode === 'bulk' && canUseBulkUpload && (
+          <BulkUploadManager
+            onBack={() => setUploadMode(null)}
+            onComplete={(results) => {
+              console.log('Bulk upload completed:', results);
+              navigate('/inventory');
+            }}
+          />
         )}
 
         {uploadMode === 'bulk' && !canUseBulkUpload && (
