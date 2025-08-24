@@ -125,8 +125,8 @@ const PLATFORM_CONFIGS: Record<string, PlatformConfig> = {
       condition: data.condition,
       brand: data.brand,
       category: mapCategoryToWhatnot(data.category),
-      startingBid: Math.floor((data.price || basePrice) * 0.5), // 50% of list price as starting bid
-      buyNowPrice: data.price || basePrice,
+      startingBid: Math.floor((data.price || 0) * 0.5), // 50% of list price as starting bid
+      buyNowPrice: data.price || 0,
       authenticityGuarantee: isAuthenticityEligible(data),
       shippingWeight: data.shipping_weight,
       tags: extractTags(data)
@@ -272,15 +272,15 @@ const UnifiedPlatformMapping: React.FC<UnifiedPlatformMappingProps> = ({
 
   const generatePlatformMappings = (): PlatformMapping[] => {
     return Object.entries(PLATFORM_CONFIGS).map(([key, config]) => {
-      const sellerFees = basePrice * config.feeRate;
-      const priceAfterFees = basePrice - sellerFees;
+      const sellerFees = (listingData.price || 0) * config.feeRate;
+      const priceAfterFees = (listingData.price || 0) - sellerFees;
       
       return {
         platform: config.name,
         platformKey: key,
         icon: config.icon,
         category: getCategoryForPlatform(key, listingData.category, listingData),
-        originalPrice: basePrice,
+        originalPrice: listingData.price || 0,
         sellerFees,
         priceAfterFees,
         platformFields: config.extractFields(listingData),
