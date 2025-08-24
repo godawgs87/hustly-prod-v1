@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/components/AuthProvider';
 import { useUnifiedUploadFlow, UnifiedUploadStep } from '@/hooks/useUnifiedUploadFlow';
 import type { StepType } from '@/components/bulk-upload/components/BulkUploadStepRenderer';
 import StreamlinedHeader from '@/components/StreamlinedHeader';
 import UnifiedMobileNavigation from '@/components/UnifiedMobileNavigation';
 import { useNavigate } from 'react-router-dom';
-import { CreateListingContent } from '@/components/create-listing/CreateListingContent';
-import { BulkUploadFlow } from '@/components/bulk-upload/BulkUploadFlow';
+import CreateListingContent from '@/components/create-listing/CreateListingContent';
 import { Upload, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,12 +19,11 @@ interface CreateListingProps {
 // Map UnifiedUploadStep to StepType for compatibility
 const mapUnifiedStepToBulkStep = (step: UnifiedUploadStep): StepType => {
   switch (step) {
-    case 'photos': return 'upload';
-    case 'grouping': return 'grouping';
-    case 'analysis': return 'analysis';
-    case 'price-research': return 'confirmation'; // Map price-research to confirmation for compatibility
-    case 'edit': return 'confirmation';
-    case 'confirmation': return 'confirmation';
+    case 'upload': return 'upload';
+    case 'analysis': return 'combinedAnalysis';
+    case 'price-research': return 'priceResearch';
+    case 'edit': return 'combinedAnalysis';
+    case 'confirmation': return 'combinedAnalysis';
     case 'shipping': return 'shipping';
     case 'finalReview': return 'finalReview';
     default: return 'upload';
@@ -167,23 +165,37 @@ function CreateListing({ onBack, onViewListings }: CreateListingProps) {
       
       <div className="max-w-4xl mx-auto p-4">
         {uploadMode === null && (
-          <CreateListingModeSelector onModeSelect={setUploadMode} />
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-center">Choose Upload Mode</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button
+                onClick={() => setUploadMode('single')}
+                className="h-32 flex flex-col items-center justify-center gap-2"
+                variant="outline"
+              >
+                <Upload className="h-8 w-8" />
+                <span className="text-lg">Single Item</span>
+                <span className="text-sm text-gray-500">Upload one item at a time</span>
+              </Button>
+              <Button
+                onClick={() => setUploadMode('bulk')}
+                className="h-32 flex flex-col items-center justify-center gap-2"
+                variant="outline"
+              >
+                <Package className="h-8 w-8" />
+                <span className="text-lg">Bulk Upload</span>
+                <span className="text-sm text-gray-500">Upload multiple items</span>
+              </Button>
+            </div>
+          </div>
         )}
 
         {uploadMode === 'single' && (
-  <>
-    {!isMobile && (
-      <CreateListingSteps 
-        currentStep={mapUnifiedStepToBulkStep(singleUpload.currentStep) as any} 
-        photos={singleUpload.photos}
-        listingData={getSingleListingData()}
-      />
-    )}
-    <CreateListingContent
+          <CreateListingContent 
       currentStep={singleUpload.currentStep as any}
       photos={singleUpload.photos}
       isAnalyzing={singleUpload.isAnalyzing}
-      listingData={getSingleListingData()}
+      listingData={getSingleListingData() as any}
       shippingCost={selectedShipping?.cost || 0}
       isSaving={isPublishing}
       hasSelectedShipping={!!selectedShipping}
@@ -231,14 +243,14 @@ function CreateListing({ onBack, onViewListings }: CreateListingProps) {
       onPriceResearchComplete={singleUpload.handlePriceResearchComplete}
       onSkipPriceResearch={singleUpload.handleSkipPriceResearch}
     />
-  </>
-)}
+        )}
 
         {uploadMode === 'bulk' && (
-          <BulkUploadManager
-            onComplete={handleBulkComplete}
-            onBack={() => setUploadMode(null)}
-          />
+          <div
+            className="text-center p-8">
+            <p>Bulk upload mode is currently under maintenance</p>
+            <Button onClick={() => setUploadMode(null)} className="mt-4">Back</Button>
+          </div>
         )}
 
         {uploadMode === 'bulk' && !canUseBulkUpload && (
