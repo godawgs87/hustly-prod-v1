@@ -148,8 +148,8 @@ const CreateListing = ({ onBack, onViewListings }: CreateListingProps) => {
         // Don't auto-trigger analysis, wait for user to click Analyze button
       }}
       onAnalyze={() => {
-        // Group photos first, then analyze
-        singleUpload.groupPhotos(singleUpload.photos);
+        // Don't call groupPhotos, just call analyzeGroups directly
+        // analyzeGroups will handle creating the group if needed
         singleUpload.analyzeGroups();
       }}
       onEdit={() => {

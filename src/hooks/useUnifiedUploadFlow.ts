@@ -71,6 +71,63 @@ export function useUnifiedUploadFlow({ initialPhotos = [], mode, onComplete, shi
   // Use real AI analysis for all groups
   const { analyzePhotos } = usePhotoAnalysis();
   const analyzeGroups = useCallback(async () => {
+    // For single mode, if photoGroups is empty but we have photos, create the group now
+    if (mode === 'single' && photoGroups.length === 0 && photos.length > 0) {
+      const group: PhotoGroup = {
+        id: `group-single-${Date.now()}`,
+        photos: photos,
+        name: 'Single Item',
+        confidence: 'high',
+        status: 'processing',
+        aiSuggestion: undefined,
+      };
+      
+      setPhotoGroups([group]);
+      setIsAnalyzing(true);
+      
+      try {
+        const aiResult = await analyzePhotos(photos);
+        if (aiResult) {
+          setPhotoGroups([{ ...group, status: 'completed' as const, listingData: aiResult }]);
+          
+          // Auto-save as draft after AI analysis
+          try {
+            const saveResult = await saveListing(aiResult, 0, 'draft');
+            if (saveResult.success && saveResult.listingId) {
+              setDraftId(saveResult.listingId);
+              console.log('✅ Auto-saved listing as draft:', saveResult.listingId);
+            }
+          } catch (error) {
+            console.error('❌ Auto-save failed:', error);
+          }
+          
+          setCurrentStep('analysis');
+          toast({ 
+            title: 'AI Analysis Complete', 
+            description: 'Review your listing and pricing.' 
+          });
+        } else {
+          setPhotoGroups([{ ...group, status: 'error' as const }]);
+          toast({ 
+            title: 'Analysis Failed', 
+            description: 'Failed to analyze photos. Please try again.',
+            variant: 'destructive'
+          });
+        }
+      } catch (error) {
+        console.error('Analysis error:', error);
+        setPhotoGroups([{ ...group, status: 'error' as const }]);
+        toast({ 
+          title: 'Analysis Failed', 
+          description: 'An error occurred during analysis.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsAnalyzing(false);
+      }
+      return;
+    }
+    
     setIsAnalyzing(true);
     setPhotoGroups(prev => prev.map(g => ({ ...g, status: 'processing' as const })));
     // Capture a fresh copy of photoGroups after status update
@@ -110,7 +167,7 @@ export function useUnifiedUploadFlow({ initialPhotos = [], mode, onComplete, shi
       title: 'AI Analysis Complete', 
       description: mode === 'single' ? 'Review your listing and pricing.' : 'Review and confirm your items.' 
     });
-  }, [toast, analyzePhotos, mode, saveListing, setDraftId]);
+  }, [toast, analyzePhotos, mode, saveListing, setDraftId, photos, photoGroups]);
 
   // Edit step (for single listing mode)
   const editItem = useCallback((updatedData: ListingData) => {
