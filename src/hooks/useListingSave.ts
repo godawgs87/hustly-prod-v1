@@ -77,7 +77,9 @@ export const useListingSave = () => {
       sku_prefix: listingData.sku_prefix?.trim() || 'SKU',
       // eBay category fields
       ebay_category_id: listingData.ebay_category_id?.trim() || null,
-      ebay_category_path: listingData.ebay_category_path?.trim() || null
+      ebay_category_path: listingData.ebay_category_path?.trim() || null,
+      // Platform categories field for multi-platform support
+      platform_categories: listingData.platform_categories || null
     };
 
     // Calculate financial metrics
@@ -137,7 +139,9 @@ export const useListingSave = () => {
         sku_prefix: listingData.sku_prefix?.trim() || 'SKU',
         // eBay category fields
         ebay_category_id: listingData.ebay_category_id?.trim() || null,
-        ebay_category_path: listingData.ebay_category_path?.trim() || null
+        ebay_category_path: listingData.ebay_category_path?.trim() || null,
+        // Platform categories field for multi-platform support
+        platform_categories: listingData.platform_categories || null
       };
 
       // Calculate financial metrics

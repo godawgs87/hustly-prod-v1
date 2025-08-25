@@ -37,11 +37,18 @@ export class EbayTradingService {
         timestamp: new Date().toISOString()
       });
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase.functions.invoke('ebay-trading-api', {
         body: {
-          action: 'create_listing',
+          action: 'addFixedPriceItem',
+          userId: user.id,
           listingId,
-          listingData
+          listing: listingData
         }
       });
 
@@ -76,12 +83,19 @@ export class EbayTradingService {
         timestamp: new Date().toISOString()
       });
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase.functions.invoke('ebay-trading-api', {
         body: {
-          action: 'update_listing',
+          action: 'updateFixedPriceItem',
+          userId: user.id,
           itemId,
           listingId,
-          listingData
+          listing: listingData
         }
       });
 
@@ -117,9 +131,16 @@ export class EbayTradingService {
         timestamp: new Date().toISOString()
       });
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase.functions.invoke('ebay-trading-api', {
         body: {
-          action: 'end_listing',
+          action: 'endFixedPriceItem',
+          userId: user.id,
           itemId,
           listingId,
           reason

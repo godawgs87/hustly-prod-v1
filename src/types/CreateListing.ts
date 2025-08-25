@@ -87,6 +87,19 @@ export interface ListingData {
   depop_category_path?: string;
   facebook_category_id?: string;
   facebook_category_path?: string;
+  // Multi-platform category support
+  platform_categories?: {
+    ebay?: {
+      category_id: string;
+      category_name: string;
+      is_leaf: boolean;
+      path: string[];
+    };
+    poshmark?: any;
+    mercari?: any;
+    depop?: any;
+    facebook?: any;
+  };
 }
 
 export interface CreateListingState {

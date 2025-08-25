@@ -28,9 +28,11 @@ const ShippingCalculator = ({
   const [isFreeShipping, setIsFreeShipping] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
-  // Automatically call onShippingSelect when Free Shipping or Local Pickup is toggled
-  useEffect(() => {
-    if (isFreeShipping) {
+  // Handle shipping selection when checkboxes change
+  const handleFreeShippingChange = (checked: boolean) => {
+    setIsFreeShipping(checked);
+    if (checked) {
+      setIsLocalPickup(false);
       const freeShippingOption = {
         service: 'Free Shipping',
         cost: 0,
@@ -40,7 +42,17 @@ const ShippingCalculator = ({
       setSelectedOption('Free Shipping');
       onShippingSelect(freeShippingOption);
       console.log('🚚 Free Shipping selected, cost set to 0');
-    } else if (isLocalPickup) {
+    } else if (selectedOption === 'Free Shipping') {
+      setSelectedOption(null);
+      onShippingSelect(null);
+      console.log('❌ Free Shipping deselected');
+    }
+  };
+
+  const handleLocalPickupChange = (checked: boolean) => {
+    setIsLocalPickup(checked);
+    if (checked) {
+      setIsFreeShipping(false);
       const localPickupOption = {
         service: 'Local Pickup',
         cost: 0,
@@ -50,13 +62,12 @@ const ShippingCalculator = ({
       setSelectedOption('Local Pickup');
       onShippingSelect(localPickupOption);
       console.log('📍 Local Pickup selected, cost set to 0');
-    } else if (!isFreeShipping && !isLocalPickup && selectedOption && (selectedOption === 'Free Shipping' || selectedOption === 'Local Pickup')) {
-      // If both checkboxes are unchecked and we had one of them selected, clear the selection
+    } else if (selectedOption === 'Local Pickup') {
       setSelectedOption(null);
       onShippingSelect(null);
-      console.log('❌ Shipping selection cleared');
+      console.log('❌ Local Pickup deselected');
     }
-  }, [isFreeShipping, isLocalPickup, selectedOption, onShippingSelect]);
+  };
 
   const calculateShipping = () => {
     if (isLocalPickup) {
@@ -125,12 +136,7 @@ const ShippingCalculator = ({
         <Checkbox 
           id="local-pickup"
           checked={isLocalPickup}
-          onCheckedChange={(checked) => {
-            setIsLocalPickup(checked as boolean);
-            if (!checked) {
-              setIsFreeShipping(false);
-            }
-          }}
+          onCheckedChange={(checked) => handleLocalPickupChange(checked as boolean)}
         />
         <div>
           <Label htmlFor="local-pickup" className="text-sm font-medium">
@@ -145,12 +151,7 @@ const ShippingCalculator = ({
         <Checkbox 
           id="free-shipping"
           checked={isFreeShipping}
-          onCheckedChange={(checked) => {
-            setIsFreeShipping(checked as boolean);
-            if (!checked) {
-              setIsLocalPickup(false);
-            }
-          }}
+          onCheckedChange={(checked) => handleFreeShippingChange(checked as boolean)}
         />
         <div>
           <Label htmlFor="free-shipping" className="text-sm font-medium">

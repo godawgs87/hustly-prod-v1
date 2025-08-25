@@ -22,10 +22,10 @@ import AuthWrapper from '@/components/wrappers/AuthWrapper';
 import ActiveListingsWrapper from '@/components/wrappers/ActiveListingsWrapper';
 import DataManagementWrapper from '@/components/wrappers/DataManagementWrapper';
 import UniversalOnboardingFlow from '@/components/onboarding/UniversalOnboardingFlow';
+import { useOnboardingStatus } from '@/hooks/useOnboardingStatus';
 
 const AppContent = () => {
-  const needsOnboarding = false;
-  const markOnboardingComplete = () => {};
+  const { needsOnboarding, markOnboardingComplete } = useOnboardingStatus();
 
   return (
     <div className="min-h-screen bg-gray-50">

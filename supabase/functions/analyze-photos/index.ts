@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { analyzePhotosWithOpenAI } from './utils/openaiClient.ts';
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // DEBUG: Print the value of the OpenAI API key in the deployed environment
 // Force redeploy: 2025-07-19 20:23
@@ -129,10 +130,62 @@ serve(async (req) => {
     const listingData = await analyzePhotosWithOpenAI(openAIApiKey, base64Images);
 
     console.log('Analysis completed successfully');
+    console.log('Fetching eBay category for listing...');
+    
+    // Fetch eBay category if we have title and description
+    let platformCategories = null;
+    if (listingData?.title || listingData?.description) {
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get("SUPABASE_URL") ?? "",
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+        );
+        
+        // Check if eBay is connected
+        const { data: ebaySettings } = await supabaseClient
+          .from('ebay_settings')
+          .select('access_token')
+          .single();
+        
+        if (ebaySettings?.access_token) {
+          // Call our category service
+          const categoryResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ebay-category-service`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({
+              action: 'suggest',
+              title: listingData.title,
+              description: listingData.description
+            })
+          });
+          
+          if (categoryResponse.ok) {
+            const categoryData = await categoryResponse.json();
+            if (categoryData.success && categoryData.category) {
+              platformCategories = {
+                ebay: categoryData.category
+              };
+              console.log('eBay category found:', categoryData.category);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching eBay category:', error);
+        // Continue without category - not critical for analysis
+      }
+    }
+    
+    // Add platform categories to listing data if found
+    const enhancedListingData = platformCategories 
+      ? { ...listingData, platform_categories: platformCategories }
+      : listingData;
 
     return new Response(JSON.stringify({ 
       success: true, 
-      listing: listingData 
+      listing: enhancedListingData 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

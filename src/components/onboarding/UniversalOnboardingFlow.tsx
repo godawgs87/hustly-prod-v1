@@ -199,7 +199,10 @@ const UniversalOnboardingFlow = ({ isOpen, onComplete }: UniversalOnboardingFlow
       case 'welcome':
         return true;
       case 'business':
-        return businessData.business_name && businessData.shipping_city;
+        // Business name is optional for individuals
+        const isIndividual = businessData.business_type === 'individual' || businessData.business_type === 'sole_proprietorship';
+        const hasRequiredBusinessName = isIndividual || businessData.business_name;
+        return businessData.contact_name && hasRequiredBusinessName && businessData.shipping_address_line1 && businessData.shipping_city;
       case 'platforms':
         return selectedPlatforms.length > 0;
       case 'setup':

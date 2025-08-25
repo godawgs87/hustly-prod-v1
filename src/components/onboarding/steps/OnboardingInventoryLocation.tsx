@@ -99,11 +99,13 @@ const OnboardingInventoryLocation = ({ businessData, selectedPlatforms }: Onboar
         <CardContent className="space-y-4">
           <div className="bg-gray-50 p-3 rounded-lg">
             <h4 className="font-medium text-gray-900 mb-1">
-              {businessData.business_name || 'Your Business'}
+              {businessData.business_name || businessData.contact_name || 'Your Business'}
             </h4>
             <p className="text-sm text-gray-600">
-              {businessData.shipping_address_line1}<br />
-              {businessData.shipping_city}, {businessData.shipping_state} {businessData.shipping_postal_code}
+              {businessData.shipping_address_line1 || 'Address not provided'}<br />
+              {businessData.shipping_city && businessData.shipping_state ? 
+                `${businessData.shipping_city}, ${businessData.shipping_state} ${businessData.shipping_postal_code || ''}` :
+                'City, State not provided'}
             </p>
           </div>
 
